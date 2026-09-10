@@ -8,7 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>FlexHub</AssemblyName>
     <RootNamespace>PersonalAppsHub</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
     <Company>Flexron</Company>
     <Product>FlexHub</Product>
     <Description>Hub Windows regroupant des outils personnels et des profils NVIDIA.</Description>

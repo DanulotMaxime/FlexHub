@@ -157,6 +157,7 @@ public partial class MainWindow : Window
             _initialXmpCheckDone = true;
             ShowMemorySetupIfNeeded();
             if (_settings.XmpMonitorEnabled) await CheckXmpAsync(false);
+            await CheckForUpdatesAtStartupAsync();
         };
         Closing += OnClosing;
         ConfigureReminderTimer();
@@ -1247,6 +1248,31 @@ public partial class MainWindow : Window
         catch (TaskCanceledException) { UpdateStatus.Text = "La vérification a dépassé le délai autorisé."; }
         catch (Exception ex) { UpdateStatus.Text = $"Vérification impossible : {ex.Message}"; }
         finally { CheckUpdates.IsEnabled = true; }
+    }
+
+    private async Task CheckForUpdatesAtStartupAsync()
+    {
+        try
+        {
+            _availableUpdate = await _updateService.CheckAsync();
+            if (!_availableUpdate.IsNewer) return;
+
+            var choice = System.Windows.MessageBox.Show(
+                this,
+                $"Une nouvelle version de FlexHub est disponible : {_availableUpdate.LatestVersion}.\n\nVoulez-vous la télécharger et l’installer maintenant ?",
+                "Mise à jour de FlexHub",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Information);
+            if (choice != MessageBoxResult.Yes) return;
+
+            UpdateStatus.Text = $"Téléchargement de FlexHub {_availableUpdate.LatestVersion}…";
+            await _updateService.DownloadAndStartInstallerAsync(_availableUpdate);
+            ExitHub();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write($"Vérification automatique des mises à jour impossible : {ex.Message}");
+        }
     }
 
     private void OpenSelectedPatchNotes()
