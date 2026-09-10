@@ -28,6 +28,15 @@ FlexHub permet notamment de :
 
 FlexHub contient les composants .NET nécessaires et fonctionne sur Windows 64 bits.
 
+## Recommandations de base gratuites
+
+Pour utiliser facilement les fonctions de texte de FlexHub, nous recommandons :
+
+- **Gemini** pour la correction et la génération de réponses : créez gratuitement un compte Gemini, générez une clé API, puis renseignez-la dans les paramètres de FlexHub ;
+- **MyMemory** pour la traduction : aucune inscription ni clé API n'est nécessaire, sélectionnez simplement l'option **MyMemory** dans le traducteur.
+
+Pensez également à bien configurer le **raccourci de la roue d'actions** dans les paramètres. Un raccourci facile à retenir permet d'ouvrir rapidement la roue et simplifie considérablement l'utilisation de FlexHub.
+
 ## Confidentialité
 
 Les réglages et les clés API sont enregistrés localement sur l'ordinateur. Les clés API personnelles ne sont pas incluses dans le projet GitHub.
