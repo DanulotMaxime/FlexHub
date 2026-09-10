@@ -26,12 +26,12 @@ Avant le commit, vérifier que `publish`, `artifacts`, les sauvegardes NVIDIA et
 
 ## 3. Créer le dépôt GitHub
 
-Créer un dépôt vide, privé dans un premier temps, sans ajouter automatiquement de README, de licence ou de `.gitignore`.
+Créer un dépôt vide et public, sans ajouter automatiquement de README, de licence ou de `.gitignore`.
 
 Puis connecter le dépôt en remplaçant l'adresse ci-dessous :
 
 ```powershell
-git remote add origin https://github.com/Flexron/FlexHub.git
+git remote add origin https://github.com/DanulotMaxime/FlexHub.git
 git push -u origin main
 ```
 

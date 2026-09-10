@@ -3,13 +3,12 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace PersonalAppsHub.Services;
 
 public sealed class UpdateService
 {
-    private static readonly Regex RepositoryPattern = new("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", RegexOptions.Compiled);
+    public const string GitHubRepository = "DanulotMaxime/FlexHub";
     private readonly HttpClient _client = new() { Timeout = TimeSpan.FromSeconds(15) };
 
     public static string CurrentVersion =>
@@ -17,13 +16,9 @@ public sealed class UpdateService
         ?? Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3)
         ?? "0.0.0";
 
-    public async Task<UpdateCheckResult> CheckAsync(string repository, CancellationToken cancellationToken = default)
+    public async Task<UpdateCheckResult> CheckAsync(CancellationToken cancellationToken = default)
     {
-        repository = repository.Trim();
-        if (!RepositoryPattern.IsMatch(repository))
-            throw new InvalidOperationException("Indiquez le dépôt GitHub au format propriétaire/dépôt dans la page Version.");
-
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.github.com/repos/{repository}/releases/latest");
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.github.com/repos/{GitHubRepository}/releases/latest");
         request.Headers.UserAgent.Add(new ProductInfoHeaderValue("FlexHub", CurrentVersion));
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
         using var response = await _client.SendAsync(request, cancellationToken);
@@ -34,7 +29,7 @@ public sealed class UpdateService
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
         var root = document.RootElement;
         var tag = root.GetProperty("tag_name").GetString()?.TrimStart('v', 'V') ?? "0.0.0";
-        var page = root.GetProperty("html_url").GetString() ?? $"https://github.com/{repository}/releases/latest";
+        var page = root.GetProperty("html_url").GetString() ?? $"https://github.com/{GitHubRepository}/releases/latest";
         var notes = root.TryGetProperty("body", out var body) ? body.GetString() ?? "" : "";
         var isNewer = IsNewerVersion(CurrentVersion, tag);
         return new UpdateCheckResult(isNewer, tag, page, notes);

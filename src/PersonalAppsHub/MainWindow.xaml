@@ -227,10 +227,7 @@
                 <ComboBox x:Name="VersionHistoryBox" MinWidth="220"/>
                 <Button x:Name="OpenPatchNotes" Grid.Column="1" Content="Voir le patchnote" Style="{StaticResource ButtonStyle}" Margin="10,0,0,0"/>
               </Grid>
-              <TextBlock Text="Dépôt GitHub des mises à jour" FontWeight="SemiBold"/>
-              <TextBlock Text="Format : propriétaire/dépôt. Ce champ sera conservé sur cet ordinateur." Foreground="{DynamicResource MutedBrush}" FontSize="12" Margin="0,4,0,7"/>
-              <TextBox x:Name="GitHubRepositoryBox"/>
-              <TextBlock Text="Éditeur : Flexron" Margin="0,14,0,0" FontWeight="SemiBold"/>
+              <TextBlock Text="Éditeur : Flexron" FontWeight="SemiBold"/>
               <TextBlock Text="Support : retrouvez-moi sur Discord — pseudo Flexron" Foreground="{DynamicResource MutedBrush}" Margin="0,5,0,12"/>
               <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <TextBlock x:Name="UpdateStatus" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource SuccessBrush}" Margin="0,0,12,0"/>

@@ -226,7 +226,6 @@ public partial class MainWindow : Window
         FontSizeBox.SelectedIndex = _settings.FontSizePreference switch { "Petit" => 0, "Grand" => 2, _ => 1 };
         ThemeBox.SelectedIndex = _settings.ThemePreference == "Clair" ? 1 : 0;
         AiConsentCheck.IsChecked = _settings.AiPrivacyConsentAccepted;
-        GitHubRepositoryBox.Text = _settings.GitHubRepository;
         CurrentVersionText.Text = $"FlexHub {UpdateService.CurrentVersion}";
         var changelogPath = Path.Combine(AppContext.BaseDirectory, "CHANGELOG.md");
         var versionNotes = ChangelogService.Load(changelogPath);
@@ -255,8 +254,6 @@ public partial class MainWindow : Window
         _settings.FontSizePreference = (FontSizeBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Content?.ToString() ?? "Moyen";
         _settings.ThemePreference = (ThemeBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Content?.ToString() ?? "Sombre";
         _settings.AiPrivacyConsentAccepted = AiConsentCheck.IsChecked == true;
-        _settings.GitHubRepository = GitHubRepositoryBox.Text.Trim();
-
         try
         {
             SaveApiKeyFromSettings("OpenAI", GeneralOpenAiKeyBox);
@@ -1237,10 +1234,9 @@ public partial class MainWindow : Window
             CheckUpdates.IsEnabled = false;
             DownloadUpdate.Visibility = Visibility.Collapsed;
             UpdateStatus.Text = "Recherche d’une nouvelle version…";
-            _settings.GitHubRepository = GitHubRepositoryBox.Text.Trim();
             _settings.LastUpdateCheckUtc = DateTime.UtcNow;
             _settingsService.Save(_settings);
-            _availableUpdate = await _updateService.CheckAsync(_settings.GitHubRepository);
+            _availableUpdate = await _updateService.CheckAsync();
             if (_availableUpdate.IsNewer)
             {
                 UpdateStatus.Text = $"Version {_availableUpdate.LatestVersion} disponible.";

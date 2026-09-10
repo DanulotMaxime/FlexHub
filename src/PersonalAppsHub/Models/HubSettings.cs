@@ -51,6 +51,5 @@ public sealed class HubSettings
     public int XmpExpectedSpeed { get; set; } = 3200;
     public DateTime? LastXmpCheckUtc { get; set; }
     public bool AiPrivacyConsentAccepted { get; set; }
-    public string GitHubRepository { get; set; } = "";
     public DateTime? LastUpdateCheckUtc { get; set; }
 }
