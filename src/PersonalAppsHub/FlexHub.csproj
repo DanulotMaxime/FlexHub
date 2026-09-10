@@ -27,7 +27,7 @@
   <ItemGroup>
     <Content Include="..\..\tools\nvidia-profile-inspector\nvidiaProfileInspector.exe" Link="Tools\nvidiaProfileInspector.exe" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\tools\nvidia-profile-inspector\Reference.xml" Link="Tools\Reference.xml" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="..\..\nvidia-profiles\baseline-20260909-194729\NVIDIA-Global-Profile-Baseline.nip" Link="Profiles\NVIDIA-Global-Profile-Baseline.nip" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\nvidia-profiles\NVIDIA-Global-Profile-Baseline.nip" Link="Profiles\NVIDIA-Global-Profile-Baseline.nip" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\nvidia-profiles\NVIDIA-Optimization-RTX-5080-5070.nip" Link="Profiles\NVIDIA-Optimization-RTX-5080-5070.nip" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\nvidia-profiles\NVIDIA-Optimization-RTX-5060-5050.nip" Link="Profiles\NVIDIA-Optimization-RTX-5060-5050.nip" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\nvidia-profiles\NVIDIA-Optimization-RTX-4080-4070.nip" Link="Profiles\NVIDIA-Optimization-RTX-4080-4070.nip" CopyToOutputDirectory="PreserveNewest" />
