@@ -41,4 +41,6 @@ jobs:
         run: |
           $version = "${{ github.ref_name }}".TrimStart("v")
           $installer = ".\artifacts\installer\FlexHub-Setup-$version-x64.exe"
-          gh release create "${{ github.ref_name }}" $installer --generate-notes --verify-tag
+          $stableInstaller = ".\artifacts\installer\FlexHub-Setup-x64.exe"
+          Copy-Item -LiteralPath $installer -Destination $stableInstaller
+          gh release create "${{ github.ref_name }}" $stableInstaller --generate-notes --verify-tag
