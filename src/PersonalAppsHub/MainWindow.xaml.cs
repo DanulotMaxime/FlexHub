@@ -15,6 +15,7 @@ namespace PersonalAppsHub;
 
 public partial class MainWindow : Window
 {
+    private const string TipeeeUrl = "https://fr.tipeee.com/flexhub-applications-by-flexron/";
     private readonly SettingsService _settingsService = new();
     private readonly CorrectionService _correctionService = new();
     private readonly TranslationService _translationService = new();
@@ -83,6 +84,7 @@ public partial class MainWindow : Window
         ActionWheelNav.Click += (_, _) => ShowPage("actionWheel");
         NvidiaNav.Click += (_, _) => ShowPage("nvidia");
         XmpNav.Click += (_, _) => ShowPage("xmp");
+        TipeeeButton.Click += (_, _) => OpenTipeeePage();
         GeneralSettingsButton.Click += (_, _) => ShowPage("general");
         HideHubButton.Click += (_, _) => Hide();
         QuitHubButton.Click += (_, _) => ExitHub();
@@ -1298,6 +1300,7 @@ public partial class MainWindow : Window
         ConfigureReminderTimer();
     }
     private void ShowTrayMessage(string title, string text, int timeout = 5000, Action? clickAction = null) { _balloonClickAction = clickAction; _tray.BalloonTipTitle = title; _tray.BalloonTipText = text; _tray.ShowBalloonTip(timeout); }
+    private void OpenTipeeePage() { try { Process.Start(new ProcessStartInfo(TipeeeUrl) { UseShellExecute = true }); } catch (Exception ex) { AppLog.Write($"Ouverture de Tipeee impossible : {ex.Message}"); } }
     private void OpenReminderUrl() { try { Process.Start(new ProcessStartInfo(_settings.ReminderUrl) { UseShellExecute = true }); } catch { } }
     private static bool IsHttpUrl(string value) => Uri.TryCreate(value.Trim(), UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https";
     private static void ShowVisibleMessage(string title, string message)

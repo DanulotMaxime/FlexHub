@@ -6,8 +6,9 @@
     <Border Grid.Row="0" Background="{DynamicResource HeaderBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
       <Grid Margin="24,0"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
         <Border Width="60" Height="60" CornerRadius="30" BorderBrush="{StaticResource AccentBrightBrush}" BorderThickness="2" ClipToBounds="True"><Image x:Name="HeaderLogo" Stretch="UniformToFill"/></Border>
-        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0"><TextBlock FontSize="23" FontWeight="SemiBold"><Run Text="Mes "/><Run Text="applications" Foreground="{StaticResource AccentBrightBrush}"/></TextBlock><TextBlock Text="S I M P L E   •   U T I L E   •   E F F I C A C E" Foreground="{StaticResource MutedBrush}" FontSize="10" Margin="0,5,0,0"/></StackPanel>
+        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0"><TextBlock Text="FlexHub" FontSize="23" FontWeight="SemiBold"/><TextBlock Text="S I M P L E   •   U T I L E   •   E F F I C A C E" Foreground="{StaticResource MutedBrush}" FontSize="10" Margin="0,5,0,0"/></StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+          <Button x:Name="TipeeeButton" Content="&#x2665;" ToolTip="Soutenir FlexHub sur Tipeee" Style="{StaticResource HeaderIconButtonStyle}" Foreground="#FFE85D75" FontSize="21" Margin="0,0,7,0"/>
           <Button x:Name="GeneralSettingsButton" Content="⚙" ToolTip="Paramètres généraux" Style="{StaticResource HeaderIconButtonStyle}" Margin="0,0,7,0"/>
           <Button x:Name="HideHubButton" Content="—" ToolTip="Réduire dans la zone de notification" Style="{StaticResource HeaderIconButtonStyle}" FontSize="22" Margin="0,0,7,0"/>
           <Button x:Name="QuitHubButton" Content="✕" ToolTip="Quitter complètement le Hub" Style="{StaticResource CloseButtonStyle}"/>
