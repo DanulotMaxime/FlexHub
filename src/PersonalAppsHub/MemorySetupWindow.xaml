@@ -1,0 +1,23 @@
+<Window x:Class="PersonalAppsHub.MemorySetupWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Configuration de la mémoire" Width="520" Height="390" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" Background="{DynamicResource PanelBrush}" Foreground="{DynamicResource TextBrush}">
+  <Grid Margin="28">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <TextBlock Text="Configuration de la mémoire" FontSize="25" FontWeight="SemiBold"/>
+    <TextBlock Grid.Row="1" Margin="0,8,0,22" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}" Text="Choisissez votre génération de mémoire. La surveillance reste facultative et pourra être modifiée ensuite."/>
+    <StackPanel Grid.Row="2">
+      <RadioButton x:Name="Ddr4Option" Foreground="{DynamicResource TextBrush}" Content="DDR4 — plage habituelle XMP : 3200 à 3600 MT/s" IsChecked="True" Margin="0,0,0,12"/>
+      <RadioButton x:Name="Ddr5Option" Foreground="{DynamicResource TextBrush}" Content="DDR5 — plage habituelle XMP : 5800 à 7400 MT/s"/>
+    </StackPanel>
+    <StackPanel Grid.Row="3" Margin="0,22,0,0">
+      <CheckBox x:Name="CustomSpeedCheck" Foreground="{DynamicResource TextBrush}" Content="Utiliser une valeur minimale personnalisée" Checked="CustomSpeedChanged" Unchecked="CustomSpeedChanged"/>
+      <TextBox x:Name="CustomSpeedBox" Margin="24,9,0,0" Width="180" HorizontalAlignment="Left" IsEnabled="False" Text="3200"/>
+    </StackPanel>
+    <CheckBox x:Name="EnableMonitoringCheck" Foreground="{DynamicResource TextBrush}" Grid.Row="4" Content="Activer la surveillance XMP" IsChecked="True" VerticalAlignment="Bottom" Margin="0,0,0,18"/>
+    <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right">
+      <Button x:Name="ConfirmButton" Content="Continuer" Style="{StaticResource PrimaryButtonStyle}" Click="ConfirmButton_OnClick"/>
+    </StackPanel>
+  </Grid>
+</Window>

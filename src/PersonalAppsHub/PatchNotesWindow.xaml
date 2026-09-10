@@ -1,0 +1,13 @@
+<Window x:Class="PersonalAppsHub.PatchNotesWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Notes de version" Width="900" Height="680" MinWidth="700" MinHeight="520"
+        WindowStartupLocation="CenterOwner" Background="{DynamicResource PanelBrush}" Foreground="{DynamicResource TextBrush}">
+  <Grid Margin="24">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <TextBlock x:Name="VersionTitle" FontSize="25" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
+    <TextBlock Grid.Row="1" Text="Modifications incluses dans cette version" Foreground="{DynamicResource MutedBrush}" Margin="0,6,0,16"/>
+    <TextBox x:Name="NotesText" Grid.Row="2" Height="Auto" MinHeight="360" Padding="18" IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True" VerticalContentAlignment="Top" VerticalScrollBarVisibility="Auto" Foreground="{DynamicResource TextBrush}"/>
+    <Button x:Name="CloseButton" Grid.Row="3" Content="Fermer" Style="{StaticResource PrimaryButtonStyle}" HorizontalAlignment="Right" Margin="0,16,0,0"/>
+  </Grid>
+</Window>

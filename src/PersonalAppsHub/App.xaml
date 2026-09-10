@@ -1,0 +1,117 @@
+<Application x:Class="PersonalAppsHub.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+  <Application.Resources>
+    <SolidColorBrush x:Key="BackgroundBrush" Color="#FF0E0F0F"/>
+    <SolidColorBrush x:Key="PanelBrush" Color="#FF1A1918"/>
+    <SolidColorBrush x:Key="PanelLightBrush" Color="#FF24211F"/>
+    <SolidColorBrush x:Key="AccentBrush" Color="#FFD58B4C"/>
+    <SolidColorBrush x:Key="AccentBrightBrush" Color="#FFF0AE72"/>
+    <SolidColorBrush x:Key="TextBrush" Color="#FFF7F3EF"/>
+    <SolidColorBrush x:Key="MutedBrush" Color="#FFBDB7B2"/>
+    <SolidColorBrush x:Key="HeaderBrush" Color="#FF151515"/>
+    <SolidColorBrush x:Key="SidebarBrush" Color="#FF141414"/>
+    <SolidColorBrush x:Key="FieldBrush" Color="#FF111212"/>
+    <SolidColorBrush x:Key="ComboBrush" Color="#FF2A2420"/>
+    <SolidColorBrush x:Key="ComboPopupBrush" Color="#FF211D1A"/>
+    <SolidColorBrush x:Key="ButtonBrush" Color="#FF28231F"/>
+    <SolidColorBrush x:Key="HoverBrush" Color="#FF3B2D23"/>
+    <SolidColorBrush x:Key="BorderBrush" Color="#FF554D47"/>
+    <SolidColorBrush x:Key="SeparatorBrush" Color="#FF4A4039"/>
+    <SolidColorBrush x:Key="DisabledTextBrush" Color="#FF8E8883"/>
+    <SolidColorBrush x:Key="SuccessBrush" Color="#FF7CE4C2"/>
+    <SolidColorBrush x:Key="ToggleOffBrush" Color="#FF49433E"/>
+    <SolidColorBrush x:Key="ToggleThumbBrush" Color="#FFFFDFC0"/>
+    <sys:Double x:Key="BaseFontSize">14</sys:Double>
+    <sys:Double x:Key="ControlFontSize">14</sys:Double>
+
+    <Style TargetType="TextBlock"><Setter Property="FontFamily" Value="Segoe UI"/><Setter Property="FontSize" Value="{DynamicResource BaseFontSize}"/></Style>
+    <Style TargetType="TextBox">
+      <Setter Property="Height" Value="42"/><Setter Property="Padding" Value="12,8"/>
+      <Setter Property="FontSize" Value="{DynamicResource ControlFontSize}"/><Setter Property="FontFamily" Value="Segoe UI"/>
+      <Setter Property="Background" Value="{DynamicResource FieldBrush}"/><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="CaretBrush" Value="{DynamicResource AccentBrightBrush}"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+    <Style TargetType="ComboBox">
+      <Setter Property="Height" Value="42"/><Setter Property="Padding" Value="10,6"/>
+      <Setter Property="FontSize" Value="{DynamicResource ControlFontSize}"/><Setter Property="FontFamily" Value="Segoe UI"/>
+      <Setter Property="Background" Value="{DynamicResource ComboBrush}"/><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBox">
+        <Grid>
+          <ToggleButton x:Name="Toggle" Focusable="False" Foreground="{DynamicResource TextBrush}" ClickMode="Press" IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+            <ToggleButton.Template><ControlTemplate TargetType="ToggleButton">
+              <Border x:Name="ComboBorder" Background="{DynamicResource ComboBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8">
+                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="38"/></Grid.ColumnDefinitions>
+                  <ContentPresenter Margin="12,0,5,0" VerticalAlignment="Center" TextElement.Foreground="{DynamicResource TextBrush}" Content="{Binding SelectionBoxItem, RelativeSource={RelativeSource AncestorType=ComboBox}}" ContentTemplate="{Binding SelectionBoxItemTemplate, RelativeSource={RelativeSource AncestorType=ComboBox}}"/>
+                  <TextBlock Grid.Column="1" Text="⌄" Foreground="#FFF0AE72" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Grid>
+              </Border>
+              <ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ComboBorder" Property="Background" Value="{DynamicResource HoverBrush}"/></Trigger></ControlTemplate.Triggers>
+            </ControlTemplate></ToggleButton.Template>
+          </ToggleButton>
+          <Popup x:Name="Popup" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" AllowsTransparency="True" Focusable="False" PopupAnimation="Fade">
+            <Border Background="{DynamicResource ComboPopupBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" MinWidth="{TemplateBinding ActualWidth}" Padding="3">
+              <ScrollViewer><StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/></ScrollViewer>
+            </Border>
+          </Popup>
+        </Grid>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style TargetType="ComboBoxItem">
+      <Setter Property="Background" Value="{DynamicResource ComboPopupBrush}"/><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+      <Setter Property="Padding" Value="10,7"/><Setter Property="FontFamily" Value="Segoe UI"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBoxItem">
+        <Border x:Name="ItemBorder" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}"><ContentPresenter/></Border>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="ItemBorder" Property="Background" Value="#FF4A3425"/></Trigger>
+          <Trigger Property="IsSelected" Value="True"><Setter TargetName="ItemBorder" Property="Background" Value="#FFD58B4C"/></Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style TargetType="PasswordBox">
+      <Setter Property="Background" Value="{DynamicResource FieldBrush}"/><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="CaretBrush" Value="{DynamicResource AccentBrightBrush}"/>
+      <Setter Property="FontFamily" Value="Segoe UI"/><Setter Property="FontSize" Value="{DynamicResource ControlFontSize}"/>
+    </Style>
+    <Style x:Key="ButtonStyle" TargetType="Button">
+      <Setter Property="Background" Value="{DynamicResource ButtonBrush}"/><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="Padding" Value="18,11"/>
+      <Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
+        <Border x:Name="B" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="{TemplateBinding Padding}">
+          <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
+        <ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="B" Property="Background" Value="{DynamicResource HoverBrush}"/></Trigger></ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
+      <Setter Property="Background" Value="{StaticResource AccentBrush}"/><Setter Property="BorderBrush" Value="{StaticResource AccentBrightBrush}"/>
+    </Style>
+    <Style x:Key="HeaderIconButtonStyle" TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
+      <Setter Property="Width" Value="42"/><Setter Property="Height" Value="42"/><Setter Property="Padding" Value="0"/>
+      <Setter Property="FontSize" Value="19"/><Setter Property="FontFamily" Value="Segoe UI Symbol"/>
+    </Style>
+    <Style x:Key="CloseButtonStyle" TargetType="Button" BasedOn="{StaticResource HeaderIconButtonStyle}">
+      <Setter Property="Foreground" Value="#FFFF6B6B"/><Setter Property="BorderBrush" Value="#FF9D4545"/>
+      <Setter Property="Background" Value="#FF472527"/>
+    </Style>
+    <Style x:Key="DangerButtonStyle" TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
+      <Setter Property="Foreground" Value="#FFFFB3B3"/><Setter Property="BorderBrush" Value="#FFB34B4B"/>
+      <Setter Property="Background" Value="#FF54282B"/>
+    </Style>
+    <Style x:Key="ToggleStyle" TargetType="ToggleButton">
+      <Setter Property="Width" Value="58"/><Setter Property="Height" Value="30"/><Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ToggleButton">
+        <Grid><Border x:Name="Track" Background="{DynamicResource ToggleOffBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="15"/>
+          <Ellipse x:Name="Thumb" Width="24" Height="24" Fill="{DynamicResource ToggleThumbBrush}" HorizontalAlignment="Left" Margin="3,0,0,0"/></Grid>
+        <ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True">
+          <Setter TargetName="Track" Property="Background" Value="{StaticResource AccentBrush}"/><Setter TargetName="Track" Property="BorderBrush" Value="{StaticResource AccentBrightBrush}"/>
+          <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right"/><Setter TargetName="Thumb" Property="Margin" Value="0,0,3,0"/>
+        </Trigger></ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
+  </Application.Resources>
+</Application>

@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>PersonalAppsHub</AssemblyName>
+    <RootNamespace>PersonalAppsHub</RootNamespace>
+    <Version>1.0.0</Version>
+    <Company>Flexron</Company>
+    <Product>Personal Apps Hub</Product>
+    <Description>Hub Windows regroupant des outils personnels et des profils NVIDIA.</Description>
+    <Authors>Flexron</Authors>
+    <Copyright>Copyright © 2026 Flexron</Copyright>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="..\..\assets\app-logo.png" Link="Assets\app-logo.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="CHANGELOG.md" Link="CHANGELOG.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\PRIVACY.md" Link="PRIVACY.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\THIRD-PARTY-NOTICES.md" Link="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\LICENSES\NVIDIA-PROFILE-INSPECTOR.txt" Link="LICENSES\NVIDIA-PROFILE-INSPECTOR.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="..\..\tools\nvidia-profile-inspector\nvidiaProfileInspector.exe" Link="Tools\nvidiaProfileInspector.exe" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\tools\nvidia-profile-inspector\Reference.xml" Link="Tools\Reference.xml" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\nvidia-profiles\baseline-20260909-194729\NVIDIA-Global-Profile-Baseline.nip" Link="Profiles\NVIDIA-Global-Profile-Baseline.nip" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\nvidia-profiles\NVIDIA-Optimization-RTX-5080-5070.nip" Link="Profiles\NVIDIA-Optimization-RTX-5080-5070.nip" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\nvidia-profiles\NVIDIA-Optimization-RTX-5060-5050.nip" Link="Profiles\NVIDIA-Optimization-RTX-5060-5050.nip" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\nvidia-profiles\NVIDIA-Optimization-RTX-4080-4070.nip" Link="Profiles\NVIDIA-Optimization-RTX-4080-4070.nip" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\nvidia-profiles\NVIDIA-Optimization-RTX-4060.nip" Link="Profiles\NVIDIA-Optimization-RTX-4060.nip" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\nvidia-profiles\NVIDIA-Optimization-RTX-3080-3070.nip" Link="Profiles\NVIDIA-Optimization-RTX-3080-3070.nip" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\nvidia-profiles\NVIDIA-Optimization-RTX-3060.nip" Link="Profiles\NVIDIA-Optimization-RTX-3060.nip" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\nvidia-profiles\NVIDIA-Optimization-RTX-3000.nip" Link="Profiles\NVIDIA-Optimization-RTX-3090.nip" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\nvidia-profiles\NVIDIA-Optimization-RTX-4000.nip" Link="Profiles\NVIDIA-Optimization-RTX-4090.nip" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\nvidia-profiles\NVIDIA-Optimization-RTX-5000.nip" Link="Profiles\NVIDIA-Optimization-RTX-5090.nip" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

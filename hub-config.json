@@ -1,0 +1,15 @@
+﻿{
+  "applications": [
+    {
+      "id": "top-serveurs-reminder",
+      "name": "Rappel Top-Serveurs",
+      "description": "Notification pour effectuer manuellement le vote Project Zomboid.",
+      "taskName": "TopServeurs-VoteReminder",
+      "script": "VoteReminder.ps1",
+      "enabled": true,
+      "intervalMinutes": 130,
+      "displaySeconds": 20,
+      "url": "https://top-serveurs.net/project-zomboid/fr-nextgen-france-project-zomboid-nouveau-serveur"
+    }
+  ]
+}
