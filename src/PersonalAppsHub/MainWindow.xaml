@@ -19,13 +19,13 @@
       <Border Background="{DynamicResource SidebarBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="14" Padding="15">
         <StackPanel><TextBlock Text="FLEXHUB" Foreground="{StaticResource MutedBrush}" FontSize="12" FontWeight="Bold" Margin="4,4,0,14"/>
           <StackPanel x:Name="ActiveAppsPanel">
-            <Button x:Name="ReminderNav" Style="{StaticResource ButtonStyle}" HorizontalContentAlignment="Left" Content="◷  Rappel Top-Serveurs"/>
             <Button x:Name="CorrectorNav" Style="{StaticResource ButtonStyle}" HorizontalContentAlignment="Left" Content="✓  Correcteur universel"/>
             <Button x:Name="TranslatorNav" Style="{StaticResource ButtonStyle}" HorizontalContentAlignment="Left" Content="⇄  Traducteur universel"/>
             <Button x:Name="ResponseGeneratorNav" Style="{StaticResource ButtonStyle}" HorizontalContentAlignment="Left" Content="✦  Générateur de réponse"/>
-            <Button x:Name="ActionWheelNav" Style="{StaticResource ButtonStyle}" HorizontalContentAlignment="Left" Content="◉  Roue d’actions"/>
+            <Button x:Name="ReminderNav" Style="{StaticResource ButtonStyle}" HorizontalContentAlignment="Left" Content="◷  Rappel Top-Serveurs"/>
             <Button x:Name="NvidiaNav" Style="{StaticResource ButtonStyle}" HorizontalContentAlignment="Left" Content="⚡  Optimisation NVIDIA"/>
             <Button x:Name="XmpNav" Style="{StaticResource ButtonStyle}" HorizontalContentAlignment="Left" Content="▦  Surveillance XMP"/>
+            <Button x:Name="ActionWheelNav" Style="{StaticResource ButtonStyle}" HorizontalContentAlignment="Left" Content="◉  Roue d’actions"/>
           </StackPanel>
           <StackPanel x:Name="DisabledAppsSection" Visibility="Collapsed">
             <Border Height="1" Background="{DynamicResource SeparatorBrush}" Margin="2,18,2,14"/>
