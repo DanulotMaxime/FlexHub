@@ -23,6 +23,7 @@ public sealed class ResponseGenerationService
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         request.Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
         using var response = await _client.SendAsync(request);
+        ApiQuotaTracker.CaptureOpenAi(response);
         var json = await response.Content.ReadAsStringAsync();
         if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"OpenAI ({(int)response.StatusCode}) : {ReadError(json)}");
         using var document = JsonDocument.Parse(json);

@@ -7,8 +7,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>FlexHub</AssemblyName>
+    <ApplicationIcon>..\..\assets\app-logo.ico</ApplicationIcon>
     <RootNamespace>PersonalAppsHub</RootNamespace>
-    <Version>1.0.1</Version>
+    <Version>1.1.0</Version>
     <Company>Flexron</Company>
     <Product>FlexHub</Product>
     <Description>Hub Windows regroupant des outils personnels et des profils NVIDIA.</Description>
@@ -17,6 +18,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Content Include="..\..\assets\app-logo.png" Link="Assets\app-logo.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\assets\app-logo.ico" Link="Assets\app-logo.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="CHANGELOG.md" Link="CHANGELOG.md" CopyToOutputDirectory="PreserveNewest" />

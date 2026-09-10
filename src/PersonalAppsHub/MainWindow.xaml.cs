@@ -16,6 +16,13 @@ namespace PersonalAppsHub;
 public partial class MainWindow : Window
 {
     private const string TipeeeUrl = "https://fr.tipeee.com/flexhub-applications-by-flexron/";
+    private const string OpenAiApiKeysUrl = "https://platform.openai.com/api-keys";
+    private const string GeminiApiKeysUrl = "https://aistudio.google.com/app/apikey";
+    private const string DeepLApiKeysUrl = "https://www.deepl.com/your-account/keys";
+    private const string GoogleTranslateApiKeysUrl = "https://console.cloud.google.com/apis/credentials";
+    private const string LibreTranslateApiKeysUrl = "https://portal.libretranslate.com";
+    private const string GeminiQuotasUrl = "https://aistudio.google.com/usage";
+    private const string GoogleTranslateQuotasUrl = "https://console.cloud.google.com/iam-admin/quotas";
     private readonly SettingsService _settingsService = new();
     private readonly CorrectionService _correctionService = new();
     private readonly TranslationService _translationService = new();
@@ -23,6 +30,7 @@ public partial class MainWindow : Window
     private readonly NvidiaProfileService _nvidiaProfileService = new();
     private readonly XmpMonitorService _xmpMonitorService = new();
     private readonly UpdateService _updateService = new();
+    private readonly ApiQuotaService _apiQuotaService = new();
     private readonly HotkeyService _hotkeyService = new(9471);
     private readonly HotkeyService _translatorHotkeyService = new(9472);
     private readonly HotkeyService _responseGeneratorHotkeyService = new(9473);
@@ -111,6 +119,14 @@ public partial class MainWindow : Window
         TestXmp.Click += async (_, _) => await CheckXmpAsync(true);
         SaveXmp.Click += (_, _) => SaveXmpSettings();
         SaveGeneralSettings.Click += (_, _) => SaveGeneralSettingsNow();
+        OpenOpenAiApiPage.Click += (_, _) => OpenExternalPage(OpenAiApiKeysUrl, "OpenAI");
+        OpenGeminiApiPage.Click += (_, _) => OpenExternalPage(GeminiApiKeysUrl, "Google Gemini");
+        OpenDeepLApiPage.Click += (_, _) => OpenExternalPage(DeepLApiKeysUrl, "DeepL");
+        OpenGoogleTranslateApiPage.Click += (_, _) => OpenExternalPage(GoogleTranslateApiKeysUrl, "Google Traduction");
+        OpenLibreTranslateApiPage.Click += (_, _) => OpenExternalPage(LibreTranslateApiKeysUrl, "LibreTranslate");
+        OpenGeminiQuotaPage.Click += (_, _) => OpenExternalPage(GeminiQuotasUrl, "quotas Google Gemini");
+        OpenGoogleTranslateQuotaPage.Click += (_, _) => OpenExternalPage(GoogleTranslateQuotasUrl, "quotas Google Traduction");
+        RefreshApiQuotas.Click += async (_, _) => await RefreshApiQuotaStatusesAsync();
         DeleteAllPersonalData.Click += (_, _) => DeleteAllPersonalDataNow();
         CheckUpdates.Click += async (_, _) => await CheckForUpdatesAsync();
         DownloadUpdate.Click += (_, _) => { if (_availableUpdate != null) UpdateService.OpenRelease(_availableUpdate); };
@@ -200,6 +216,7 @@ public partial class MainWindow : Window
         TargetLanguageBox.ItemsSource = languages.Skip(1).ToArray();
         SourceLanguageBox.SelectedValue = _settings.TranslationSourceLanguage;
         TargetLanguageBox.SelectedValue = _settings.TranslationTargetLanguage;
+        RefreshActionWheelPreview();
         if (SourceLanguageBox.SelectedIndex < 0) SourceLanguageBox.SelectedIndex = 0;
         if (TargetLanguageBox.SelectedIndex < 0) TargetLanguageBox.SelectedValue = "EN";
         TranslationPreviewCheck.IsChecked = _settings.TranslationPreviewBeforeReplace;
@@ -235,6 +252,7 @@ public partial class MainWindow : Window
         OpenPatchNotes.IsEnabled = VersionHistoryBox.SelectedItem != null;
         UpdateStartupLabel();
         RefreshGeneralApiKeyBoxes();
+        RefreshApiQuotaStatuses();
     }
 
     private void ShowPage(string page)
@@ -295,6 +313,33 @@ public partial class MainWindow : Window
 
     private static void SetStoredKeyState(System.Windows.Controls.PasswordBox box, string provider) =>
         box.Password = SecretStore.HasKey(provider) ? "••••••••••••••••" : "";
+
+    private void RefreshApiQuotaStatuses()
+    {
+        OpenAiQuotaStatus.Text = ApiQuotaTracker.OpenAiStatus;
+        DeepLQuotaStatus.Text = SecretStore.HasKey("DeepL") ? "Cliquer sur Actualiser" : "Clé API manquante";
+    }
+
+    private async Task RefreshApiQuotaStatusesAsync()
+    {
+        RefreshApiQuotas.IsEnabled = false;
+        OpenAiQuotaStatus.Text = ApiQuotaTracker.OpenAiStatus;
+        var deepLKey = SecretStore.Load("DeepL");
+        DeepLQuotaStatus.Text = string.IsNullOrWhiteSpace(deepLKey)
+            ? "Clé API manquante"
+            : "Actualisation…";
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(deepLKey))
+                DeepLQuotaStatus.Text = await _apiQuotaService.GetDeepLStatusAsync(deepLKey, _settings.DeepLUseFreeApi);
+        }
+        catch (Exception ex)
+        {
+            DeepLQuotaStatus.Text = "Quota indisponible";
+            AppLog.Write($"Lecture du quota DeepL impossible : {ex.Message}");
+        }
+        finally { RefreshApiQuotas.IsEnabled = true; }
+    }
 
     private void DeleteAllPersonalDataNow()
     {
@@ -507,6 +552,7 @@ public partial class MainWindow : Window
         if (provider != "MyMemory" && !string.IsNullOrWhiteSpace(TranslationApiKeyBox.Password) && !TranslationApiKeyBox.Password.StartsWith('•'))
             SecretStore.Save(provider, TranslationApiKeyBox.Password.Trim());
         _settingsService.Save(_settings);
+        RefreshActionWheelPreview();
         TranslatorStatus.Text = RegisterTranslatorHotkey()
             ? "Configuration enregistrée."
             : "Ce raccourci est déjà utilisé par une autre application.";
@@ -580,15 +626,20 @@ public partial class MainWindow : Window
         _actionWheelOpen = true;
         try
         {
-            var wheel = new ActionWheelWindow();
+            var sourceLanguage = DisplayLanguage(_settings.TranslationSourceLanguage);
+            var targetLanguage = DisplayLanguage(_settings.TranslationTargetLanguage);
+            var wheel = new ActionWheelWindow(sourceLanguage, targetLanguage);
             var action = await wheel.ShowAndWaitAsync();
             switch (action)
             {
                 case WheelAction.Correct when _settings.CorrectorEnabled:
                     await RunCorrectionAsync();
                     break;
-                case WheelAction.Translate when _settings.TranslatorEnabled:
+                case WheelAction.TranslateForward when _settings.TranslatorEnabled:
                     await RunTranslationAsync();
+                    break;
+                case WheelAction.TranslateReverse when _settings.TranslatorEnabled:
+                    await RunTranslationAsync(reverseLanguages: true);
                     break;
                 case WheelAction.Respond when _settings.ResponseGeneratorEnabled:
                     await RunResponseGenerationAsync();
@@ -596,7 +647,8 @@ public partial class MainWindow : Window
                 case WheelAction.Correct:
                     ShowVisibleMessage("Roue d’actions", "Le Correcteur universel est désactivé.");
                     break;
-                case WheelAction.Translate:
+                case WheelAction.TranslateForward:
+                case WheelAction.TranslateReverse:
                     ShowVisibleMessage("Roue d’actions", "Le Traducteur universel est désactivé.");
                     break;
                 case WheelAction.Respond:
@@ -663,10 +715,17 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task RunTranslationAsync()
+    private async Task RunTranslationAsync(bool reverseLanguages = false)
     {
         if (!_settings.TranslatorEnabled) return;
         if (!EnsureOnlineServicesConsent()) return;
+        if (reverseLanguages && _settings.TranslationSourceLanguage == "auto")
+        {
+            ShowVisibleMessage("Traducteur universel", "Choisissez une langue source précise dans les paramètres pour utiliser la traduction inverse.");
+            return;
+        }
+        var sourceLanguage = reverseLanguages ? _settings.TranslationTargetLanguage : _settings.TranslationSourceLanguage;
+        var targetLanguage = reverseLanguages ? _settings.TranslationSourceLanguage : _settings.TranslationTargetLanguage;
         System.Windows.IDataObject? previousClipboard = null;
         try
         {
@@ -690,11 +749,11 @@ public partial class MainWindow : Window
 
             var translated = provider switch
             {
-                "GoogleTranslate" => await _translationService.TranslateGoogleAsync(capture.Text, key!, _settings.TranslationTargetLanguage, _settings.TranslationSourceLanguage),
-                "Gemini" => await _translationService.TranslateGeminiAsync(capture.Text, key!, _settings.TranslatorGeminiModel, _settings.TranslationTargetLanguage, _settings.TranslationSourceLanguage),
-                "LibreTranslate" => await _translationService.TranslateLibreAsync(capture.Text, key, _settings.LibreTranslateUrl, _settings.TranslationTargetLanguage, _settings.TranslationSourceLanguage),
-                "MyMemory" => await _translationService.TranslateMyMemoryAsync(capture.Text, _settings.TranslationTargetLanguage, _settings.TranslationSourceLanguage, _settings.MyMemoryEmail),
-                _ => await _translationService.TranslateDeepLAsync(capture.Text, key!, _settings.TranslationTargetLanguage, _settings.TranslationSourceLanguage, _settings.DeepLUseFreeApi)
+                "GoogleTranslate" => await _translationService.TranslateGoogleAsync(capture.Text, key!, targetLanguage, sourceLanguage),
+                "Gemini" => await _translationService.TranslateGeminiAsync(capture.Text, key!, _settings.TranslatorGeminiModel, targetLanguage, sourceLanguage),
+                "LibreTranslate" => await _translationService.TranslateLibreAsync(capture.Text, key, _settings.LibreTranslateUrl, targetLanguage, sourceLanguage),
+                "MyMemory" => await _translationService.TranslateMyMemoryAsync(capture.Text, targetLanguage, sourceLanguage, _settings.MyMemoryEmail),
+                _ => await _translationService.TranslateDeepLAsync(capture.Text, key!, targetLanguage, sourceLanguage, _settings.DeepLUseFreeApi)
             };
 
             if (_settings.TranslationPreviewBeforeReplace)
@@ -888,6 +947,21 @@ public partial class MainWindow : Window
         }
     }
     private static string DisplayTranslationProvider(string provider) => provider switch { "GoogleTranslate" => "Google Traduction", "Gemini" => "Google Gemini", "LibreTranslate" => "LibreTranslate", "MyMemory" => "MyMemory (Translated)", _ => "DeepL" };
+    private static string DisplayLanguage(string code) => code switch
+    {
+        "auto" => "Auto", "FR" => "Français", "EN" => "Anglais", "DE" => "Allemand",
+        "ES" => "Espagnol", "IT" => "Italien", "PT" => "Portugais", "NL" => "Néerlandais",
+        "PL" => "Polonais", "JA" => "Japonais", _ => code
+    };
+
+    private void RefreshActionWheelPreview()
+    {
+        if (PreviewTranslationForwardText == null || PreviewTranslationReverseText == null) return;
+        var source = DisplayLanguage(_settings.TranslationSourceLanguage);
+        var target = DisplayLanguage(_settings.TranslationTargetLanguage);
+        PreviewTranslationForwardText.Text = $"{source} > {target}";
+        PreviewTranslationReverseText.Text = $"{target} > {source}";
+    }
 
     private void TranslationEngineBox_OnSelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
@@ -1323,6 +1397,11 @@ public partial class MainWindow : Window
     }
     private void ShowTrayMessage(string title, string text, int timeout = 5000, Action? clickAction = null) { _balloonClickAction = clickAction; _tray.BalloonTipTitle = title; _tray.BalloonTipText = text; _tray.ShowBalloonTip(timeout); }
     private void OpenTipeeePage() { try { Process.Start(new ProcessStartInfo(TipeeeUrl) { UseShellExecute = true }); } catch (Exception ex) { AppLog.Write($"Ouverture de Tipeee impossible : {ex.Message}"); } }
+    private static void OpenExternalPage(string url, string provider)
+    {
+        try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
+        catch (Exception ex) { AppLog.Write($"Ouverture de la page API {provider} impossible : {ex.Message}"); }
+    }
     private void OpenReminderUrl() { try { Process.Start(new ProcessStartInfo(_settings.ReminderUrl) { UseShellExecute = true }); } catch { } }
     private static bool IsHttpUrl(string value) => Uri.TryCreate(value.Trim(), UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https";
     private static void ShowVisibleMessage(string title, string message)

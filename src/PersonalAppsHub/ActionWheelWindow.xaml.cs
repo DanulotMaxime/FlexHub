@@ -6,7 +6,7 @@ using System.Windows.Threading;
 
 namespace PersonalAppsHub;
 
-public enum WheelAction { None, Correct, Translate, Respond }
+public enum WheelAction { None, Correct, TranslateForward, TranslateReverse, Respond }
 
 public partial class ActionWheelWindow : Window
 {
@@ -19,9 +19,11 @@ public partial class ActionWheelWindow : Window
     private WheelAction _hoveredAction;
     private DateTime _hoverStartedUtc;
 
-    public ActionWheelWindow()
+    public ActionWheelWindow(string sourceLanguage, string targetLanguage)
     {
         InitializeComponent();
+        TranslationForwardText.Text = $"{sourceLanguage} > {targetLanguage}";
+        TranslationReverseText.Text = $"{targetLanguage} > {sourceLanguage}";
         GetCursorPos(out var cursor);
         _origin = new System.Windows.Point(cursor.X, cursor.Y);
         SourceInitialized += (_, _) =>
@@ -52,7 +54,7 @@ public partial class ActionWheelWindow : Window
         var dy = cursor.Y - _origin.Y;
         var distance = Math.Sqrt(dx * dx + dy * dy);
         _selected = distance < 48 ? WheelAction.None
-            : Math.Abs(dx) > Math.Abs(dy) ? (dx < 0 ? WheelAction.Translate : WheelAction.Respond)
+            : Math.Abs(dx) > Math.Abs(dy) ? (dx < 0 ? (dy < 0 ? WheelAction.TranslateForward : WheelAction.TranslateReverse) : WheelAction.Respond)
             : dy < 0 ? WheelAction.Correct : WheelAction.None;
         UpdateSelection();
 
@@ -81,10 +83,12 @@ public partial class ActionWheelWindow : Window
         var normal = new SolidColorBrush(System.Windows.Media.Color.FromRgb(51, 43, 38));
         var selected = new SolidColorBrush(System.Windows.Media.Color.FromRgb(177, 103, 48));
         CorrectionZone.Background = _selected == WheelAction.Correct ? selected : normal;
-        TranslationZone.Background = _selected == WheelAction.Translate ? selected : normal;
+        TranslationZone.Background = normal;
+        TranslationForwardZone.Background = _selected == WheelAction.TranslateForward ? selected : System.Windows.Media.Brushes.Transparent;
+        TranslationReverseZone.Background = _selected == WheelAction.TranslateReverse ? selected : System.Windows.Media.Brushes.Transparent;
         ResponseZone.Background = _selected == WheelAction.Respond ? selected : normal;
         CancelZone.Background = _selected == WheelAction.None ? selected : normal;
-        CurrentActionText.Text = _selected switch { WheelAction.Correct => "Corriger", WheelAction.Translate => "Traduire", WheelAction.Respond => "Répondre", _ => "Annuler" };
+        CurrentActionText.Text = _selected switch { WheelAction.Correct => "Corriger", WheelAction.TranslateForward => "Traduire", WheelAction.TranslateReverse => "Traduire inverse", WheelAction.Respond => "Répondre", _ => "Annuler" };
     }
 
     [StructLayout(LayoutKind.Sequential)] private struct NativePoint { public int X; public int Y; }

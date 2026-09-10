@@ -1,5 +1,14 @@
 # Notes de version
 
+## 1.1.0
+
+- Ajout de liens directs pour obtenir les clés API depuis les paramètres généraux.
+- Ajout d’un suivi des quotas : caractères restants pour DeepL, dernière limite connue pour OpenAI et accès direct aux tableaux de bord Google.
+- Nouvelle roue d’actions agrandie avec des boutons carrés et des pictogrammes plus lisibles.
+- La zone de traduction de la roue permet maintenant de traduire dans les deux sens, sans clic, selon les langues configurées.
+- Mise à jour de l’aperçu de la roue dans l’application avec redimensionnement automatique.
+- Intégration du logo FlexHub dans l’exécutable, l’installeur et les raccourcis Windows.
+
 ## 1.0.1
 
 - Vérification automatique des nouvelles versions au lancement.

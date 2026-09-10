@@ -45,6 +45,7 @@ public sealed class CorrectionService
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
         request.Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
         using var response = await _http.SendAsync(request);
+        ApiQuotaTracker.CaptureOpenAi(response);
         var json = await response.Content.ReadAsStringAsync();
         if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"OpenAI : {(int)response.StatusCode} {ExtractError(json)}");
         using var document = JsonDocument.Parse(json);
