@@ -6,6 +6,6 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\PersonalAppsHub\PersonalAppsHub.csproj" />
+    <ProjectReference Include="..\..\src\PersonalAppsHub\FlexHub.csproj" />
   </ItemGroup>
 </Project>

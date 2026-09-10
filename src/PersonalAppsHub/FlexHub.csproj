@@ -6,11 +6,11 @@
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AssemblyName>PersonalAppsHub</AssemblyName>
+    <AssemblyName>FlexHub</AssemblyName>
     <RootNamespace>PersonalAppsHub</RootNamespace>
     <Version>1.0.0</Version>
     <Company>Flexron</Company>
-    <Product>Personal Apps Hub</Product>
+    <Product>FlexHub</Product>
     <Description>Hub Windows regroupant des outils personnels et des profils NVIDIA.</Description>
     <Authors>Flexron</Authors>
     <Copyright>Copyright © 2026 Flexron</Copyright>

@@ -156,7 +156,7 @@ $trayIconHandle = $trayBitmap.GetHicon()
 $trayAppIcon = [System.Drawing.Icon]::FromHandle($trayIconHandle).Clone()
 $trayBitmap.Dispose()
 $trayIcon.Icon = $trayAppIcon
-$trayIcon.Text = "Mes applications"
+$trayIcon.Text = "FlexHub"
 $trayIcon.Visible = $true
 $menu = [System.Windows.Forms.ContextMenuStrip]::new()
 $openItem = $menu.Items.Add("Ouvrir le hub")

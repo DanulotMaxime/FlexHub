@@ -19,7 +19,7 @@ public partial class App : System.Windows.Application
         DispatcherUnhandledException += (_, args) =>
         {
             AppLog.Write($"ERREUR WPF NON GÉRÉE: {args.Exception}");
-            System.Windows.MessageBox.Show($"Une erreur inattendue s’est produite. Un diagnostic a été enregistré.\n\n{args.Exception.Message}", "Personal Apps Hub", MessageBoxButton.OK, MessageBoxImage.Error);
+            System.Windows.MessageBox.Show($"Une erreur inattendue s’est produite. Un diagnostic a été enregistré.\n\n{args.Exception.Message}", "FlexHub", MessageBoxButton.OK, MessageBoxImage.Error);
             args.Handled = true;
         };
         AppDomain.CurrentDomain.UnhandledException += (_, args) => AppLog.Write($"ERREUR FATALE: {args.ExceptionObject}");

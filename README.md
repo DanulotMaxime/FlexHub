@@ -11,7 +11,7 @@ winget install --id JRSoftware.InnoSetup -e
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build-Installer.ps1
 ```
 
-Le fichier distribuable est créé dans `artifacts\installer\PersonalAppsHub-Setup-1.0.0-x64.exe`. Pour publier une autre version, utilisez par exemple `-Version 1.1.0`.
+Le fichier distribuable est créé dans `artifacts\installer\FlexHub-Setup-1.0.0-x64.exe`. Pour publier une autre version, utilisez par exemple `-Version 1.1.0`.
 
 Le numéro suit le format `MAJEURE.MINEURE.CORRECTIF`. La version du programme et celle de l’installeur sont synchronisées par `Build-Installer.ps1`. Après configuration du dépôt GitHub dans la page **Version et mises à jour**, l’application peut vérifier la dernière Release publique.
 

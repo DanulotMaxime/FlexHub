@@ -1,5 +1,5 @@
-#define AppName "Personal Apps Hub"
-#define AppExeName "PersonalAppsHub.exe"
+#define AppName "FlexHub"
+#define AppExeName "FlexHub.exe"
 #ifndef AppVersion
   #define AppVersion "1.0.0"
 #endif
@@ -16,14 +16,14 @@ AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher=Flexron
 AppContact=Discord : Flexron
-DefaultDirName={localappdata}\Programs\PersonalAppsHub
+DefaultDirName={localappdata}\Programs\FlexHub
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir={#OutputDir}
-OutputBaseFilename=PersonalAppsHub-Setup-{#AppVersion}-x64
+OutputBaseFilename=FlexHub-Setup-{#AppVersion}-x64
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
@@ -53,10 +53,10 @@ Name: "{group}\Désinstaller {#AppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Registry]
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "PersonalAppsHub"; ValueData: """{app}\{#AppExeName}"""; Flags: uninsdeletevalue; Tasks: startup
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "FlexHub"; ValueData: """{app}\{#AppExeName}"""; Flags: uninsdeletevalue; Tasks: startup
 
 [Run]
 Filename: "{app}\{#AppExeName}"; Description: "Lancer {#AppName}"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
-Filename: "{cmd}"; Parameters: "/C taskkill /IM {#AppExeName} /F"; Flags: runhidden; RunOnceId: "StopPersonalAppsHub"
+Filename: "{cmd}"; Parameters: "/C taskkill /IM {#AppExeName} /F"; Flags: runhidden; RunOnceId: "StopFlexHub"

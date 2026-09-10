@@ -31,7 +31,7 @@ Créer un dépôt vide, privé dans un premier temps, sans ajouter automatiqueme
 Puis connecter le dépôt en remplaçant l'adresse ci-dessous :
 
 ```powershell
-git remote add origin https://github.com/Flexron/NOM-DU-DEPOT.git
+git remote add origin https://github.com/Flexron/FlexHub.git
 git push -u origin main
 ```
 

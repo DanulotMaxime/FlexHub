@@ -24,7 +24,7 @@ public sealed class UpdateService
             throw new InvalidOperationException("Indiquez le dépôt GitHub au format propriétaire/dépôt dans la page Version.");
 
         using var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.github.com/repos/{repository}/releases/latest");
-        request.Headers.UserAgent.Add(new ProductInfoHeaderValue("PersonalAppsHub", CurrentVersion));
+        request.Headers.UserAgent.Add(new ProductInfoHeaderValue("FlexHub", CurrentVersion));
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
         using var response = await _client.SendAsync(request, cancellationToken);
         if ((int)response.StatusCode == 404)

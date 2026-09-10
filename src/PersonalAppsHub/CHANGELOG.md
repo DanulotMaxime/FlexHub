@@ -2,7 +2,7 @@
 
 ## 1.0.0
 
-- Première version publique de Personal Apps Hub.
+- Première version publique de FlexHub.
 - Correcteur, traducteur et générateur de réponse universels.
 - Rappel Top-Serveurs et roue d’actions.
 - Profils NVIDIA avec sauvegarde préalable.

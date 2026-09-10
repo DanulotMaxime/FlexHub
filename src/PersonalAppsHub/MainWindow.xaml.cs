@@ -45,7 +45,7 @@ public partial class MainWindow : Window
         _settings = _settingsService.Load();
         ApplyAppearance();
         var logoPath = Path.Combine(AppContext.BaseDirectory, "Assets", "app-logo.png");
-        _tray = new Forms.NotifyIcon { Text = "Personal Apps Hub", Visible = true };
+        _tray = new Forms.NotifyIcon { Text = "FlexHub", Visible = true };
         try
         {
             var logo = new BitmapImage();
@@ -225,7 +225,7 @@ public partial class MainWindow : Window
         ThemeBox.SelectedIndex = _settings.ThemePreference == "Clair" ? 1 : 0;
         AiConsentCheck.IsChecked = _settings.AiPrivacyConsentAccepted;
         GitHubRepositoryBox.Text = _settings.GitHubRepository;
-        CurrentVersionText.Text = $"Personal Apps Hub {UpdateService.CurrentVersion}";
+        CurrentVersionText.Text = $"FlexHub {UpdateService.CurrentVersion}";
         var changelogPath = Path.Combine(AppContext.BaseDirectory, "CHANGELOG.md");
         var versionNotes = ChangelogService.Load(changelogPath);
         VersionHistoryBox.ItemsSource = versionNotes;

@@ -1,17 +1,18 @@
 param([switch]$SelfContained)
 
 $ErrorActionPreference = "Stop"
-$project = Join-Path $PSScriptRoot "src\PersonalAppsHub\PersonalAppsHub.csproj"
-$publish = Join-Path $PSScriptRoot "publish\PersonalAppsHub"
+$project = Join-Path $PSScriptRoot "src\PersonalAppsHub\FlexHub.csproj"
+$publish = Join-Path $PSScriptRoot "publish\FlexHub"
 $selfContainedValue = if ($SelfContained) { "true" } else { "false" }
 
 Get-Process PersonalAppsHub -ErrorAction SilentlyContinue | Stop-Process -Force
+Get-Process FlexHub -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Sleep -Milliseconds 500
 
 dotnet publish $project -c Release -r win-x64 --self-contained $selfContainedValue -o $publish
 if ($LASTEXITCODE -ne 0) { throw "La compilation du Hub a échoué." }
 
-$exe = Join-Path $publish "PersonalAppsHub.exe"
+$exe = Join-Path $publish "FlexHub.exe"
 $runKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
 try {
     $startWithWindows = $true
@@ -24,10 +25,12 @@ try {
     }
 
     if ($startWithWindows) {
-        New-ItemProperty -Path $runKey -Name "PersonalAppsHub" -Value "`"$exe`"" -PropertyType String -Force | Out-Null
+        Remove-ItemProperty -Path $runKey -Name "PersonalAppsHub" -ErrorAction SilentlyContinue
+        New-ItemProperty -Path $runKey -Name "FlexHub" -Value "`"$exe`"" -PropertyType String -Force | Out-Null
     }
     else {
         Remove-ItemProperty -Path $runKey -Name "PersonalAppsHub" -ErrorAction SilentlyContinue
+        Remove-ItemProperty -Path $runKey -Name "FlexHub" -ErrorAction SilentlyContinue
     }
 }
 catch {

@@ -5,9 +5,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
-$project = Join-Path $root "src\PersonalAppsHub\PersonalAppsHub.csproj"
+$project = Join-Path $root "src\PersonalAppsHub\FlexHub.csproj"
 $publishDir = Join-Path $root "publish\installer\win-x64"
-$installerScript = Join-Path $root "installer\PersonalAppsHub.iss"
+$installerScript = Join-Path $root "installer\FlexHub.iss"
 $outputDir = Join-Path $root "artifacts\installer"
 
 if ([string]::IsNullOrWhiteSpace($Version)) {
@@ -20,7 +20,7 @@ if ($Version -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') {
 }
 
 if (-not $SkipPublish) {
-    Write-Host "Publication autonome de Personal Apps Hub $Version..."
+    Write-Host "Publication autonome de FlexHub $Version..."
     dotnet publish $project -c Release -r win-x64 --self-contained true `
         -p:Version=$Version -p:DebugType=None -p:DebugSymbols=false `
         -o $publishDir --source "https://api.nuget.org/v3/index.json"
@@ -43,6 +43,6 @@ New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 & $iscc "/DAppVersion=$Version" "/DSourceDir=$publishDir" "/DOutputDir=$outputDir" $installerScript
 if ($LASTEXITCODE -ne 0) { throw "La création de l'installeur a échoué." }
 
-$installer = Join-Path $outputDir "PersonalAppsHub-Setup-$Version-x64.exe"
+$installer = Join-Path $outputDir "FlexHub-Setup-$Version-x64.exe"
 if (-not (Test-Path -LiteralPath $installer)) { throw "L'installeur attendu est introuvable." }
 Write-Host "Installeur créé : $installer"
