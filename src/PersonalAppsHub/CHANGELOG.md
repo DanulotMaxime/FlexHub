@@ -1,5 +1,12 @@
 # Notes de version
 
+## 1.2.1
+
+- Installation automatique des nouvelles versions dès leur détection.
+- Vérification obligatoire de l’empreinte SHA-256 de l’installeur avant son lancement silencieux.
+- Le bouton de vérification manuelle utilise désormais le même processus sécurisé d’installation automatique.
+- Journalisation du téléchargement, de la validation et des éventuels échecs de mise à jour.
+
 ## 1.2.0
 
 - Nouveau module « Clavier de saisie automatique » pour passer temporairement du QWERTY à l’AZERTY dans les champs de texte Windows.

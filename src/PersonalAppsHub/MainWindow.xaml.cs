@@ -49,6 +49,7 @@ public partial class MainWindow : Window
     private XmpAlertWindow? _xmpAlertWindow;
     private Action? _balloonClickAction;
     private UpdateCheckResult? _availableUpdate;
+    private bool _updateInstallRunning;
 
     public MainWindow()
     {
@@ -137,7 +138,7 @@ public partial class MainWindow : Window
         RefreshApiQuotas.Click += async (_, _) => await RefreshApiQuotaStatusesAsync();
         DeleteAllPersonalData.Click += (_, _) => DeleteAllPersonalDataNow();
         CheckUpdates.Click += async (_, _) => await CheckForUpdatesAsync();
-        DownloadUpdate.Click += (_, _) => { if (_availableUpdate != null) UpdateService.OpenRelease(_availableUpdate); };
+        DownloadUpdate.Click += async (_, _) => await InstallAvailableUpdateAsync();
         OpenPatchNotes.Click += (_, _) => OpenSelectedPatchNotes();
         StartWithWindowsToggle.Checked += (_, _) => UpdateStartupLabel();
         StartWithWindowsToggle.Unchecked += (_, _) => UpdateStartupLabel();
@@ -1407,8 +1408,7 @@ public partial class MainWindow : Window
             _availableUpdate = await _updateService.CheckAsync();
             if (_availableUpdate.IsNewer)
             {
-                UpdateStatus.Text = $"Version {_availableUpdate.LatestVersion} disponible.";
-                DownloadUpdate.Visibility = Visibility.Visible;
+                await InstallAvailableUpdateAsync();
             }
             else UpdateStatus.Text = $"Vous utilisez la dernière version ({UpdateService.CurrentVersion}).";
         }
@@ -1423,22 +1423,37 @@ public partial class MainWindow : Window
         {
             _availableUpdate = await _updateService.CheckAsync();
             if (!_availableUpdate.IsNewer) return;
-
-            var choice = System.Windows.MessageBox.Show(
-                this,
-                $"Une nouvelle version de FlexHub est disponible : {_availableUpdate.LatestVersion}.\n\nVoulez-vous la télécharger et l’installer maintenant ?",
-                "Mise à jour de FlexHub",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Information);
-            if (choice != MessageBoxResult.Yes) return;
-
-            UpdateStatus.Text = $"Téléchargement de FlexHub {_availableUpdate.LatestVersion}…";
-            await _updateService.DownloadAndStartInstallerAsync(_availableUpdate);
-            ExitHub();
+            await InstallAvailableUpdateAsync();
         }
         catch (Exception ex)
         {
             AppLog.Write($"Vérification automatique des mises à jour impossible : {ex.Message}");
+        }
+    }
+
+    private async Task InstallAvailableUpdateAsync()
+    {
+        if (_updateInstallRunning || _availableUpdate is not { IsNewer: true } update) return;
+        _updateInstallRunning = true;
+        CheckUpdates.IsEnabled = false;
+        DownloadUpdate.IsEnabled = false;
+        DownloadUpdate.Visibility = Visibility.Collapsed;
+        try
+        {
+            UpdateStatus.Text = $"Téléchargement et vérification de FlexHub {update.LatestVersion}…";
+            AppLog.Write($"MISE À JOUR AUTOMATIQUE | Téléchargement de {update.LatestVersion}");
+            await _updateService.DownloadAndStartInstallerAsync(update);
+            AppLog.Write($"MISE À JOUR AUTOMATIQUE | Installeur {update.LatestVersion} vérifié et lancé");
+            ExitHub();
+        }
+        catch (Exception ex)
+        {
+            AppLog.WriteException("ÉCHEC DE LA MISE À JOUR AUTOMATIQUE", ex);
+            UpdateStatus.Text = $"Installation automatique impossible : {ex.Message}";
+            DownloadUpdate.Visibility = Visibility.Visible;
+            DownloadUpdate.IsEnabled = true;
+            _updateInstallRunning = false;
+            CheckUpdates.IsEnabled = true;
         }
     }
 

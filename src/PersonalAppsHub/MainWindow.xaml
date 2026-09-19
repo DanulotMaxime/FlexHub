@@ -260,7 +260,7 @@
               <TextBlock Text="Support : retrouvez-moi sur Discord — pseudo Flexron" Foreground="{DynamicResource MutedBrush}" Margin="0,5,0,12"/>
               <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <TextBlock x:Name="UpdateStatus" VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource SuccessBrush}" Margin="0,0,12,0"/>
-                <Button x:Name="DownloadUpdate" Grid.Column="1" Content="Ouvrir la nouvelle version" Style="{StaticResource ButtonStyle}" Visibility="Collapsed" Margin="0,0,10,0"/>
+                <Button x:Name="DownloadUpdate" Grid.Column="1" Content="Installer maintenant" Style="{StaticResource ButtonStyle}" Visibility="Collapsed" Margin="0,0,10,0"/>
                 <Button x:Name="CheckUpdates" Grid.Column="2" Content="Vérifier les mises à jour" Style="{StaticResource PrimaryButtonStyle}"/>
               </Grid>
               <Border Height="1" Background="{DynamicResource SeparatorBrush}" Margin="0,12,0,18"/>
