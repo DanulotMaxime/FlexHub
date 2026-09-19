@@ -6,6 +6,8 @@ public sealed class HubSettings
     public bool StartWithWindows { get; set; } = true;
     public string FontSizePreference { get; set; } = "Moyen";
     public string ThemePreference { get; set; } = "Sombre";
+    public bool AutoFrenchKeyboardInDialogs { get; set; } = true;
+    public string GameChatKeyboardShortcut { get; set; } = "Enter";
     public bool ReminderEnabled { get; set; } = true;
     public int ReminderIntervalMinutes { get; set; } = 130;
     public int ReminderDisplaySeconds { get; set; } = 20;

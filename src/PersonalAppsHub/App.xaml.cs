@@ -13,17 +13,22 @@ public partial class App : System.Windows.Application
     private EventWaitHandle? _showEvent;
     private volatile bool _exiting;
     private MainWindow? _mainWindow;
+    private RuntimeDiagnosticsService? _runtimeDiagnostics;
 
     protected override void OnStartup(StartupEventArgs e)
     {
         DispatcherUnhandledException += (_, args) =>
         {
-            AppLog.Write($"ERREUR WPF NON GÉRÉE: {args.Exception}");
+            AppLog.WriteException("ERREUR WPF NON GÉRÉE", args.Exception);
             System.Windows.MessageBox.Show($"Une erreur inattendue s’est produite. Un diagnostic a été enregistré.\n\n{args.Exception.Message}", "FlexHub", MessageBoxButton.OK, MessageBoxImage.Error);
-            args.Handled = true;
+            args.Handled = args.Exception is not OutOfMemoryException;
         };
-        AppDomain.CurrentDomain.UnhandledException += (_, args) => AppLog.Write($"ERREUR FATALE: {args.ExceptionObject}");
-        TaskScheduler.UnobservedTaskException += (_, args) => { AppLog.Write($"ERREUR ASYNCHRONE: {args.Exception}"); args.SetObserved(); };
+        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+        {
+            if (args.ExceptionObject is Exception exception) AppLog.WriteException("ERREUR FATALE", exception);
+            else AppLog.Write($"ERREUR FATALE | {AppLog.MemorySnapshot()} | {args.ExceptionObject}");
+        };
+        TaskScheduler.UnobservedTaskException += (_, args) => { AppLog.WriteException("ERREUR ASYNCHRONE", args.Exception); args.SetObserved(); };
         _mutex = new Mutex(true, MutexName, out var created);
         _ownsMutex = created;
         if (!created)
@@ -33,6 +38,7 @@ public partial class App : System.Windows.Application
             return;
         }
         base.OnStartup(e);
+        _runtimeDiagnostics = new RuntimeDiagnosticsService();
         _showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowEventName);
         _mainWindow = new MainWindow();
         _mainWindow.Show();
@@ -51,6 +57,7 @@ public partial class App : System.Windows.Application
         _exiting = true;
         _showEvent?.Set();
         _showEvent?.Dispose();
+        _runtimeDiagnostics?.Dispose();
         if (_ownsMutex) _mutex?.ReleaseMutex();
         _mutex?.Dispose();
         base.OnExit(e);

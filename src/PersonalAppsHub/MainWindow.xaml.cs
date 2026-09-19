@@ -35,6 +35,8 @@ public partial class MainWindow : Window
     private readonly HotkeyService _translatorHotkeyService = new(9472);
     private readonly HotkeyService _responseGeneratorHotkeyService = new(9473);
     private readonly HotkeyService _actionWheelHotkeyService = new(9474);
+    private readonly KeyboardLayoutMonitorService _keyboardLayoutMonitorService = new();
+    private readonly GameChatKeyboardService _gameChatKeyboardService = new();
     private readonly DispatcherTimer _reminderTimer = new();
     private readonly DispatcherTimer _xmpTimer = new();
     private readonly Forms.NotifyIcon _tray;
@@ -92,6 +94,7 @@ public partial class MainWindow : Window
         ActionWheelNav.Click += (_, _) => ShowPage("actionWheel");
         NvidiaNav.Click += (_, _) => ShowPage("nvidia");
         XmpNav.Click += (_, _) => ShowPage("xmp");
+        KeyboardLayoutNav.Click += (_, _) => ShowPage("keyboardLayout");
         TipeeeButton.Click += (_, _) => OpenTipeeePage();
         GeneralSettingsButton.Click += (_, _) => ShowPage("general");
         HideHubButton.Click += (_, _) => Hide();
@@ -116,8 +119,13 @@ public partial class MainWindow : Window
         NvidiaEnabled.Unchecked += (_, _) => ApplyEnabledStates();
         XmpEnabled.Checked += (_, _) => ApplyEnabledStates();
         XmpEnabled.Unchecked += (_, _) => ApplyEnabledStates();
+        KeyboardLayoutEnabled.Checked += (_, _) => ApplyEnabledStates();
+        KeyboardLayoutEnabled.Unchecked += (_, _) => ApplyEnabledStates();
         TestXmp.Click += async (_, _) => await CheckXmpAsync(true);
         SaveXmp.Click += (_, _) => SaveXmpSettings();
+        SaveKeyboardLayout.Click += (_, _) => SaveKeyboardLayoutSettings();
+        TestKeyboardLayout.Click += (_, _) => TestKeyboardLayoutNow();
+        OpenDiagnosticLog.Click += (_, _) => OpenDiagnosticLogNow();
         SaveGeneralSettings.Click += (_, _) => SaveGeneralSettingsNow();
         OpenOpenAiApiPage.Click += (_, _) => OpenExternalPage(OpenAiApiKeysUrl, "OpenAI");
         OpenGeminiApiPage.Click += (_, _) => OpenExternalPage(GeminiApiKeysUrl, "Google Gemini");
@@ -164,6 +172,10 @@ public partial class MainWindow : Window
         _translatorHotkeyService.Pressed += async (_, _) => await RunTranslationAsync();
         _responseGeneratorHotkeyService.Pressed += async (_, _) => await RunResponseGenerationAsync();
         _actionWheelHotkeyService.Pressed += async (_, _) => await ShowActionWheelAsync();
+        _gameChatKeyboardService.StateChanged += (_, active) => Dispatcher.BeginInvoke(() =>
+            KeyboardLayoutStatus.Text = active
+                ? "Mode chat en jeu : AZERTY actif. Utilisez à nouveau le raccourci pour revenir au QWERTY."
+                : "Mode chat en jeu terminé : disposition précédente restaurée.");
         _reminderTimer.Tick += (_, _) => ShowReminder();
         _xmpTimer.Tick += async (_, _) => await CheckXmpAsync(false);
         SourceInitialized += (_, _) => { RegisterHotkey(); RegisterTranslatorHotkey(); RegisterResponseGeneratorHotkey(); RegisterActionWheelHotkey(); };
@@ -178,6 +190,7 @@ public partial class MainWindow : Window
         Closing += OnClosing;
         ConfigureReminderTimer();
         ConfigureXmpTimer();
+        ConfigureKeyboardLayoutMonitor();
         UpdateNavigationState();
     }
 
@@ -239,6 +252,8 @@ public partial class MainWindow : Window
         XmpExpectedSpeedBox.Text = _settings.XmpExpectedSpeed.ToString();
         UpdateXmpSpeedControls();
         XmpIntervalBox.Text = _settings.XmpCheckIntervalMinutes.ToString();
+        KeyboardLayoutEnabled.IsChecked = _settings.AutoFrenchKeyboardInDialogs;
+        GameChatShortcutBox.Text = _settings.GameChatKeyboardShortcut.Replace("+", " + ");
         UpdateXmpLastCheck();
         StartWithWindowsToggle.IsChecked = _settings.StartWithWindows;
         FontSizeBox.SelectedIndex = _settings.FontSizePreference switch { "Petit" => 0, "Grand" => 2, _ => 1 };
@@ -264,6 +279,7 @@ public partial class MainWindow : Window
         ActionWheelPage.Visibility = page == "actionWheel" ? Visibility.Visible : Visibility.Collapsed;
         NvidiaPage.Visibility = page == "nvidia" ? Visibility.Visible : Visibility.Collapsed;
         XmpPage.Visibility = page == "xmp" ? Visibility.Visible : Visibility.Collapsed;
+        KeyboardLayoutPage.Visibility = page == "keyboardLayout" ? Visibility.Visible : Visibility.Collapsed;
         GeneralSettingsPage.Visibility = page == "general" ? Visibility.Visible : Visibility.Collapsed;
     }
 
@@ -287,12 +303,85 @@ public partial class MainWindow : Window
             UpdateProviderPanel();
             UpdateTranslationProviderPanel();
             UpdateResponseGeneratorModel();
+            AppLog.Write($"PARAMÈTRES GÉNÉRAUX ENREGISTRÉS | DémarrageWindows={_settings.StartWithWindows}; " +
+                         $"Thème={_settings.ThemePreference}; Police={_settings.FontSizePreference}; ConsentementIA={_settings.AiPrivacyConsentAccepted}");
             GeneralSettingsStatus.Text = "Paramètres généraux et clés API enregistrés.";
         }
         catch (Exception ex)
         {
             GeneralSettingsStatus.Text = $"Impossible de modifier le démarrage automatique : {ex.Message}";
         }
+    }
+
+    private void ConfigureKeyboardLayoutMonitor()
+    {
+        if (_settings.AutoFrenchKeyboardInDialogs) _keyboardLayoutMonitorService.Start();
+        else _keyboardLayoutMonitorService.Stop();
+        if (!_gameChatKeyboardService.Configure(_settings.AutoFrenchKeyboardInDialogs, _settings.GameChatKeyboardShortcut))
+            AppLog.Write("Raccourci du chat en jeu : installation du hook clavier impossible.");
+    }
+
+    private void SaveKeyboardLayoutSettings()
+    {
+        _settings.AutoFrenchKeyboardInDialogs = KeyboardLayoutEnabled.IsChecked == true;
+        _settings.GameChatKeyboardShortcut = GameChatShortcutBox.Text.Replace(" ", "");
+        _settingsService.Save(_settings);
+        LogModuleStates();
+        ConfigureKeyboardLayoutMonitor();
+        UpdateNavigationState();
+        KeyboardLayoutStatus.Text = _settings.AutoFrenchKeyboardInDialogs
+            ? "Module activé. Les zones de saisie ouvertes en QWERTY utiliseront temporairement l’AZERTY."
+            : "Module désactivé.";
+    }
+
+    private void TestKeyboardLayoutNow()
+    {
+        if (KeyboardLayoutEnabled.IsChecked != true)
+        {
+            KeyboardLayoutStatus.Text = "Activez d’abord le module pour effectuer le test.";
+            return;
+        }
+
+        KeyboardLayoutStatus.Text = "Passez en clavier anglais dans le dialogue, puis testez les touches A et Q.";
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Test FlexHub — le clavier doit être en Français (AZERTY)",
+            CheckFileExists = false,
+            Multiselect = false
+        };
+        dialog.ShowDialog(this);
+        KeyboardLayoutStatus.Text = "Dialogue fermé : la disposition utilisée avant le test doit être restaurée.";
+    }
+
+    private void OpenDiagnosticLogNow()
+    {
+        AppLog.Write($"OUVERTURE DU JOURNAL | {AppLog.MemorySnapshot()}");
+        try
+        {
+            Process.Start(new ProcessStartInfo { FileName = AppLog.PathName, UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            KeyboardLayoutStatus.Text = $"Impossible d’ouvrir le journal : {ex.Message}";
+        }
+    }
+
+    private void LogModuleStates() =>
+        AppLog.Write($"ÉTAT DES MODULES | Rappel={_settings.ReminderEnabled}; Correcteur={_settings.CorrectorEnabled}; " +
+                     $"Traducteur={_settings.TranslatorEnabled}; Réponses={_settings.ResponseGeneratorEnabled}; " +
+                     $"Roue={_settings.ActionWheelEnabled}; NVIDIA={_settings.NvidiaOptimizerEnabled}; " +
+                     $"XMP={_settings.XmpMonitorEnabled}; Clavier={_settings.AutoFrenchKeyboardInDialogs}");
+
+    private void GameChatShortcutBox_OnPreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        e.Handled = true;
+        var shortcut = ReadShortcut(e);
+        if (shortcut == null)
+        {
+            KeyboardLayoutStatus.Text = "Choisissez une touche autre que Ctrl, Alt, Maj ou Windows seule.";
+            return;
+        }
+        GameChatShortcutBox.Text = shortcut.Replace("+", " + ");
     }
 
     private static void SaveApiKeyFromSettings(string provider, System.Windows.Controls.PasswordBox box)
@@ -430,7 +519,7 @@ public partial class MainWindow : Window
 
     private void UpdateNavigationState()
     {
-        if (ReminderNav == null || CorrectorNav == null || TranslatorNav == null || ResponseGeneratorNav == null || ActionWheelNav == null || NvidiaNav == null || XmpNav == null) return;
+        if (ReminderNav == null || CorrectorNav == null || TranslatorNav == null || ResponseGeneratorNav == null || ActionWheelNav == null || NvidiaNav == null || XmpNav == null || KeyboardLayoutNav == null) return;
         PlaceNavigationButton(ReminderNav, ReminderEnabled.IsChecked == true);
         PlaceNavigationButton(CorrectorNav, CorrectorEnabled.IsChecked == true);
         PlaceNavigationButton(TranslatorNav, TranslatorEnabled.IsChecked == true);
@@ -438,6 +527,7 @@ public partial class MainWindow : Window
         PlaceNavigationButton(ActionWheelNav, ActionWheelEnabled.IsChecked == true);
         PlaceNavigationButton(NvidiaNav, NvidiaEnabled.IsChecked == true);
         PlaceNavigationButton(XmpNav, XmpEnabled.IsChecked == true);
+        PlaceNavigationButton(KeyboardLayoutNav, KeyboardLayoutEnabled.IsChecked == true);
         DisabledAppsSection.Visibility = DisabledAppsPanel.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
@@ -458,7 +548,7 @@ public partial class MainWindow : Window
     }
 
     private int NavigationRank(System.Windows.Controls.Button button) =>
-        button == ReminderNav ? 0 : button == CorrectorNav ? 1 : button == TranslatorNav ? 2 : button == ResponseGeneratorNav ? 3 : button == ActionWheelNav ? 4 : button == NvidiaNav ? 5 : 6;
+        button == ReminderNav ? 0 : button == CorrectorNav ? 1 : button == TranslatorNav ? 2 : button == ResponseGeneratorNav ? 3 : button == ActionWheelNav ? 4 : button == NvidiaNav ? 5 : button == XmpNav ? 6 : 7;
 
     private void ApplyEnabledStates()
     {
@@ -469,9 +559,12 @@ public partial class MainWindow : Window
         _settings.ActionWheelEnabled = ActionWheelEnabled.IsChecked == true;
         _settings.NvidiaOptimizerEnabled = NvidiaEnabled.IsChecked == true;
         _settings.XmpMonitorEnabled = XmpEnabled.IsChecked == true;
+        _settings.AutoFrenchKeyboardInDialogs = KeyboardLayoutEnabled.IsChecked == true;
         _settingsService.Save(_settings);
+        LogModuleStates();
         ConfigureReminderTimer();
         ConfigureXmpTimer();
+        ConfigureKeyboardLayoutMonitor();
         RegisterHotkey();
         RegisterTranslatorHotkey();
         RegisterResponseGeneratorHotkey();
@@ -1420,7 +1513,7 @@ public partial class MainWindow : Window
         Focus();
     }
     private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e) { if (!_exit) { e.Cancel = true; Hide(); } }
-    private void ExitHub() { _exit = true; _hotkeyService.Dispose(); _translatorHotkeyService.Dispose(); _responseGeneratorHotkeyService.Dispose(); _actionWheelHotkeyService.Dispose(); _reminderTimer.Stop(); _xmpTimer.Stop(); _tray.Visible = false; _tray.Dispose(); Close(); System.Windows.Application.Current.Shutdown(); }
+    private void ExitHub() { _exit = true; _gameChatKeyboardService.Dispose(); _keyboardLayoutMonitorService.Dispose(); _hotkeyService.Dispose(); _translatorHotkeyService.Dispose(); _responseGeneratorHotkeyService.Dispose(); _actionWheelHotkeyService.Dispose(); _reminderTimer.Stop(); _xmpTimer.Stop(); _tray.Visible = false; _tray.Dispose(); Close(); System.Windows.Application.Current.Shutdown(); }
 
     private sealed record LanguageChoice(string Name, string Code)
     {

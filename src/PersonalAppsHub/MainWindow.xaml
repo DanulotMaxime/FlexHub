@@ -26,6 +26,7 @@
             <Button x:Name="NvidiaNav" Style="{StaticResource ButtonStyle}" HorizontalContentAlignment="Left" Content="⚡  Optimisation NVIDIA"/>
             <Button x:Name="XmpNav" Style="{StaticResource ButtonStyle}" HorizontalContentAlignment="Left" Content="▦  Surveillance XMP"/>
             <Button x:Name="ActionWheelNav" Style="{StaticResource ButtonStyle}" HorizontalContentAlignment="Left" Content="◉  Roue d’actions"/>
+            <Button x:Name="KeyboardLayoutNav" Style="{StaticResource ButtonStyle}" HorizontalContentAlignment="Left" Content="⌨  Clavier de saisie"/>
           </StackPanel>
           <StackPanel x:Name="DisabledAppsSection" Visibility="Collapsed">
             <Border Height="1" Background="{DynamicResource SeparatorBrush}" Margin="2,18,2,14"/>
@@ -195,6 +196,28 @@
             </StackPanel>
           </Grid>
 
+          <Grid x:Name="KeyboardLayoutPage" Visibility="Collapsed"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+            <Grid><StackPanel><TextBlock Text="Clavier de saisie automatique" FontSize="27" FontWeight="SemiBold"/><TextBlock Text="Utilise automatiquement le clavier français dans toute fenêtre permettant d’écrire du texte." Foreground="{DynamicResource MutedBrush}" Margin="0,7,0,0" TextWrapping="Wrap"/></StackPanel><StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><ToggleButton x:Name="KeyboardLayoutEnabled" Style="{StaticResource ToggleStyle}"/><TextBlock Text="Activé" Margin="10,0,0,0" VerticalAlignment="Center"/></StackPanel></Grid>
+            <Border Grid.Row="1" Height="1" Background="{DynamicResource SeparatorBrush}" Margin="0,20"/>
+            <StackPanel Grid.Row="2">
+              <Grid Margin="0,0,0,18"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="220"/></Grid.ColumnDefinitions>
+                <StackPanel><TextBlock Text="Raccourci du chat en jeu" FontWeight="SemiBold"/><TextBlock Text="La première pression active l’AZERTY, la suivante restaure le QWERTY. La touche reste transmise au jeu." Foreground="{DynamicResource MutedBrush}" FontSize="12" Margin="0,4,18,0" TextWrapping="Wrap"/></StackPanel>
+                <TextBox x:Name="GameChatShortcutBox" Grid.Column="1" IsReadOnly="True" PreviewKeyDown="GameChatShortcutBox_OnPreviewKeyDown"/>
+              </Grid>
+              <Border Background="{DynamicResource PanelLightBrush}" CornerRadius="11" Padding="18"><StackPanel>
+                <TextBlock Text="Fonctionnement" FontWeight="SemiBold" FontSize="16"/>
+                <TextBlock Text="Lorsqu’un champ de texte, un éditeur ou une zone de document reçoit le focus avec une disposition anglaise, FlexHub passe temporairement en Français (AZERTY). La disposition précédente est restaurée dès que vous quittez la zone ou la fenêtre." Foreground="{DynamicResource MutedBrush}" Margin="0,9,0,0" TextWrapping="Wrap"/>
+                <TextBlock Text="La disposition Français (France) doit être installée dans Windows. Le contenu saisi n’est jamais lu ni enregistré." Foreground="{DynamicResource MutedBrush}" FontSize="11" Margin="0,12,0,0" TextWrapping="Wrap"/>
+                <TextBlock Text="Le raccourci de jeu est seulement observé et n’est jamais bloqué. Certains systèmes anti-triche peuvent néanmoins limiter les hooks clavier globaux." Foreground="{DynamicResource MutedBrush}" FontSize="11" Margin="0,7,0,0" TextWrapping="Wrap"/>
+              </StackPanel></Border>
+            </StackPanel>
+            <TextBlock x:Name="KeyboardLayoutStatus" Grid.Row="3" Foreground="{DynamicResource SuccessBrush}" Margin="0,16" TextWrapping="Wrap"/>
+            <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
+              <Button x:Name="TestKeyboardLayout" Content="Ouvrir une zone de test" Style="{StaticResource ButtonStyle}" Margin="0,0,10,0"/>
+              <Button x:Name="SaveKeyboardLayout" Content="Enregistrer" Style="{StaticResource PrimaryButtonStyle}"/>
+            </StackPanel>
+          </Grid>
+
           <Grid x:Name="GeneralSettingsPage" Visibility="Collapsed">
             <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
             <StackPanel>
@@ -241,6 +264,13 @@
                 <Button x:Name="CheckUpdates" Grid.Column="2" Content="Vérifier les mises à jour" Style="{StaticResource PrimaryButtonStyle}"/>
               </Grid>
               <Border Height="1" Background="{DynamicResource SeparatorBrush}" Margin="0,12,0,18"/>
+              <TextBlock Text="Diagnostic de l’application" FontSize="18" FontWeight="SemiBold"/>
+              <TextBlock Text="Le journal global enregistre le démarrage, l’arrêt, l’état des modules, les opérations, les mises à jour, la consommation mémoire et les erreurs de FlexHub. Les textes saisis, le presse-papiers et les clés API ne sont jamais enregistrés." Foreground="{DynamicResource MutedBrush}" FontSize="12" Margin="0,5,0,12" TextWrapping="Wrap"/>
+              <Grid Margin="0,0,0,14"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <TextBlock Text="Journal global FlexHub (rotation automatique à 2 Mo)" VerticalAlignment="Center"/>
+                <Button x:Name="OpenDiagnosticLog" Grid.Column="1" Content="Ouvrir le journal" Style="{StaticResource ButtonStyle}"/>
+              </Grid>
+              <Border Height="1" Background="{DynamicResource SeparatorBrush}" Margin="0,4,0,18"/>
               <Border Background="{DynamicResource PanelLightBrush}" BorderBrush="#FF9D4545" BorderThickness="1" CornerRadius="11" Padding="16" Margin="0,0,0,4"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <StackPanel Margin="0,0,18,0"><TextBlock Text="Effacer toutes les données personnelles" FontWeight="SemiBold" Foreground="#FFFF7F7F"/><TextBlock Text="Supprime les réglages, les clés API, les journaux et tous les profils NVIDIA sauvegardés. Cette action est irréversible." Foreground="{DynamicResource MutedBrush}" FontSize="12" Margin="0,5,0,0" TextWrapping="Wrap"/></StackPanel>
                 <Button x:Name="DeleteAllPersonalData" Grid.Column="1" Content="Tout effacer" Style="{StaticResource DangerButtonStyle}" VerticalAlignment="Center"/>

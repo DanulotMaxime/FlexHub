@@ -36,6 +36,7 @@ public sealed class SettingsService
         var temporaryPath = SettingsPath + ".tmp";
         File.WriteAllText(temporaryPath, JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));
         File.Move(temporaryPath, SettingsPath, overwrite: true);
+        AppLog.Write("CONFIGURATION ENREGISTRÉE");
     }
 
     public void DeleteAllPersonalData()
