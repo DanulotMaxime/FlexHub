@@ -1149,13 +1149,13 @@ public partial class MainWindow : Window
         }
         else if (!_nvidiaProfileService.CanOptimize)
         {
-            NvidiaProfileState.Text = "Carte non reconnue : aucun profil automatique disponible. Séries compatibles : RTX 5000, 4000 et 3000.";
+            NvidiaProfileState.Text = "Carte non reconnue : aucun profil automatique disponible. Séries compatibles : GeForce RTX 2000, 3000, 4000 et 5000.";
             OptimizeNvidia.IsEnabled = false;
             RestoreNvidia.IsEnabled = _nvidiaProfileService.CanRestore;
         }
         else
         {
-            NvidiaProfileState.Text = $"Profil {_nvidiaProfileService.DetectedGpuGroup} sélectionné automatiquement.";
+            NvidiaProfileState.Text = $"Profil {_nvidiaProfileService.DetectedGpuGroup} généré automatiquement. La version du pilote est informative et ne bloque pas l’application.";
             OptimizeNvidia.IsEnabled = NvidiaEnabled.IsChecked == true;
             RestoreNvidia.IsEnabled = _nvidiaProfileService.CanRestore;
         }

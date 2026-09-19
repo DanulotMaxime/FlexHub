@@ -17,10 +17,12 @@ public sealed class NvidiaProfileService
     private string ReferencePath => Path.Combine(AppContext.BaseDirectory, "Tools", "Reference.xml");
     public string UserProfilesFolder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PersonalAppsHub", "NvidiaProfiles");
     public string BeforeOptimizationPath => Path.Combine(UserProfilesFolder, "Dernier-profil-avant-optimisation.nip");
+    private string AutomaticProfilesFolder => Path.Combine(UserProfilesFolder, "OptimisationsAutomatiques");
+    private string? _hardwareInformation;
 
     private string? DetectedProfileKey => DetectProfileKey();
-    public string? DetectedGpuGroup => DetectedProfileKey?.Replace("RTX-", "RTX ").Replace('-', '/');
-    public string? OptimizationPath => DetectedProfileKey is { } key ? Path.Combine(ProfilesFolder, $"NVIDIA-Optimization-{key}.nip") : null;
+    public string? DetectedGpuGroup => DetectedProfileKey?.Replace('-', ' ');
+    public string? OptimizationPath => DetectedProfileKey is { } key ? EnsureAutomaticProfile(key) : null;
     public bool FilesAvailable => File.Exists(ToolPath) && File.Exists(BaselinePath) && IsToolIntegrityValid();
     public bool CanOptimize => OptimizationPath is { } path && File.Exists(path);
 
@@ -46,7 +48,12 @@ public sealed class NvidiaProfileService
                     : DescribeValue(name, numericId, numericValue, value);
                 return $"• {TranslateSettingName(name, id)}\n  → {readableValue}";
             });
-            return $"PROFIL {DetectedGpuGroup}\n{settings.Length} paramètres appliqués\n\n{string.Join("\n", lines)}";
+            var key = DetectedProfileKey ?? "";
+            var smoothMotionNote = key.StartsWith("RTX-40", StringComparison.Ordinal) || key.StartsWith("RTX-50", StringComparison.Ordinal)
+                ? "\n\nMouvement fluide : disponible pour cette génération, mais NVIDIA impose son activation jeu par jeu dans NVIDIA App."
+                : "";
+            return $"PROFIL {DetectedGpuGroup}\n{settings.Length} paramètres appliqués\n\n{string.Join("\n", lines)}" +
+                   "\n\nLes overrides DLSS agissent uniquement dans les jeux compatibles où DLSS est activé." + smoothMotionNote;
         }
         catch (Exception ex) { return $"Impossible de lire le profil : {ex.Message}"; }
     }
@@ -83,6 +90,7 @@ public sealed class NvidiaProfileService
         return name.Trim() switch
         {
             "Texture filtering - Trilinear optimization" => "Filtrage des textures — optimisation trilinéaire",
+            "Low Latency Mode" => "Mode faible latence",
             "Vertical Sync Tear Control" => "Contrôle du déchirement d’image",
             "Preferred refresh rate" => "Fréquence de rafraîchissement préférée",
             "Maximum pre-rendered frames" => "Nombre maximal d’images pré-rendues",
@@ -114,13 +122,19 @@ public sealed class NvidiaProfileService
     private static string DescribeValue(string? name, uint id, uint value, string raw)
     {
         var text = name ?? "";
+        if (id == 390467 && value == 2) return "Ultra";
         if (id == 11306135 && value == uint.MaxValue) return "Illimitée";
-        if (id == 13510289 && value == 20) return "Haute performance";
+        if (id == 13510289) return value switch { 0 => "Qualité", 10 => "Performance", 20 => "Haute performance", _ => $"Valeur technique : {raw}" };
         if (id == 6600001 && value == 1) return "La plus élevée disponible";
         if (id == 8102046) return $"{value} image" + (value > 1 ? "s" : "");
         if (id == 274197361 && value == 1) return "Privilégier les performances maximales";
-        if (id is 277041154 or 277041162) return $"{value} FPS";
-        if (id == 11041231 && value == 0x47814940) return "Activée";
+        if (id is 277041154 or 277041162) return value == 0 ? "Désactivé (FPS illimités)" : $"{value} FPS";
+        if (id == 11041231) return value switch { 0x08416747 => "Désactivée pour libérer les FPS", 0x47814940 => "Activée", _ => $"Valeur technique : {raw}" };
+        if (id == 283385333 && value == 50) return "Performance (résolution interne 50 %)";
+        if (id == 283385345 && value == 1) return "Override activé (DLSS doit être activé dans le jeu)";
+        if (id == 283385347 && value == 1) return "Override activé (Frame Generation doit être activée dans le jeu)";
+        if (id is 273507943 or 274083087) return $"Maximum matériel ({value} images générées)";
+        if (id == 294973784 && value == 1) return "Activé si l’écran est compatible";
         if (text.Contains("Saturation", StringComparison.OrdinalIgnoreCase) || text.Contains("Intensity", StringComparison.OrdinalIgnoreCase) || text.Contains("Middle Grey", StringComparison.OrdinalIgnoreCase) || text.Contains("contrast", StringComparison.OrdinalIgnoreCase)) return $"{value} %";
         if ((text.Contains("Enable", StringComparison.OrdinalIgnoreCase) || text.Contains("G-SYNC", StringComparison.OrdinalIgnoreCase) || text.Contains("VRR", StringComparison.OrdinalIgnoreCase) || text.Contains("Low Latency", StringComparison.OrdinalIgnoreCase) || text.Contains("optimization", StringComparison.OrdinalIgnoreCase)) && value <= 1) return value == 1 ? "Activé" : "Désactivé";
         return $"Réglage NVIDIA conservé (valeur technique : {raw})";
@@ -177,6 +191,7 @@ public sealed class NvidiaProfileService
 
     public string GetHardwareInformation()
     {
+        if (_hardwareInformation != null) return _hardwareInformation;
         try
         {
             using var process = Process.Start(new ProcessStartInfo
@@ -187,34 +202,130 @@ public sealed class NvidiaProfileService
                 RedirectStandardOutput = true,
                 CreateNoWindow = true
             });
-            if (process == null) return "Informations NVIDIA indisponibles";
+            if (process == null) return _hardwareInformation = "Informations NVIDIA indisponibles";
             var result = process.StandardOutput.ReadToEnd().Trim();
             process.WaitForExit(5000);
-            if (string.IsNullOrWhiteSpace(result)) return "Informations NVIDIA indisponibles";
+            if (string.IsNullOrWhiteSpace(result)) return _hardwareInformation = "Informations NVIDIA indisponibles";
             var parts = result.Split(',', StringSplitOptions.TrimEntries);
-            return parts.Length >= 3 ? $"{parts[0]} · Pilote {parts[1]} · VBIOS {parts[2]} (informatif)" : result;
+            return _hardwareInformation = parts.Length >= 3
+                ? $"{parts[0]} · Pilote {parts[1]} · VBIOS {parts[2]} (informatifs, sans blocage de version)"
+                : result;
         }
-        catch { return "Informations NVIDIA indisponibles"; }
+        catch { return _hardwareInformation = "Informations NVIDIA indisponibles"; }
     }
 
     private string? DetectProfileKey()
     {
         var information = GetHardwareInformation();
-        var match = Regex.Match(information, @"RTX\s*(5090|5080|5070|5060|5050|4090|4080|4070|4060|3090|3080|3070|3060)", RegexOptions.IgnoreCase);
+        return GetProfileKeyForGpuName(information);
+    }
+
+    public static string? GetProfileKeyForGpuName(string? gpuName)
+    {
+        if (string.IsNullOrWhiteSpace(gpuName)) return null;
+        var match = Regex.Match(gpuName,
+            @"(?:GeForce\s+)?RTX\s*(?<model>5090|5080|5070|5060|5050|4090|4080|4070|4060|4050|3090|3080|3070|3060|3050|2080|2070|2060|2050)(?:\s+(?<ti>Ti))?(?:\s+(?<super>SUPER))?",
+            RegexOptions.IgnoreCase);
         if (!match.Success) return null;
-        return match.Groups[1].Value switch
+
+        var parts = new List<string> { "RTX", match.Groups["model"].Value };
+        if (match.Groups["ti"].Success) parts.Add("Ti");
+        if (match.Groups["super"].Success) parts.Add("SUPER");
+        if (Regex.IsMatch(gpuName, @"\bLaptop\b", RegexOptions.IgnoreCase)) parts.Add("Laptop");
+        return string.Join('-', parts);
+    }
+
+    private string EnsureAutomaticProfile(string key)
+    {
+        Directory.CreateDirectory(AutomaticProfilesFolder);
+        var path = Path.Combine(AutomaticProfilesFolder, $"NVIDIA-Optimization-{key}.nip");
+        var document = CreateMaximumPerformanceProfile(key);
+
+        var shouldWrite = true;
+        if (File.Exists(path))
         {
-            "5090" => "RTX-5090",
-            "5080" or "5070" => "RTX-5080-5070",
-            "5060" or "5050" => "RTX-5060-5050",
-            "4090" => "RTX-4090",
-            "4080" or "4070" => "RTX-4080-4070",
-            "4060" => "RTX-4060",
-            "3090" => "RTX-3090",
-            "3080" or "3070" => "RTX-3080-3070",
-            "3060" => "RTX-3060",
-            _ => null
+            try { shouldWrite = !ProfilesHaveSameSettings(LoadNvidiaProfile(path), document); }
+            catch { shouldWrite = true; }
+        }
+        if (shouldWrite)
+        {
+            SaveUnicodeProfile(document, path);
+            AppLog.Write($"NVIDIA | Profil automatique {key} généré : {path}");
+        }
+        return path;
+    }
+
+    private static bool ProfilesHaveSameSettings(XDocument first, XDocument second)
+    {
+        static string[] Values(XDocument document) => document.Descendants("ProfileSetting")
+            .Select(setting => $"{(string?)setting.Element("SettingID")}|{(string?)setting.Element("SettingValue")}|{(string?)setting.Element("ValueType")}")
+            .OrderBy(value => value, StringComparer.Ordinal)
+            .ToArray();
+        return Values(first).SequenceEqual(Values(second), StringComparer.Ordinal);
+    }
+
+    private static XDocument CreateMaximumPerformanceProfile(string key)
+    {
+        var isRtx40 = key.StartsWith("RTX-40", StringComparison.Ordinal);
+        var isRtx50 = key.StartsWith("RTX-50", StringComparison.Ordinal);
+        var supportsFrameGeneration = isRtx40 || isRtx50;
+
+        // Profil global volontairement agressif : débit d'images maximal, qualité de filtrage
+        // minimale et overrides DLSS. Les overrides restent sans effet dans un jeu non compatible.
+        var settings = new List<(string Name, uint Id, uint Value)>
+        {
+            ("Low Latency Mode", 390467, 2),
+            ("Preferred refresh rate", 6600001, 1),
+            ("Maximum pre-rendered frames", 8102046, 1),
+            ("Vertical Sync", 11041231, 0x08416747),
+            ("Shader disk cache maximum size", 11306135, uint.MaxValue),
+            ("Texture filtering - Trilinear optimization", 3066610, 1),
+            ("Texture filtering - Anisotropic sample optimization", 15151633, 1),
+            ("Texture filtering - Quality", 13510289, 20),
+            ("Pre-Compile Shader Options", 15389065, 2),
+            ("Power management mode", 274197361, 1),
+            ("FRL Low Latency", 277041152, 1),
+            ("Frame Rate Limiter", 277041154, 0),
+            ("Frame Rate Limiter for NVCPL", 277041162, 0),
+            ("VRR requested state", 278196727, 1),
+            ("Override DLSS-SR performance mode", 279951208, 0),
+            ("Override DLSS-RR performance mode", 280859683, 0),
+            ("Override scaling ratio for DLSS-RR", 281531554, 50),
+            ("Override DLSS-SR presets", 283385331, 13),
+            ("Override scaling ratio for DLSS-SR", 283385333, 50),
+            ("Override DLSS-RR preset", 283385335, 16777215),
+            ("Enable DLSS-SR override", 283385345, 1),
+            ("Enable DLSS-RR override", 283385346, 1),
+            ("Enable Streamline override", 283385350, 1),
+            ("Enable G-SYNC globally", 294973784, 1)
         };
+
+        if (supportsFrameGeneration)
+        {
+            settings.Add(("Override DLSSG mode", 271614616, 4));
+            settings.Add(("Override DLSS-FG preset", 283385329, 2));
+            settings.Add(("Enable DLSS-FG override", 283385347, 1));
+        }
+
+        if (isRtx50)
+        {
+            settings.Add(("Override DLSSG multi-frame count", 273507943, 5));
+            settings.Add(("Override maximum DLSSG dynamic multi frame count", 274083087, 5));
+            settings.Add(("Override DLSSG Target Frame Rate", 282018085, 16777216));
+        }
+
+        return new XDocument(
+            new XDeclaration("1.0", "utf-16", null),
+            new XElement("ArrayOfProfile",
+                new XElement("Profile",
+                    new XElement("ProfileName", "Base Profile"),
+                    new XElement("Executeables"),
+                    new XElement("Settings", settings.Select(setting =>
+                        new XElement("ProfileSetting",
+                            new XElement("SettingNameInfo", setting.Name),
+                            new XElement("SettingID", setting.Id),
+                            new XElement("SettingValue", setting.Value),
+                            new XElement("ValueType", "Dword")))))));
     }
 
     public Task<NvidiaProfileSnapshot> SaveCurrentProfileAsync() => SaveCurrentProfileAsync($"Profil-NVIDIA-{DateTime.Now:yyyyMMdd-HHmmss}", null);
@@ -286,6 +397,7 @@ public sealed class NvidiaProfileService
     {
         VerifyToolIntegrity();
         if (!File.Exists(profilePath)) throw new FileNotFoundException("Le profil NVIDIA est introuvable.", profilePath);
+        AppLog.Write($"NVIDIA | Import de {Path.GetFileName(profilePath)} | {GetHardwareInformation()} | Filtre de version pilote : aucun");
         using var process = Process.Start(new ProcessStartInfo
         {
             FileName = ToolPath,

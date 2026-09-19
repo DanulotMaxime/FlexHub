@@ -1,5 +1,15 @@
 # Notes de version
 
+## 1.3.0
+
+- Refonte du module NVIDIA avec détection automatique des GeForce RTX séries 2000, 3000, 4000 et 5000.
+- Prise en charge des variantes Ti, SUPER et Laptop avec génération d’un fichier d’optimisation propre au modèle détecté.
+- Nouveau profil « FPS maximum » : performances maximales, faible latence Ultra, FPS illimités, V-Sync désactivée, cache des shaders illimité et filtrage haute performance.
+- Activation des overrides DLSS Super Resolution en mode Performance pour toutes les RTX compatibles.
+- Activation de Frame Generation sur RTX 40/50 et de Multi Frame Generation maximal sur RTX 50 dans les jeux compatibles.
+- La version du pilote NVIDIA reste informative et ne bloque plus l’application du profil.
+- Ajout de contrôles automatiques empêchant l’injection de fonctions incompatibles sur les anciennes générations.
+
 ## 1.2.1
 
 - Installation automatique des nouvelles versions dès leur détection.

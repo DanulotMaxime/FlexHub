@@ -155,7 +155,7 @@
               <ToggleButton x:Name="NvidiaEnabled" Style="{StaticResource ToggleStyle}"/><TextBlock Text="Activé" Margin="10,0,0,0" VerticalAlignment="Center"/>
             </StackPanel></Grid>
             <Border Grid.Row="1" Height="1" Background="{DynamicResource SeparatorBrush}" Margin="0,20"/>
-            <Border Grid.Row="2" Background="#332F9E66" BorderBrush="#FFCA8B55" BorderThickness="1" CornerRadius="11" Padding="14" Margin="0,0,0,12"><TextBlock Text="⚠ Vérifiez la liste des valeurs qui seront modifiées avant d’appliquer l’optimisation. Certains réglages NVIDIA sont globaux, expérimentaux ou dépendants de votre écran et de vos jeux." TextWrapping="Wrap"/></Border>
+            <Border Grid.Row="2" Background="#332F9E66" BorderBrush="#FFCA8B55" BorderThickness="1" CornerRadius="11" Padding="14" Margin="0,0,0,12"><TextBlock Text="⚠ Mode FPS maximum : performances maximales, V-Sync désactivée, FPS illimités, faible latence Ultra et overrides DLSS. Frame Generation est ajoutée sur RTX 40/50 et Multi Frame Generation sur RTX 50. Le jeu doit prendre en charge et activer ces fonctions. Smooth Motion reste configurable jeu par jeu dans NVIDIA App. La version du pilote ne bloque pas l’application." TextWrapping="Wrap"/></Border>
             <Border Grid.Row="3" Background="{DynamicResource PanelLightBrush}" CornerRadius="11" Padding="18"><StackPanel>
               <TextBlock Text="Profil global détecté" FontWeight="SemiBold" FontSize="16"/>
               <TextBlock x:Name="NvidiaHardwareInfo" Text="Lecture des informations NVIDIA…" Foreground="{StaticResource MutedBrush}" Margin="0,7,0,0" TextWrapping="Wrap"/>
