@@ -1,5 +1,13 @@
 # Notes de version
 
+## 1.3.1
+
+- Ajout d’une étape de configuration de la clé API Google Gemini au premier lancement, juste après le choix de la mémoire.
+- Ajout d’un lien direct vers Google AI Studio et stockage local chiffré de la clé Gemini.
+- MyMemory est désormais le service de traduction présélectionné, de l’anglais vers le français.
+- Le module « Clavier de saisie » est renommé « Azerty>Querty auto ».
+- Le module « Azerty>Querty auto » et le rappel Top-Serveurs sont désormais désactivés par défaut sur les nouvelles installations.
+
 ## 1.3.0
 
 - Refonte du module NVIDIA avec détection automatique des GeForce RTX séries 2000, 3000, 4000 et 5000.
