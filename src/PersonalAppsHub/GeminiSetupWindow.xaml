@@ -1,0 +1,29 @@
+<Window x:Class="PersonalAppsHub.GeminiSetupWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Configuration de Google Gemini" Width="560" Height="350" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" Background="{DynamicResource PanelBrush}" Foreground="{DynamicResource TextBrush}">
+  <Grid Margin="28">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+    <TextBlock Text="Configuration de Google Gemini" FontSize="25" FontWeight="SemiBold"/>
+    <TextBlock Grid.Row="1" Margin="0,8,0,20" TextWrapping="Wrap" Foreground="{DynamicResource MutedBrush}"
+               Text="Modèle IA par défaut à configurer. Ajoutez votre clé API Google Gemini pour utiliser la génération de réponses et les autres fonctions IA."/>
+    <Button Grid.Row="2" x:Name="OpenApiKeyPageButton" Content="Obtenir une clé API Gemini ↗"
+            HorizontalAlignment="Left" Style="{StaticResource ButtonStyle}" Click="OpenApiKeyPageButton_OnClick"/>
+    <StackPanel Grid.Row="3" Margin="0,20,0,0">
+      <TextBlock Text="Clé API Google Gemini" FontWeight="SemiBold"/>
+      <PasswordBox x:Name="ApiKeyBox" Height="42" Padding="12,8" Margin="0,7,0,0"/>
+    </StackPanel>
+    <TextBlock Grid.Row="4" Margin="0,10,0,0" TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource MutedBrush}"
+               Text="La clé est chiffrée et enregistrée localement pour votre compte Windows. Vous pourrez la modifier dans les paramètres généraux."/>
+    <Button Grid.Row="5" x:Name="ConfirmButton" Content="Enregistrer et continuer" HorizontalAlignment="Right"
+            Style="{StaticResource PrimaryButtonStyle}" Click="ConfirmButton_OnClick"/>
+  </Grid>
+</Window>

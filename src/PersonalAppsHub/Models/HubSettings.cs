@@ -6,9 +6,9 @@ public sealed class HubSettings
     public bool StartWithWindows { get; set; } = true;
     public string FontSizePreference { get; set; } = "Moyen";
     public string ThemePreference { get; set; } = "Sombre";
-    public bool AutoFrenchKeyboardInDialogs { get; set; } = true;
+    public bool AutoFrenchKeyboardInDialogs { get; set; }
     public string GameChatKeyboardShortcut { get; set; } = "Enter";
-    public bool ReminderEnabled { get; set; } = true;
+    public bool ReminderEnabled { get; set; }
     public int ReminderIntervalMinutes { get; set; } = 130;
     public int ReminderDisplaySeconds { get; set; } = 20;
     public string ReminderUrl { get; set; } = "https://top-serveurs.net/project-zomboid/fr-nextgen-france-project-zomboid-nouveau-serveur";
@@ -24,10 +24,10 @@ public sealed class HubSettings
     public string GeminiModel { get; set; } = "gemini-3.5-flash-lite";
     public string LanguageToolUrl { get; set; } = "http://localhost:8081";
     public bool TranslatorEnabled { get; set; } = true;
-    public string TranslatorProvider { get; set; } = "DeepL";
+    public string TranslatorProvider { get; set; } = "MyMemory";
     public string TranslatorHotkey { get; set; } = "Ctrl+Alt+F9";
-    public string TranslationSourceLanguage { get; set; } = "auto";
-    public string TranslationTargetLanguage { get; set; } = "EN";
+    public string TranslationSourceLanguage { get; set; } = "EN";
+    public string TranslationTargetLanguage { get; set; } = "FR";
     public bool TranslationPreviewBeforeReplace { get; set; } = true;
     public bool DeepLUseFreeApi { get; set; } = true;
     public string TranslatorGeminiModel { get; set; } = "gemini-3.5-flash-lite";
@@ -48,6 +48,7 @@ public sealed class HubSettings
     public bool XmpMonitorEnabled { get; set; }
     public int XmpCheckIntervalMinutes { get; set; } = 360;
     public bool MemorySetupCompleted { get; set; }
+    public bool GeminiSetupCompleted { get; set; }
     public string MemoryType { get; set; } = "";
     public bool XmpUseCustomSpeed { get; set; }
     public int XmpExpectedSpeed { get; set; } = 3200;

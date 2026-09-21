@@ -185,6 +185,7 @@ public partial class MainWindow : Window
             if (_initialXmpCheckDone) return;
             _initialXmpCheckDone = true;
             ShowMemorySetupIfNeeded();
+            ShowGeminiSetupIfNeeded();
             if (_settings.XmpMonitorEnabled) await CheckXmpAsync(false);
             await CheckForUpdatesAtStartupAsync();
         };
@@ -1368,6 +1369,26 @@ public partial class MainWindow : Window
         XmpExpectedSpeedBox.Text = _settings.XmpExpectedSpeed.ToString();
         UpdateXmpSpeedControls();
         ConfigureXmpTimer();
+    }
+
+    private void ShowGeminiSetupIfNeeded()
+    {
+        if (_settings.GeminiSetupCompleted) return;
+        if (SecretStore.HasKey("Gemini"))
+        {
+            _settings.GeminiSetupCompleted = true;
+            _settingsService.Save(_settings);
+            return;
+        }
+        var dialog = new GeminiSetupWindow { Owner = this };
+        if (dialog.ShowDialog() != true) return;
+        SecretStore.Save("Gemini", dialog.ApiKey);
+        _settings.GeminiSetupCompleted = true;
+        _settingsService.Save(_settings);
+        RefreshGeneralApiKeyBoxes();
+        UpdateProviderPanel();
+        UpdateTranslationProviderPanel();
+        UpdateResponseGeneratorModel();
     }
 
     private void MemoryTypeBox_OnSelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e) => UpdateXmpSpeedControls();

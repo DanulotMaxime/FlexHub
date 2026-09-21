@@ -19,6 +19,12 @@ Check(!ddr4Low.IsProbablyActive, "DDR4 sous la plage");
 Check(ddr5Fast.IsProbablyActive, "DDR5 au-dessus de la plage");
 
 var defaults = new HubSettings();
+Check(!defaults.ReminderEnabled, "rappel Top-Serveurs désactivé par défaut");
+Check(!defaults.AutoFrenchKeyboardInDialogs, "clavier de saisie désactivé par défaut");
+Check(defaults.TranslatorProvider == "MyMemory", "MyMemory présélectionné pour la traduction");
+Check(defaults.TranslationSourceLanguage == "EN" && defaults.TranslationTargetLanguage == "FR",
+    "traduction par défaut de l’anglais vers le français");
+Check(!defaults.GeminiSetupCompleted, "configuration Gemini demandée au premier lancement");
 Check(!defaults.XmpMonitorEnabled && !defaults.MemorySetupCompleted, "surveillance désactivée avant l’assistant");
 Check(!defaults.AiPrivacyConsentAccepted, "consentement API explicite");
 
