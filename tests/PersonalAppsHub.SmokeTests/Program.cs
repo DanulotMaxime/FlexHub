@@ -28,6 +28,16 @@ Check(!defaults.GeminiSetupCompleted, "configuration Gemini demandée au premier
 Check(!defaults.XmpMonitorEnabled && !defaults.MemorySetupCompleted, "surveillance désactivée avant l’assistant");
 Check(!defaults.AiPrivacyConsentAccepted, "consentement API explicite");
 
+Check(defaults.ReformulatorEnabled && defaults.SimplifierEnabled, "transformations de texte activées par défaut");
+var reformulateInstruction = ResponseGenerationService.BuildTransformationInstruction(TextTransformationMode.Reformulate, "Discours médiéval");
+Check(reformulateInstruction.Contains("Discours médiéval") && reformulateInstruction.Contains("sens"), "consigne de reformulation avec style");
+var simplifyInstruction = ResponseGenerationService.BuildTransformationInstruction(TextTransformationMode.Simplify, "Ultra simplifié");
+Check(simplifyInstruction.Contains("enfant") && simplifyInstruction.Contains("même langue"), "consigne de simplification selon le niveau");
+var summaryInstruction = ResponseGenerationService.BuildTransformationInstruction(TextTransformationMode.SummarizeConversation, "5 lignes. Extrais les tâches.");
+Check(summaryInstruction.Contains("5 lignes") && summaryInstruction.Contains("tâches") && summaryInstruction.Contains("même langue"), "consigne de résumé de conversation");
+var definitionInstruction = ResponseGenerationService.BuildTransformationInstruction(TextTransformationMode.DefineWord, "Définition courte avec un exemple.");
+Check(definitionInstruction.Contains("Définition courte") && definitionInstruction.Contains("contexte"), "consigne de définition d’un mot");
+
 Check(NvidiaProfileService.GetProfileKeyForGpuName("NVIDIA GeForce RTX 2080 Ti") == "RTX-2080-Ti", "détection RTX 2080 Ti");
 Check(NvidiaProfileService.GetProfileKeyForGpuName("NVIDIA GeForce RTX 3050 Laptop GPU") == "RTX-3050-Laptop", "détection RTX 3050 mobile");
 Check(NvidiaProfileService.GetProfileKeyForGpuName("GeForce RTX 4070 Ti SUPER") == "RTX-4070-Ti-SUPER", "détection RTX 4070 Ti SUPER");

@@ -2,7 +2,7 @@ namespace PersonalAppsHub.Models;
 
 public sealed class HubSettings
 {
-    public int SettingsSchemaVersion { get; set; } = 2;
+    public int SettingsSchemaVersion { get; set; } = 3;
     public bool StartWithWindows { get; set; } = true;
     public string FontSizePreference { get; set; } = "Moyen";
     public string ThemePreference { get; set; } = "Sombre";
@@ -41,6 +41,17 @@ public sealed class HubSettings
     public string ResponseGeneratorOpenAiModel { get; set; } = "gpt-4o-mini";
     public string ResponseGeneratorGeminiModel { get; set; } = "gemini-3.5-flash-lite";
     public bool ResponseGeneratorPreview { get; set; } = true;
+    public bool ReformulatorEnabled { get; set; } = true;
+    public string ReformulationStyle { get; set; } = "Email professionnel";
+    public bool SimplifierEnabled { get; set; } = true;
+    public string SimplificationLevel { get; set; } = "Simplifier";
+    public bool ConversationSummarizerEnabled { get; set; } = true;
+    public string ConversationSummaryLength { get; set; } = "Court - 5 lignes";
+    public bool ConversationSummaryPreserveNames { get; set; } = true;
+    public bool ConversationSummaryIncludeActions { get; set; } = true;
+    public bool WordDefinitionEnabled { get; set; } = true;
+    public string WordDefinitionDetail { get; set; } = "Simple";
+    public bool WordDefinitionIncludeExamples { get; set; } = true;
     public bool ActionWheelEnabled { get; set; } = true;
     public string ActionWheelHotkey { get; set; } = "Ctrl+Alt+Space";
     public bool NvidiaOptimizerEnabled { get; set; } = true;

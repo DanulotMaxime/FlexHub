@@ -17,9 +17,17 @@
     </Border>
     <Grid Grid.Row="1" Margin="18"><Grid.ColumnDefinitions><ColumnDefinition Width="255"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
       <Border Background="{DynamicResource SidebarBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="14" Padding="15">
-        <StackPanel><TextBlock Text="FLEXHUB" Foreground="{StaticResource MutedBrush}" FontSize="12" FontWeight="Bold" Margin="4,4,0,14"/>
-          <StackPanel x:Name="ActiveAppsPanel">
+        <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+          <TextBlock Text="FLEXHUB" Foreground="{StaticResource MutedBrush}" FontSize="12" FontWeight="Bold" Margin="4,4,0,14"/>
+          <ScrollViewer x:Name="SidebarScrollViewer" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                        PanningMode="VerticalOnly" CanContentScroll="False" PreviewMouseWheel="SidebarScrollViewer_OnPreviewMouseWheel">
+          <StackPanel Margin="0,0,5,0">
+            <StackPanel x:Name="ActiveAppsPanel">
             <Button x:Name="CorrectorNav" Style="{StaticResource ButtonStyle}" HorizontalContentAlignment="Left" Content="✓  Correcteur universel"/>
+            <Button x:Name="ReformulateNav" Style="{StaticResource ButtonStyle}" HorizontalContentAlignment="Left" Content="↻  Reformuler"/>
+            <Button x:Name="SimplifyNav" Style="{StaticResource ButtonStyle}" HorizontalContentAlignment="Left" Content="≡  Simplifier"/>
+            <Button x:Name="ConversationSummaryNav" Style="{StaticResource ButtonStyle}" HorizontalContentAlignment="Left" Content="☷  Résumer conversation"/>
+            <Button x:Name="WordDefinitionNav" Style="{StaticResource ButtonStyle}" HorizontalContentAlignment="Left" Content="?  Définition d’un mot"/>
             <Button x:Name="TranslatorNav" Style="{StaticResource ButtonStyle}" HorizontalContentAlignment="Left" Content="⇄  Traducteur universel"/>
             <Button x:Name="ResponseGeneratorNav" Style="{StaticResource ButtonStyle}" HorizontalContentAlignment="Left" Content="✦  Générateur de réponse"/>
             <Button x:Name="ReminderNav" Style="{StaticResource ButtonStyle}" HorizontalContentAlignment="Left" Content="◷  Rappel Top-Serveurs"/>
@@ -27,13 +35,15 @@
             <Button x:Name="XmpNav" Style="{StaticResource ButtonStyle}" HorizontalContentAlignment="Left" Content="▦  Surveillance XMP"/>
             <Button x:Name="ActionWheelNav" Style="{StaticResource ButtonStyle}" HorizontalContentAlignment="Left" Content="◉  Roue d’actions"/>
             <Button x:Name="KeyboardLayoutNav" Style="{StaticResource ButtonStyle}" HorizontalContentAlignment="Left" Content="⌨  Azerty&gt;Querty auto"/>
+            </StackPanel>
+            <StackPanel x:Name="DisabledAppsSection" Visibility="Collapsed">
+              <Border Height="1" Background="{DynamicResource SeparatorBrush}" Margin="2,18,2,14"/>
+              <TextBlock Text="APPLICATIONS DÉSACTIVÉES" Foreground="{DynamicResource DisabledTextBrush}" FontSize="11" FontWeight="Bold" Margin="4,0,0,10" TextWrapping="Wrap"/>
+              <StackPanel x:Name="DisabledAppsPanel"/>
+            </StackPanel>
           </StackPanel>
-          <StackPanel x:Name="DisabledAppsSection" Visibility="Collapsed">
-            <Border Height="1" Background="{DynamicResource SeparatorBrush}" Margin="2,18,2,14"/>
-            <TextBlock Text="APPLICATIONS DÉSACTIVÉES" Foreground="{DynamicResource DisabledTextBrush}" FontSize="11" FontWeight="Bold" Margin="4,0,0,10"/>
-            <StackPanel x:Name="DisabledAppsPanel"/>
-          </StackPanel>
-        </StackPanel>
+          </ScrollViewer>
+        </Grid>
       </Border>
       <Border Grid.Column="2" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="14" Padding="26">
         <Grid>
@@ -78,6 +88,109 @@
             <Button x:Name="SaveCorrector" Grid.Row="4" Content="Enregistrer" Style="{StaticResource PrimaryButtonStyle}" HorizontalAlignment="Right"/>
           </Grid>
 
+          <Grid x:Name="ReformulatePage" Visibility="Collapsed">
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+            <Grid>
+              <StackPanel><TextBlock Text="Reformuler" FontSize="27" FontWeight="SemiBold"/><TextBlock Text="Réécrit le texte sélectionné en conservant son sens, sa langue et ses informations." Foreground="{DynamicResource MutedBrush}" Margin="0,7,150,0" TextWrapping="Wrap"/></StackPanel>
+              <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><ToggleButton x:Name="ReformulatorEnabled" Style="{StaticResource ToggleStyle}"/><TextBlock Text="Activé" Margin="10,0,0,0" VerticalAlignment="Center"/></StackPanel>
+            </Grid>
+            <Border Grid.Row="1" Height="1" Background="{DynamicResource SeparatorBrush}" Margin="0,20"/>
+            <StackPanel Grid.Row="2">
+              <Grid Margin="0,0,0,14"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="250"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Style de reformulation" FontWeight="SemiBold"/><TextBlock Text="Le texte conserve son sens mais adopte ce style." Foreground="{DynamicResource MutedBrush}" FontSize="12" Margin="0,4,12,0"/></StackPanel><ComboBox x:Name="ReformulationStyleBox" Grid.Column="1"><ComboBoxItem Content="Email professionnel"/><ComboBoxItem Content="Message décontracté"/><ComboBoxItem Content="LinkedIn enthousiaste"/><ComboBoxItem Content="LinkedIn cringe"/><ComboBoxItem Content="Discours médiéval"/><ComboBoxItem Content="Très formel"/><ComboBoxItem Content="Amical"/><ComboBoxItem Content="Direct et concis"/><ComboBoxItem Content="Diplomatique"/><ComboBoxItem Content="Humoristique"/><ComboBoxItem Content="Commercial convaincant"/><ComboBoxItem Content="Académique"/><ComboBoxItem Content="Poétique"/><ComboBoxItem Content="Fantasy"/><ComboBoxItem Content="Discours motivant"/><ComboBoxItem Content="Vieux français"/><ComboBoxItem Content="Français très complexe"/><ComboBoxItem Content="Scientifique"/><ComboBoxItem Content="Méchant"/><ComboBoxItem Content="Insultant"/><ComboBoxItem Content="Insultant mais discret"/><ComboBoxItem Content="Méchant de film"/></ComboBox></Grid>
+              <Border Background="{DynamicResource PanelLightBrush}" CornerRadius="11" Padding="18" Margin="0,0,0,14">
+                <StackPanel>
+                  <TextBlock Text="Comment l’utiliser" FontSize="17" FontWeight="SemiBold"/>
+                  <TextBlock Text="1. Sélectionnez un texte dans une application Windows.&#x0a;2. Ouvrez la roue d’actions.&#x0a;3. Survolez Reformuler pendant un court instant.&#x0a;4. Vérifiez le résultat avant de remplacer le texte." Foreground="{DynamicResource MutedBrush}" Margin="0,10,0,0" TextWrapping="Wrap" LineHeight="22"/>
+                </StackPanel>
+              </Border>
+              <Border Background="{DynamicResource PanelLightBrush}" CornerRadius="11" Padding="18">
+                <StackPanel>
+                  <TextBlock Text="Configuration utilisée" FontSize="17" FontWeight="SemiBold"/>
+                  <TextBlock x:Name="ReformulateConfigurationText" Foreground="{DynamicResource AccentBrightBrush}" Margin="0,10,0,0" TextWrapping="Wrap"/>
+                  <TextBlock Text="La clé API, le modèle, le ton et l’aperçu sont partagés avec le Générateur de réponse." Foreground="{DynamicResource MutedBrush}" FontSize="12" Margin="0,7,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+            <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
+              <Button x:Name="OpenReformulateWheelSettings" Content="Roue d’actions" Style="{StaticResource ButtonStyle}" Margin="0,0,9,0"/>
+              <Button x:Name="OpenReformulateAiSettings" Content="Réglages IA" Style="{StaticResource ButtonStyle}" Margin="0,0,9,0"/>
+              <Button x:Name="SaveReformulator" Content="Enregistrer" Style="{StaticResource PrimaryButtonStyle}"/>
+            </StackPanel>
+          </Grid>
+
+          <Grid x:Name="SimplifyPage" Visibility="Collapsed">
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+            <Grid>
+              <StackPanel><TextBlock Text="Simplifier" FontSize="27" FontWeight="SemiBold"/><TextBlock Text="Transforme un texte complexe en une version claire, accessible et fidèle aux informations d’origine." Foreground="{DynamicResource MutedBrush}" Margin="0,7,150,0" TextWrapping="Wrap"/></StackPanel>
+              <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><ToggleButton x:Name="SimplifierEnabled" Style="{StaticResource ToggleStyle}"/><TextBlock Text="Activé" Margin="10,0,0,0" VerticalAlignment="Center"/></StackPanel>
+            </Grid>
+            <Border Grid.Row="1" Height="1" Background="{DynamicResource SeparatorBrush}" Margin="0,20"/>
+            <StackPanel Grid.Row="2">
+              <Grid Margin="0,0,0,14"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="250"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Niveau de simplification" FontWeight="SemiBold"/><TextBlock Text="Choisissez la quantité de détails et la difficulté du vocabulaire." Foreground="{DynamicResource MutedBrush}" FontSize="12" Margin="0,4,12,0"/></StackPanel><ComboBox x:Name="SimplificationLevelBox" Grid.Column="1"><ComboBoxItem Content="Ultra simplifié"/><ComboBoxItem Content="Beaucoup simplifié"/><ComboBoxItem Content="Simplifié"/></ComboBox></Grid>
+              <Border Background="{DynamicResource PanelLightBrush}" CornerRadius="11" Padding="18" Margin="0,0,0,14">
+                <StackPanel>
+                  <TextBlock Text="Comment l’utiliser" FontSize="17" FontWeight="SemiBold"/>
+                  <TextBlock Text="1. Sélectionnez le texte difficile à comprendre.&#x0a;2. Ouvrez la roue d’actions.&#x0a;3. Survolez Simplifier pendant un court instant.&#x0a;4. Vérifiez la version simplifiée avant le remplacement." Foreground="{DynamicResource MutedBrush}" Margin="0,10,0,0" TextWrapping="Wrap" LineHeight="22"/>
+                </StackPanel>
+              </Border>
+              <Border Background="{DynamicResource PanelLightBrush}" CornerRadius="11" Padding="18">
+                <StackPanel>
+                  <TextBlock Text="Configuration utilisée" FontSize="17" FontWeight="SemiBold"/>
+                  <TextBlock x:Name="SimplifyConfigurationText" Foreground="{DynamicResource AccentBrightBrush}" Margin="0,10,0,0" TextWrapping="Wrap"/>
+                  <TextBlock Text="La simplification conserve la langue et les faits importants. Le moteur et l’aperçu sont partagés avec le Générateur de réponse." Foreground="{DynamicResource MutedBrush}" FontSize="12" Margin="0,7,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+            <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
+              <Button x:Name="OpenSimplifyWheelSettings" Content="Roue d’actions" Style="{StaticResource ButtonStyle}" Margin="0,0,9,0"/>
+              <Button x:Name="OpenSimplifyAiSettings" Content="Réglages IA" Style="{StaticResource ButtonStyle}" Margin="0,0,9,0"/>
+              <Button x:Name="SaveSimplifier" Content="Enregistrer" Style="{StaticResource PrimaryButtonStyle}"/>
+            </StackPanel>
+          </Grid>
+
+          <Grid x:Name="ConversationSummaryPage" Visibility="Collapsed">
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+            <Grid>
+              <StackPanel><TextBlock Text="Résumer une conversation" FontSize="27" FontWeight="SemiBold"/><TextBlock Text="Extrait l’essentiel d’une conversation Discord, Slack, Teams ou de tout autre texte sélectionné." Foreground="{DynamicResource MutedBrush}" Margin="0,7,150,0" TextWrapping="Wrap"/></StackPanel>
+              <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><ToggleButton x:Name="ConversationSummarizerEnabled" Style="{StaticResource ToggleStyle}"/><TextBlock Text="Activé" Margin="10,0,0,0" VerticalAlignment="Center"/></StackPanel>
+            </Grid>
+            <Border Grid.Row="1" Height="1" Background="{DynamicResource SeparatorBrush}" Margin="0,20"/>
+            <StackPanel Grid.Row="2">
+              <Grid Margin="0,0,0,14"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="250"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Longueur du résumé" FontWeight="SemiBold"/><TextBlock Text="Adapte le niveau de détail du résultat." Foreground="{DynamicResource MutedBrush}" FontSize="12" Margin="0,4,12,0"/></StackPanel><ComboBox x:Name="ConversationSummaryLengthBox" Grid.Column="1"><ComboBoxItem Content="Très court - 3 lignes"/><ComboBoxItem Content="Court - 5 lignes"/><ComboBoxItem Content="Moyen - 10 lignes"/><ComboBoxItem Content="Détaillé"/></ComboBox></Grid>
+              <CheckBox x:Name="ConversationSummaryPreserveNamesCheck" Content="Conserver les noms des participants lorsqu’ils sont utiles" Foreground="{DynamicResource TextBrush}" Margin="0,0,0,12"/>
+              <CheckBox x:Name="ConversationSummaryIncludeActionsCheck" Content="Extraire les décisions et les tâches à faire" Foreground="{DynamicResource TextBrush}" Margin="0,0,0,18"/>
+              <Border Background="{DynamicResource PanelLightBrush}" CornerRadius="11" Padding="18">
+                <StackPanel><TextBlock Text="Utilisation" FontSize="17" FontWeight="SemiBold"/><TextBlock Text="Sélectionnez ou copiez la conversation dans une zone de texte, ouvrez la roue d’actions puis choisissez Résumer une conversation. Un aperçu modifiable sera affiché avant le remplacement." Foreground="{DynamicResource MutedBrush}" Margin="0,9,0,0" TextWrapping="Wrap"/><TextBlock x:Name="ConversationSummaryConfigurationText" Foreground="{DynamicResource AccentBrightBrush}" Margin="0,10,0,0" TextWrapping="Wrap"/></StackPanel>
+              </Border>
+            </StackPanel>
+            <TextBlock x:Name="ConversationSummaryStatus" Grid.Row="3" Foreground="{DynamicResource SuccessBrush}" Margin="0,14" TextWrapping="Wrap"/>
+            <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
+              <Button x:Name="OpenConversationSummaryAiSettings" Content="Réglages IA" Style="{StaticResource ButtonStyle}" Margin="0,0,9,0"/>
+              <Button x:Name="SaveConversationSummary" Content="Enregistrer" Style="{StaticResource PrimaryButtonStyle}"/>
+            </StackPanel>
+          </Grid>
+
+          <Grid x:Name="WordDefinitionPage" Visibility="Collapsed">
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+            <Grid>
+              <StackPanel><TextBlock Text="Définition d’un mot" FontSize="27" FontWeight="SemiBold"/><TextBlock Text="Explique instantanément un mot ou une expression sélectionnée, en tenant compte de son contexte." Foreground="{DynamicResource MutedBrush}" Margin="0,7,150,0" TextWrapping="Wrap"/></StackPanel>
+              <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><ToggleButton x:Name="WordDefinitionEnabled" Style="{StaticResource ToggleStyle}"/><TextBlock Text="Activé" Margin="10,0,0,0" VerticalAlignment="Center"/></StackPanel>
+            </Grid>
+            <Border Grid.Row="1" Height="1" Background="{DynamicResource SeparatorBrush}" Margin="0,20"/>
+            <StackPanel Grid.Row="2">
+              <Grid Margin="0,0,0,14"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="250"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Niveau d’explication" FontWeight="SemiBold"/><TextBlock Text="Définit la quantité de détails fournie." Foreground="{DynamicResource MutedBrush}" FontSize="12" Margin="0,4,12,0"/></StackPanel><ComboBox x:Name="WordDefinitionDetailBox" Grid.Column="1"><ComboBoxItem Content="Très simple"/><ComboBoxItem Content="Simple"/><ComboBoxItem Content="Détaillé"/><ComboBoxItem Content="Expert"/></ComboBox></Grid>
+              <CheckBox x:Name="WordDefinitionIncludeExamplesCheck" Content="Ajouter un exemple d’utilisation" Foreground="{DynamicResource TextBrush}" Margin="0,0,0,18"/>
+              <Border Background="{DynamicResource PanelLightBrush}" CornerRadius="11" Padding="18">
+                <StackPanel><TextBlock Text="Utilisation" FontSize="17" FontWeight="SemiBold"/><TextBlock Text="Sélectionnez un mot ou une expression, puis choisissez Définition d’un mot dans la roue. FlexHub consulte d’abord le Wiktionnaire sans clé API. Gemini est utilisé uniquement si aucune définition exploitable n’est trouvée." Foreground="{DynamicResource MutedBrush}" Margin="0,9,0,0" TextWrapping="Wrap"/><TextBlock x:Name="WordDefinitionConfigurationText" Foreground="{DynamicResource AccentBrightBrush}" Margin="0,10,0,0" TextWrapping="Wrap"/></StackPanel>
+              </Border>
+            </StackPanel>
+            <TextBlock x:Name="WordDefinitionStatus" Grid.Row="3" Foreground="{DynamicResource SuccessBrush}" Margin="0,14" TextWrapping="Wrap"/>
+            <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
+              <Button x:Name="OpenWordDefinitionAiSettings" Content="Réglages IA" Style="{StaticResource ButtonStyle}" Margin="0,0,9,0"/>
+              <Button x:Name="SaveWordDefinition" Content="Enregistrer" Style="{StaticResource PrimaryButtonStyle}"/>
+            </StackPanel>
+          </Grid>
+
           <Grid x:Name="TranslatorPage" Visibility="Collapsed"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
             <Grid><StackPanel><TextBlock Text="Traducteur universel" FontSize="27" FontWeight="SemiBold"/><TextBlock Text="Traduit le texte sélectionné dans les applications Windows." Foreground="{StaticResource MutedBrush}" Margin="0,7,0,0"/></StackPanel><StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><ToggleButton x:Name="TranslatorEnabled" Style="{StaticResource ToggleStyle}"/><TextBlock Text="Activé" Margin="10,0,0,0" VerticalAlignment="Center"/></StackPanel></Grid>
             <Border Grid.Row="1" Height="1" Background="{DynamicResource SeparatorBrush}" Margin="0,20"/>
@@ -119,31 +232,24 @@
           <Grid x:Name="ActionWheelPage" Visibility="Collapsed"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
             <Grid><StackPanel><TextBlock Text="Roue d’actions" FontSize="27" FontWeight="SemiBold"/><TextBlock Text="Accédez à la correction, la traduction et la génération de réponse avec un seul geste." Foreground="{DynamicResource MutedBrush}" Margin="0,7,0,0" TextWrapping="Wrap"/></StackPanel><StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><ToggleButton x:Name="ActionWheelEnabled" Style="{StaticResource ToggleStyle}"/><TextBlock Text="Activé" Margin="10,0,0,0" VerticalAlignment="Center"/></StackPanel></Grid>
             <Border Grid.Row="1" Height="1" Background="{DynamicResource SeparatorBrush}" Margin="0,20"/>
-            <Grid Grid.Row="2"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="220"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Raccourci de la roue" FontWeight="SemiBold"/><TextBlock Text="Appuyez brièvement, puis survolez une direction pour lancer l’action." Foreground="{DynamicResource MutedBrush}" FontSize="12" Margin="0,4,12,0" TextWrapping="Wrap"/></StackPanel><TextBox x:Name="ActionWheelHotkeyBox" Grid.Column="1" IsReadOnly="True" PreviewKeyDown="ActionWheelHotkeyBox_OnPreviewKeyDown"/></Grid>
+            <Grid Grid.Row="2"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="220"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Raccourci de la roue" FontWeight="SemiBold"/><TextBlock Text="Appuyez brièvement, puis survolez une action pendant un court instant pour la lancer." Foreground="{DynamicResource MutedBrush}" FontSize="12" Margin="0,4,12,0" TextWrapping="Wrap"/></StackPanel><TextBox x:Name="ActionWheelHotkeyBox" Grid.Column="1" IsReadOnly="True" PreviewKeyDown="ActionWheelHotkeyBox_OnPreviewKeyDown"/></Grid>
             <Border Grid.Row="3" Background="{DynamicResource PanelLightBrush}" CornerRadius="11" Padding="12" Margin="0,22,0,18">
               <Viewbox Stretch="Uniform" StretchDirection="DownOnly" MaxWidth="350" MaxHeight="280" HorizontalAlignment="Center" VerticalAlignment="Center">
-              <Grid Width="370" Height="330">
-                <Ellipse Width="320" Height="320" Fill="#B51B1918" Stroke="{DynamicResource AccentBrightBrush}" StrokeThickness="2"/>
-                <Ellipse Width="104" Height="104" Fill="{DynamicResource PanelBrush}" Stroke="{DynamicResource BorderBrush}" StrokeThickness="1"/>
-
-                <Border Width="100" Height="100" CornerRadius="18" Background="{DynamicResource ButtonBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,5,0,0">
-                  <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"><TextBlock Text="✓" Foreground="{DynamicResource AccentBrightBrush}" FontSize="26" HorizontalAlignment="Center"/><TextBlock Text="CORRIGER" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center"/></StackPanel>
-                </Border>
-                <Border Width="100" Height="100" CornerRadius="18" Background="{DynamicResource ButtonBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0,0,0" ClipToBounds="True">
-                  <Grid><Grid.RowDefinitions><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
-                    <Border CornerRadius="17,17,0,0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,0.5"><StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"><TextBlock Text="TRADUIRE" FontSize="9" FontWeight="SemiBold" HorizontalAlignment="Center"/><TextBlock x:Name="PreviewTranslationForwardText" Text="Auto > Anglais" Foreground="{DynamicResource AccentBrightBrush}" FontSize="9" HorizontalAlignment="Center"/></StackPanel></Border>
-                    <Border Grid.Row="1" CornerRadius="0,0,17,17" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0.5,0,0"><StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"><TextBlock Text="TRADUIRE" FontSize="9" FontWeight="SemiBold" HorizontalAlignment="Center"/><TextBlock x:Name="PreviewTranslationReverseText" Text="Anglais > Auto" Foreground="{DynamicResource AccentBrightBrush}" FontSize="9" HorizontalAlignment="Center"/></StackPanel></Border>
-                  </Grid>
-                </Border>
-                <Border Width="100" Height="100" CornerRadius="18" Background="{DynamicResource AccentBrush}" BorderBrush="{DynamicResource AccentBrightBrush}" BorderThickness="1" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,5,0">
-                  <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"><TextBlock Text="✦" Foreground="{DynamicResource TextBrush}" FontSize="26" HorizontalAlignment="Center"/><TextBlock Text="RÉPONDRE" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center"/></StackPanel>
-                </Border>
-                <Border Width="100" Height="100" CornerRadius="18" Background="{DynamicResource ButtonBrush}" BorderBrush="#FF9D4545" BorderThickness="1" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,5">
-                  <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"><TextBlock Text="×" Foreground="#FFFF7F7F" FontSize="26" HorizontalAlignment="Center"/><TextBlock Text="ANNULER" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center"/></StackPanel>
-                </Border>
-
-                <StackPanel Width="84" HorizontalAlignment="Center" VerticalAlignment="Center"><TextBlock Text="Répondre" FontWeight="SemiBold" FontSize="12" HorizontalAlignment="Center"/><TextBlock Text="survol actif" Foreground="{DynamicResource MutedBrush}" FontSize="9" HorizontalAlignment="Center"/></StackPanel>
-              </Grid>
+              <Canvas Width="650" Height="610">
+                <Canvas.Resources>
+                  <Style x:Key="PreviewWheelZone" TargetType="Border"><Setter Property="Width" Value="190"/><Setter Property="Height" Value="58"/><Setter Property="CornerRadius" Value="12"/><Setter Property="Background" Value="{DynamicResource ButtonBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="BorderThickness" Value="1"/></Style>
+                  <Style x:Key="PreviewWheelText" TargetType="TextBlock"><Setter Property="FontSize" Value="11"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="HorizontalAlignment" Value="Center"/><Setter Property="VerticalAlignment" Value="Center"/></Style>
+                </Canvas.Resources>
+                <Border x:Name="PreviewCorrectorZone" Style="{StaticResource PreviewWheelZone}" Canvas.Left="15" Canvas.Top="5"><TextBlock Text="✓  CORRIGER" Style="{StaticResource PreviewWheelText}"/></Border>
+                <Border x:Name="PreviewReformulateZone" Style="{StaticResource PreviewWheelZone}" Canvas.Left="95" Canvas.Top="75"><TextBlock Text="↻  REFORMULER" Style="{StaticResource PreviewWheelText}"/></Border>
+                <Border x:Name="PreviewSimplifyZone" Style="{StaticResource PreviewWheelZone}" Canvas.Left="175" Canvas.Top="145"><TextBlock Text="≡  SIMPLIFIER" Style="{StaticResource PreviewWheelText}"/></Border>
+                <Border x:Name="PreviewTranslationForwardZone" Style="{StaticResource PreviewWheelZone}" Canvas.Left="255" Canvas.Top="215"><StackPanel VerticalAlignment="Center"><TextBlock Text="⇄  TRADUIRE" Style="{StaticResource PreviewWheelText}"/><TextBlock x:Name="PreviewTranslationForwardText" Text="Auto > Anglais" Foreground="{DynamicResource AccentBrightBrush}" FontSize="10" HorizontalAlignment="Center"/></StackPanel></Border>
+                <Border Width="180" Height="180" CornerRadius="90" Canvas.Left="235" Canvas.Top="215" Background="{DynamicResource PanelBrush}" BorderBrush="#FF9D4545" BorderThickness="2"><StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"><TextBlock Text="×" Foreground="#FFFF7F7F" FontSize="32" HorizontalAlignment="Center"/><TextBlock Text="ANNULER" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center"/></StackPanel></Border>
+                <Border x:Name="PreviewTranslationReverseZone" Style="{StaticResource PreviewWheelZone}" Canvas.Left="255" Canvas.Top="285"><StackPanel VerticalAlignment="Center"><TextBlock Text="⇆  TRADUIRE" Style="{StaticResource PreviewWheelText}"/><TextBlock x:Name="PreviewTranslationReverseText" Text="Anglais > Auto" Foreground="{DynamicResource AccentBrightBrush}" FontSize="10" HorizontalAlignment="Center"/></StackPanel></Border>
+                <Border x:Name="PreviewResponseZone" Style="{StaticResource PreviewWheelZone}" Canvas.Left="215" Canvas.Top="355"><TextBlock Text="✦  TON PERSONNALISÉ" Style="{StaticResource PreviewWheelText}"/></Border>
+                <Border x:Name="PreviewSummarizeZone" Style="{StaticResource PreviewWheelZone}" Canvas.Left="135" Canvas.Top="425"><TextBlock Text="☷  RÉSUMER UNE CONVERSATION" Style="{StaticResource PreviewWheelText}"/></Border>
+                <Border x:Name="PreviewDefineWordZone" Style="{StaticResource PreviewWheelZone}" Canvas.Left="55" Canvas.Top="495"><TextBlock Text="?  DÉFINITION D’UN MOT" Style="{StaticResource PreviewWheelText}"/></Border>
+              </Canvas>
               </Viewbox>
             </Border>
             <TextBlock x:Name="ActionWheelStatus" Grid.Row="4" Foreground="{DynamicResource SuccessBrush}" Margin="0,0,0,14" TextWrapping="Wrap"/>

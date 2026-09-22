@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Threading;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using PersonalAppsHub.Models;
 using PersonalAppsHub.Services;
@@ -27,6 +28,7 @@ public partial class MainWindow : Window
     private readonly CorrectionService _correctionService = new();
     private readonly TranslationService _translationService = new();
     private readonly ResponseGenerationService _responseGenerationService = new();
+    private readonly WiktionaryService _wiktionaryService = new();
     private readonly NvidiaProfileService _nvidiaProfileService = new();
     private readonly XmpMonitorService _xmpMonitorService = new();
     private readonly UpdateService _updateService = new();
@@ -50,6 +52,8 @@ public partial class MainWindow : Window
     private Action? _balloonClickAction;
     private UpdateCheckResult? _availableUpdate;
     private bool _updateInstallRunning;
+    private double _sidebarScrollTarget;
+    private bool _sidebarScrollAnimating;
 
     public MainWindow()
     {
@@ -90,6 +94,10 @@ public partial class MainWindow : Window
         _loadingSettings = false;
         ReminderNav.Click += (_, _) => ShowPage("reminder");
         CorrectorNav.Click += (_, _) => ShowPage("corrector");
+        ReformulateNav.Click += (_, _) => ShowPage("reformulate");
+        SimplifyNav.Click += (_, _) => ShowPage("simplify");
+        ConversationSummaryNav.Click += (_, _) => ShowPage("conversationSummary");
+        WordDefinitionNav.Click += (_, _) => ShowPage("wordDefinition");
         TranslatorNav.Click += (_, _) => ShowPage("translator");
         ResponseGeneratorNav.Click += (_, _) => ShowPage("responseGenerator");
         ActionWheelNav.Click += (_, _) => ShowPage("actionWheel");
@@ -105,6 +113,16 @@ public partial class MainWindow : Window
         SaveCorrector.Click += (_, _) => SaveCorrectorSettings();
         SaveTranslator.Click += (_, _) => SaveTranslatorSettings();
         SaveResponseGenerator.Click += (_, _) => SaveResponseGeneratorSettings();
+        SaveReformulator.Click += (_, _) => SaveReformulatorSettings();
+        SaveSimplifier.Click += (_, _) => SaveSimplifierSettings();
+        SaveConversationSummary.Click += (_, _) => SaveConversationSummarySettings();
+        SaveWordDefinition.Click += (_, _) => SaveWordDefinitionSettings();
+        OpenReformulateAiSettings.Click += (_, _) => ShowPage("responseGenerator");
+        OpenSimplifyAiSettings.Click += (_, _) => ShowPage("responseGenerator");
+        OpenReformulateWheelSettings.Click += (_, _) => ShowPage("actionWheel");
+        OpenSimplifyWheelSettings.Click += (_, _) => ShowPage("actionWheel");
+        OpenConversationSummaryAiSettings.Click += (_, _) => ShowPage("responseGenerator");
+        OpenWordDefinitionAiSettings.Click += (_, _) => ShowPage("responseGenerator");
         SaveActionWheel.Click += (_, _) => SaveActionWheelSettings();
         ReminderEnabled.Checked += (_, _) => ApplyEnabledStates();
         ReminderEnabled.Unchecked += (_, _) => ApplyEnabledStates();
@@ -114,6 +132,14 @@ public partial class MainWindow : Window
         TranslatorEnabled.Unchecked += (_, _) => ApplyEnabledStates();
         ResponseGeneratorEnabled.Checked += (_, _) => ApplyEnabledStates();
         ResponseGeneratorEnabled.Unchecked += (_, _) => ApplyEnabledStates();
+        ReformulatorEnabled.Checked += (_, _) => ApplyEnabledStates();
+        ReformulatorEnabled.Unchecked += (_, _) => ApplyEnabledStates();
+        SimplifierEnabled.Checked += (_, _) => ApplyEnabledStates();
+        SimplifierEnabled.Unchecked += (_, _) => ApplyEnabledStates();
+        ConversationSummarizerEnabled.Checked += (_, _) => ApplyEnabledStates();
+        ConversationSummarizerEnabled.Unchecked += (_, _) => ApplyEnabledStates();
+        WordDefinitionEnabled.Checked += (_, _) => ApplyEnabledStates();
+        WordDefinitionEnabled.Unchecked += (_, _) => ApplyEnabledStates();
         ActionWheelEnabled.Checked += (_, _) => ApplyEnabledStates();
         ActionWheelEnabled.Unchecked += (_, _) => ApplyEnabledStates();
         NvidiaEnabled.Checked += (_, _) => ApplyEnabledStates();
@@ -243,7 +269,37 @@ public partial class MainWindow : Window
         ResponseGeneratorToneBox.SelectedIndex = _settings.ResponseGeneratorTone switch { "Professionnel" => 1, "Amical" => 2, "Concis" => 3, _ => 0 };
         ResponseGeneratorInstructionBox.Text = _settings.ResponseGeneratorInstruction;
         ResponseGeneratorPreviewCheck.IsChecked = _settings.ResponseGeneratorPreview;
+        ReformulatorEnabled.IsChecked = _settings.ReformulatorEnabled;
+        ReformulationStyleBox.SelectedIndex = _settings.ReformulationStyle switch
+        {
+            "Message décontracté" => 1, "LinkedIn enthousiaste" => 2, "LinkedIn cringe" => 3,
+            "Discours médiéval" => 4, "Très formel" => 5, "Amical" => 6,
+            "Direct et concis" => 7, "Diplomatique" => 8, "Humoristique" => 9,
+            "Commercial convaincant" => 10, "Académique" => 11, "Poétique" => 12,
+            "Fantasy" => 13, "Discours motivant" => 14, "Vieux français" => 15,
+            "Français très complexe" => 16, "Scientifique" => 17, "Méchant" => 18,
+            "Insultant" => 19, "Insultant mais discret" => 20, "Méchant de film" => 21, _ => 0
+        };
+        SimplifierEnabled.IsChecked = _settings.SimplifierEnabled;
+        SimplificationLevelBox.SelectedIndex = _settings.SimplificationLevel switch
+        {
+            "Ultra simplifié" => 0, "Beaucoup simplifié" => 1, _ => 2
+        };
+        ConversationSummarizerEnabled.IsChecked = _settings.ConversationSummarizerEnabled;
+        ConversationSummaryLengthBox.SelectedIndex = _settings.ConversationSummaryLength switch
+        {
+            "Très court - 3 lignes" => 0, "Moyen - 10 lignes" => 2, "Détaillé" => 3, _ => 1
+        };
+        ConversationSummaryPreserveNamesCheck.IsChecked = _settings.ConversationSummaryPreserveNames;
+        ConversationSummaryIncludeActionsCheck.IsChecked = _settings.ConversationSummaryIncludeActions;
+        WordDefinitionEnabled.IsChecked = _settings.WordDefinitionEnabled;
+        WordDefinitionDetailBox.SelectedIndex = _settings.WordDefinitionDetail switch
+        {
+            "Très simple" => 0, "Détaillé" => 2, "Expert" => 3, _ => 1
+        };
+        WordDefinitionIncludeExamplesCheck.IsChecked = _settings.WordDefinitionIncludeExamples;
         UpdateResponseGeneratorModel();
+        RefreshTransformationPages();
         ActionWheelEnabled.IsChecked = _settings.ActionWheelEnabled;
         ActionWheelHotkeyBox.Text = _settings.ActionWheelHotkey.Replace("+", " + ");
         NvidiaEnabled.IsChecked = _settings.NvidiaOptimizerEnabled;
@@ -276,6 +332,10 @@ public partial class MainWindow : Window
     {
         ReminderPage.Visibility = page == "reminder" ? Visibility.Visible : Visibility.Collapsed;
         CorrectorPage.Visibility = page == "corrector" ? Visibility.Visible : Visibility.Collapsed;
+        ReformulatePage.Visibility = page == "reformulate" ? Visibility.Visible : Visibility.Collapsed;
+        SimplifyPage.Visibility = page == "simplify" ? Visibility.Visible : Visibility.Collapsed;
+        ConversationSummaryPage.Visibility = page == "conversationSummary" ? Visibility.Visible : Visibility.Collapsed;
+        WordDefinitionPage.Visibility = page == "wordDefinition" ? Visibility.Visible : Visibility.Collapsed;
         TranslatorPage.Visibility = page == "translator" ? Visibility.Visible : Visibility.Collapsed;
         ResponseGeneratorPage.Visibility = page == "responseGenerator" ? Visibility.Visible : Visibility.Collapsed;
         ActionWheelPage.Visibility = page == "actionWheel" ? Visibility.Visible : Visibility.Collapsed;
@@ -283,6 +343,33 @@ public partial class MainWindow : Window
         XmpPage.Visibility = page == "xmp" ? Visibility.Visible : Visibility.Collapsed;
         KeyboardLayoutPage.Visibility = page == "keyboardLayout" ? Visibility.Visible : Visibility.Collapsed;
         GeneralSettingsPage.Visibility = page == "general" ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void SidebarScrollViewer_OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (SidebarScrollViewer.ScrollableHeight <= 0) return;
+        e.Handled = true;
+        var startingOffset = _sidebarScrollAnimating ? _sidebarScrollTarget : SidebarScrollViewer.VerticalOffset;
+        _sidebarScrollTarget = Math.Clamp(
+            startingOffset - e.Delta * 0.42,
+            0,
+            SidebarScrollViewer.ScrollableHeight);
+        if (_sidebarScrollAnimating) return;
+        _sidebarScrollAnimating = true;
+        CompositionTarget.Rendering += AnimateSidebarScroll;
+    }
+
+    private void AnimateSidebarScroll(object? sender, EventArgs e)
+    {
+        var difference = _sidebarScrollTarget - SidebarScrollViewer.VerticalOffset;
+        if (Math.Abs(difference) < 0.5)
+        {
+            SidebarScrollViewer.ScrollToVerticalOffset(_sidebarScrollTarget);
+            CompositionTarget.Rendering -= AnimateSidebarScroll;
+            _sidebarScrollAnimating = false;
+            return;
+        }
+        SidebarScrollViewer.ScrollToVerticalOffset(SidebarScrollViewer.VerticalOffset + difference * 0.22);
     }
 
     private void SaveGeneralSettingsNow()
@@ -521,9 +608,13 @@ public partial class MainWindow : Window
 
     private void UpdateNavigationState()
     {
-        if (ReminderNav == null || CorrectorNav == null || TranslatorNav == null || ResponseGeneratorNav == null || ActionWheelNav == null || NvidiaNav == null || XmpNav == null || KeyboardLayoutNav == null) return;
+        if (ReminderNav == null || CorrectorNav == null || ReformulateNav == null || SimplifyNav == null || ConversationSummaryNav == null || WordDefinitionNav == null || TranslatorNav == null || ResponseGeneratorNav == null || ActionWheelNav == null || NvidiaNav == null || XmpNav == null || KeyboardLayoutNav == null) return;
         PlaceNavigationButton(ReminderNav, ReminderEnabled.IsChecked == true);
         PlaceNavigationButton(CorrectorNav, CorrectorEnabled.IsChecked == true);
+        PlaceNavigationButton(ReformulateNav, ReformulatorEnabled.IsChecked == true);
+        PlaceNavigationButton(SimplifyNav, SimplifierEnabled.IsChecked == true);
+        PlaceNavigationButton(ConversationSummaryNav, ConversationSummarizerEnabled.IsChecked == true);
+        PlaceNavigationButton(WordDefinitionNav, WordDefinitionEnabled.IsChecked == true);
         PlaceNavigationButton(TranslatorNav, TranslatorEnabled.IsChecked == true);
         PlaceNavigationButton(ResponseGeneratorNav, ResponseGeneratorEnabled.IsChecked == true);
         PlaceNavigationButton(ActionWheelNav, ActionWheelEnabled.IsChecked == true);
@@ -550,7 +641,7 @@ public partial class MainWindow : Window
     }
 
     private int NavigationRank(System.Windows.Controls.Button button) =>
-        button == ReminderNav ? 0 : button == CorrectorNav ? 1 : button == TranslatorNav ? 2 : button == ResponseGeneratorNav ? 3 : button == ActionWheelNav ? 4 : button == NvidiaNav ? 5 : button == XmpNav ? 6 : 7;
+        button == ReminderNav ? 0 : button == CorrectorNav ? 1 : button == ReformulateNav ? 2 : button == SimplifyNav ? 3 : button == ConversationSummaryNav ? 4 : button == WordDefinitionNav ? 5 : button == TranslatorNav ? 6 : button == ResponseGeneratorNav ? 7 : button == ActionWheelNav ? 8 : button == NvidiaNav ? 9 : button == XmpNav ? 10 : 11;
 
     private void ApplyEnabledStates()
     {
@@ -558,6 +649,10 @@ public partial class MainWindow : Window
         _settings.CorrectorEnabled = CorrectorEnabled.IsChecked == true;
         _settings.TranslatorEnabled = TranslatorEnabled.IsChecked == true;
         _settings.ResponseGeneratorEnabled = ResponseGeneratorEnabled.IsChecked == true;
+        _settings.ReformulatorEnabled = ReformulatorEnabled.IsChecked == true;
+        _settings.SimplifierEnabled = SimplifierEnabled.IsChecked == true;
+        _settings.ConversationSummarizerEnabled = ConversationSummarizerEnabled.IsChecked == true;
+        _settings.WordDefinitionEnabled = WordDefinitionEnabled.IsChecked == true;
         _settings.ActionWheelEnabled = ActionWheelEnabled.IsChecked == true;
         _settings.NvidiaOptimizerEnabled = NvidiaEnabled.IsChecked == true;
         _settings.XmpMonitorEnabled = XmpEnabled.IsChecked == true;
@@ -572,6 +667,7 @@ public partial class MainWindow : Window
         RegisterResponseGeneratorHotkey();
         RegisterActionWheelHotkey();
         UpdateNavigationState();
+        RefreshActionWheelPreview();
         UpdateNvidiaPage();
     }
 
@@ -666,10 +762,60 @@ public partial class MainWindow : Window
         if (provider == "OpenAI") _settings.ResponseGeneratorOpenAiModel = ResponseGeneratorModelBox.Text.Trim();
         else _settings.ResponseGeneratorGeminiModel = ResponseGeneratorModelBox.Text.Trim();
         _settingsService.Save(_settings);
+        RefreshTransformationPages();
         ResponseGeneratorStatus.Text = RegisterResponseGeneratorHotkey()
             ? $"Configuration enregistrée. Clé {provider} : {(SecretStore.HasKey(provider) ? "disponible" : "manquante")}."
             : "Ce raccourci est déjà utilisé par une autre application.";
         UpdateNavigationState();
+    }
+
+    private void SaveReformulatorSettings()
+    {
+        _settings.ReformulatorEnabled = ReformulatorEnabled.IsChecked == true;
+        _settings.ReformulationStyle = (ReformulationStyleBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Content?.ToString()
+            ?? "Email professionnel";
+        _settingsService.Save(_settings);
+        RefreshTransformationPages();
+        RefreshActionWheelPreview();
+        UpdateNavigationState();
+    }
+
+    private void SaveSimplifierSettings()
+    {
+        _settings.SimplifierEnabled = SimplifierEnabled.IsChecked == true;
+        _settings.SimplificationLevel = (SimplificationLevelBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Content?.ToString()
+            ?? "Simplifié";
+        _settingsService.Save(_settings);
+        RefreshTransformationPages();
+        RefreshActionWheelPreview();
+        UpdateNavigationState();
+    }
+
+    private void SaveConversationSummarySettings()
+    {
+        _settings.ConversationSummarizerEnabled = ConversationSummarizerEnabled.IsChecked == true;
+        _settings.ConversationSummaryLength = (ConversationSummaryLengthBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Content?.ToString()
+            ?? "Court - 5 lignes";
+        _settings.ConversationSummaryPreserveNames = ConversationSummaryPreserveNamesCheck.IsChecked == true;
+        _settings.ConversationSummaryIncludeActions = ConversationSummaryIncludeActionsCheck.IsChecked == true;
+        _settingsService.Save(_settings);
+        RefreshTransformationPages();
+        RefreshActionWheelPreview();
+        UpdateNavigationState();
+        ConversationSummaryStatus.Text = "Configuration enregistrée.";
+    }
+
+    private void SaveWordDefinitionSettings()
+    {
+        _settings.WordDefinitionEnabled = WordDefinitionEnabled.IsChecked == true;
+        _settings.WordDefinitionDetail = (WordDefinitionDetailBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Content?.ToString()
+            ?? "Simple";
+        _settings.WordDefinitionIncludeExamples = WordDefinitionIncludeExamplesCheck.IsChecked == true;
+        _settingsService.Save(_settings);
+        RefreshTransformationPages();
+        RefreshActionWheelPreview();
+        UpdateNavigationState();
+        WordDefinitionStatus.Text = "Configuration enregistrée.";
     }
 
     private void SaveActionWheelSettings()
@@ -723,7 +869,16 @@ public partial class MainWindow : Window
         {
             var sourceLanguage = DisplayLanguage(_settings.TranslationSourceLanguage);
             var targetLanguage = DisplayLanguage(_settings.TranslationTargetLanguage);
-            var wheel = new ActionWheelWindow(sourceLanguage, targetLanguage);
+            var wheel = new ActionWheelWindow(
+                sourceLanguage,
+                targetLanguage,
+                _settings.CorrectorEnabled,
+                _settings.TranslatorEnabled,
+                _settings.ResponseGeneratorEnabled,
+                _settings.ReformulatorEnabled,
+                _settings.SimplifierEnabled,
+                _settings.ConversationSummarizerEnabled,
+                _settings.WordDefinitionEnabled);
             var action = await wheel.ShowAndWaitAsync();
             switch (action)
             {
@@ -739,6 +894,18 @@ public partial class MainWindow : Window
                 case WheelAction.Respond when _settings.ResponseGeneratorEnabled:
                     await RunResponseGenerationAsync();
                     break;
+                case WheelAction.Reformulate when _settings.ResponseGeneratorEnabled && _settings.ReformulatorEnabled:
+                    await RunTextTransformationAsync(TextTransformationMode.Reformulate);
+                    break;
+                case WheelAction.Simplify when _settings.ResponseGeneratorEnabled && _settings.SimplifierEnabled:
+                    await RunTextTransformationAsync(TextTransformationMode.Simplify);
+                    break;
+                case WheelAction.SummarizeConversation when _settings.ResponseGeneratorEnabled && _settings.ConversationSummarizerEnabled:
+                    await RunTextTransformationAsync(TextTransformationMode.SummarizeConversation);
+                    break;
+                case WheelAction.DefineWord when _settings.ResponseGeneratorEnabled && _settings.WordDefinitionEnabled:
+                    await RunTextTransformationAsync(TextTransformationMode.DefineWord);
+                    break;
                 case WheelAction.Correct:
                     ShowVisibleMessage("Roue d’actions", "Le Correcteur universel est désactivé.");
                     break;
@@ -748,6 +915,26 @@ public partial class MainWindow : Window
                     break;
                 case WheelAction.Respond:
                     ShowVisibleMessage("Roue d’actions", "Le Générateur de réponse est désactivé.");
+                    break;
+                case WheelAction.Reformulate:
+                    ShowVisibleMessage("Roue d’actions", _settings.ResponseGeneratorEnabled
+                        ? "Le module Reformuler est désactivé. Activez-le depuis son onglet."
+                        : "Activez le Générateur de réponse pour utiliser les transformations de texte.");
+                    break;
+                case WheelAction.Simplify:
+                    ShowVisibleMessage("Roue d’actions", _settings.ResponseGeneratorEnabled
+                        ? "Le module Simplifier est désactivé. Activez-le depuis son onglet."
+                        : "Activez le Générateur de réponse pour utiliser les transformations de texte.");
+                    break;
+                case WheelAction.SummarizeConversation:
+                    ShowVisibleMessage("Roue d’actions", _settings.ResponseGeneratorEnabled
+                        ? "Le module Résumer une conversation est désactivé. Activez-le depuis son onglet."
+                        : "Activez le Générateur de réponse pour utiliser le résumé de conversation.");
+                    break;
+                case WheelAction.DefineWord:
+                    ShowVisibleMessage("Roue d’actions", _settings.ResponseGeneratorEnabled
+                        ? "Le module Définition d’un mot est désactivé. Activez-le depuis son onglet."
+                        : "Activez le Générateur de réponse pour utiliser la définition d’un mot.");
                     break;
             }
         }
@@ -808,6 +995,163 @@ public partial class MainWindow : Window
             AppLog.Write($"ERREUR GÉNÉRATION DE RÉPONSE: {ex}");
             ShowVisibleMessage("Erreur de génération", ex.Message);
         }
+    }
+
+    private async Task RunTextTransformationAsync(TextTransformationMode mode)
+    {
+        if (!_settings.ResponseGeneratorEnabled) return;
+        if (mode != TextTransformationMode.DefineWord && !EnsureOnlineServicesConsent()) return;
+        System.Windows.IDataObject? previousClipboard = null;
+        var actionName = mode switch
+        {
+            TextTransformationMode.Reformulate => "Reformuler",
+            TextTransformationMode.Simplify => "Simplifier",
+            TextTransformationMode.SummarizeConversation => "Résumer une conversation",
+            TextTransformationMode.DefineWord => "Définir un mot",
+            _ => "Transformer"
+        };
+        try
+        {
+            var capture = await ClipboardService.CopySelectionAsync();
+            previousClipboard = capture.Previous;
+            if (string.IsNullOrWhiteSpace(capture.Text))
+            {
+                ClipboardService.Restore(capture.Previous);
+                ShowVisibleMessage(actionName, "Aucun texte n’a été récupéré. Sélectionnez le texte, relâchez les touches, puis ouvrez de nouveau la roue.");
+                return;
+            }
+
+            if (mode == TextTransformationMode.DefineWord)
+            {
+                try
+                {
+                    AppLog.Write($"DICTIONNAIRE | Recherche Wiktionnaire pour {capture.Text.Length} caractère(s).");
+                    var dictionaryResult = await _wiktionaryService.FindAsync(capture.Text);
+                    if (dictionaryResult != null)
+                    {
+                        AppLog.Write($"DICTIONNAIRE | Définition Wiktionnaire trouvée pour « {dictionaryResult.Word} ».");
+                        var preview = new ResponsePreviewWindow(
+                            dictionaryResult.DisplayText + $"{Environment.NewLine}{Environment.NewLine}Source : {dictionaryResult.SourceUrl}",
+                            $"Définition de « {dictionaryResult.Word} »",
+                            "Définition fournie par le Wiktionnaire. Le texte sélectionné ne sera pas remplacé.",
+                            "Fermer");
+                        preview.ShowDialog();
+                        ClipboardService.Restore(capture.Previous);
+                        return;
+                    }
+                    AppLog.Write("DICTIONNAIRE | Aucune définition exploitable, passage à Gemini.");
+                }
+                catch (Exception dictionaryError)
+                {
+                    AppLog.Write($"DICTIONNAIRE | Wiktionnaire indisponible, passage à Gemini : {dictionaryError.Message}");
+                }
+
+                if (!EnsureOnlineServicesConsent())
+                {
+                    ClipboardService.Restore(capture.Previous);
+                    return;
+                }
+            }
+
+            var provider = mode == TextTransformationMode.DefineWord ? "Gemini" : _settings.ResponseGeneratorProvider;
+            var key = SecretStore.Load(provider);
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                ClipboardService.Restore(capture.Previous);
+                ShowVisibleMessage(actionName, $"Ajoutez d’abord une clé API {provider} dans les paramètres généraux.");
+                return;
+            }
+
+            var transformationOption = mode switch
+            {
+                TextTransformationMode.Reformulate => _settings.ReformulationStyle,
+                TextTransformationMode.Simplify => _settings.SimplificationLevel,
+                TextTransformationMode.SummarizeConversation => BuildConversationSummaryOption(),
+                TextTransformationMode.DefineWord => BuildWordDefinitionOption(),
+                _ => ""
+            };
+            AppLog.Write($"TRANSFORMATION {actionName.ToUpperInvariant()} | Démarrage avec {provider}; option={transformationOption}; caractères={capture.Text.Length}.");
+            ShowTrayMessage(actionName, $"Génération en cours avec {provider}…");
+            var transformed = provider == "OpenAI"
+                ? await _responseGenerationService.TransformOpenAiAsync(capture.Text, key, _settings.ResponseGeneratorOpenAiModel, mode, transformationOption)
+                : await _responseGenerationService.TransformGeminiAsync(capture.Text, key, _settings.ResponseGeneratorGeminiModel, mode, transformationOption);
+
+            if (mode == TextTransformationMode.DefineWord)
+            {
+                var definitionPreview = new ResponsePreviewWindow(
+                    transformed,
+                    "Définition proposée par Gemini",
+                    "Le Wiktionnaire n’avait pas de résultat exploitable. Le texte sélectionné ne sera pas remplacé.",
+                    "Fermer");
+                definitionPreview.ShowDialog();
+                ClipboardService.Restore(capture.Previous);
+                AppLog.Write($"DICTIONNAIRE | Définition de secours Gemini affichée. Longueur : {transformed.Length}.");
+                return;
+            }
+
+            if (_settings.ResponseGeneratorPreview)
+            {
+                var preview = new ResponsePreviewWindow(
+                    transformed,
+                    $"Texte à {actionName.ToLowerInvariant()}",
+                    "Vous pouvez modifier le résultat avant de remplacer le texte sélectionné.");
+                if (preview.ShowDialog() != true)
+                {
+                    ClipboardService.Restore(capture.Previous);
+                    return;
+                }
+                transformed = preview.Result;
+            }
+
+            await ClipboardService.ReplaceAsync(transformed, capture.Window, capture.Previous);
+            ShowTrayMessage(actionName, "Le texte sélectionné a été remplacé.");
+            AppLog.Write($"Transformation {actionName} terminée. Longueur du résultat : {transformed.Length}.");
+        }
+        catch (TaskCanceledException)
+        {
+            ClipboardService.Restore(previousClipboard);
+            AppLog.Write($"ERREUR {actionName.ToUpperInvariant()}: aucun modèle Gemini n’a répondu après les tentatives d’une minute.");
+            ShowVisibleMessage($"Erreur - {actionName}", "Gemini n’a répondu avec aucun des modèles essayés. Chaque tentative a disposé d’une minute.");
+        }
+        catch (Exception ex)
+        {
+            ClipboardService.Restore(previousClipboard);
+            AppLog.Write($"ERREUR {actionName.ToUpperInvariant()}: {ex}");
+            ShowVisibleMessage($"Erreur - {actionName}", ex.Message);
+        }
+    }
+
+    private string BuildConversationSummaryOption()
+    {
+        var length = _settings.ConversationSummaryLength switch
+        {
+            "Très court - 3 lignes" => "Produis un résumé de 3 lignes maximum.",
+            "Moyen - 10 lignes" => "Produis un résumé structuré d’environ 10 lignes.",
+            "Détaillé" => "Produis un résumé détaillé et structuré sans répétitions inutiles.",
+            _ => "Produis un résumé de 5 lignes maximum."
+        };
+        var names = _settings.ConversationSummaryPreserveNames
+            ? "Conserve les noms des participants lorsqu’ils sont utiles pour comprendre qui dit ou décide quoi."
+            : "Ne mentionne pas les noms des participants sauf si cela est indispensable.";
+        var actions = _settings.ConversationSummaryIncludeActions
+            ? "Termine par des rubriques séparées Décisions et Tâches à faire lorsqu’il y en a."
+            : "N’ajoute pas de rubrique séparée pour les décisions ou les tâches.";
+        return $"{length} {names} {actions}";
+    }
+
+    private string BuildWordDefinitionOption()
+    {
+        var detail = _settings.WordDefinitionDetail switch
+        {
+            "Très simple" => "Utilise une seule phrase et des mots compréhensibles par un enfant.",
+            "Détaillé" => "Donne le sens principal, les nuances importantes et la catégorie grammaticale.",
+            "Expert" => "Fournis une définition précise avec terminologie spécialisée, nuances et étymologie utile.",
+            _ => "Donne une définition courte et facile à comprendre."
+        };
+        var example = _settings.WordDefinitionIncludeExamples
+            ? "Ajoute ensuite un exemple d’utilisation naturel et clairement séparé."
+            : "N’ajoute pas d’exemple.";
+        return $"{detail} {example}";
     }
 
     private async Task RunTranslationAsync(bool reverseLanguages = false)
@@ -1041,6 +1385,19 @@ public partial class MainWindow : Window
                 : $"Clé {provider} manquante : ajoutez-la dans le Correcteur universel.";
         }
     }
+
+    private void RefreshTransformationPages()
+    {
+        if (ReformulateConfigurationText == null || SimplifyConfigurationText == null || ConversationSummaryConfigurationText == null || WordDefinitionConfigurationText == null) return;
+        var provider = _settings.ResponseGeneratorProvider == "OpenAI" ? "OpenAI" : "Google Gemini";
+        var keyState = SecretStore.HasKey(_settings.ResponseGeneratorProvider) ? "clé disponible" : "clé manquante";
+        var previewState = _settings.ResponseGeneratorPreview ? "aperçu activé" : "aperçu désactivé";
+        ReformulateConfigurationText.Text = $"{provider} • {_settings.ReformulationStyle} • {previewState} • {keyState}";
+        SimplifyConfigurationText.Text = $"{provider} • {_settings.SimplificationLevel} • {previewState} • {keyState}";
+        ConversationSummaryConfigurationText.Text = $"{provider} • {_settings.ConversationSummaryLength} • {previewState} • {keyState}";
+        var geminiKeyState = SecretStore.HasKey("Gemini") ? "secours Gemini disponible" : "clé Gemini manquante pour le secours";
+        WordDefinitionConfigurationText.Text = $"Wiktionnaire en priorité • niveau {_settings.WordDefinitionDetail} • {geminiKeyState}";
+    }
     private static string DisplayTranslationProvider(string provider) => provider switch { "GoogleTranslate" => "Google Traduction", "Gemini" => "Google Gemini", "LibreTranslate" => "LibreTranslate", "MyMemory" => "MyMemory (Translated)", _ => "DeepL" };
     private static string DisplayLanguage(string code) => code switch
     {
@@ -1056,6 +1413,31 @@ public partial class MainWindow : Window
         var target = DisplayLanguage(_settings.TranslationTargetLanguage);
         PreviewTranslationForwardText.Text = $"{source} > {target}";
         PreviewTranslationReverseText.Text = $"{target} > {source}";
+
+        PreviewCorrectorZone.Visibility = _settings.CorrectorEnabled ? Visibility.Visible : Visibility.Collapsed;
+        PreviewReformulateZone.Visibility = _settings.ResponseGeneratorEnabled && _settings.ReformulatorEnabled ? Visibility.Visible : Visibility.Collapsed;
+        PreviewSimplifyZone.Visibility = _settings.ResponseGeneratorEnabled && _settings.SimplifierEnabled ? Visibility.Visible : Visibility.Collapsed;
+        PreviewTranslationForwardZone.Visibility = _settings.TranslatorEnabled ? Visibility.Visible : Visibility.Collapsed;
+        PreviewTranslationReverseZone.Visibility = _settings.TranslatorEnabled ? Visibility.Visible : Visibility.Collapsed;
+        PreviewResponseZone.Visibility = _settings.ResponseGeneratorEnabled ? Visibility.Visible : Visibility.Collapsed;
+        PreviewSummarizeZone.Visibility = _settings.ResponseGeneratorEnabled && _settings.ConversationSummarizerEnabled ? Visibility.Visible : Visibility.Collapsed;
+        PreviewDefineWordZone.Visibility = _settings.ResponseGeneratorEnabled && _settings.WordDefinitionEnabled ? Visibility.Visible : Visibility.Collapsed;
+
+        System.Windows.FrameworkElement[] previewZones =
+        [
+            PreviewCorrectorZone, PreviewReformulateZone, PreviewSimplifyZone,
+            PreviewTranslationForwardZone, PreviewTranslationReverseZone, PreviewResponseZone,
+            PreviewSummarizeZone, PreviewDefineWordZone
+        ];
+        var visibleZones = previewZones.Where(zone => zone.Visibility == Visibility.Visible).ToArray();
+        for (var index = 0; index < visibleZones.Length; index++)
+        {
+            var angle = -Math.PI / 2 + index * 2 * Math.PI / visibleZones.Length;
+            var centerX = 325 + 225 * Math.Cos(angle);
+            var centerY = 305 + 230 * Math.Sin(angle);
+            System.Windows.Controls.Canvas.SetLeft(visibleZones[index], centerX - visibleZones[index].Width / 2);
+            System.Windows.Controls.Canvas.SetTop(visibleZones[index], centerY - visibleZones[index].Height / 2);
+        }
     }
 
     private void TranslationEngineBox_OnSelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)

@@ -15,7 +15,7 @@ public sealed class SettingsService
         try
         {
             var settings = JsonSerializer.Deserialize<HubSettings>(File.ReadAllText(SettingsPath)) ?? new();
-            settings.SettingsSchemaVersion = 2;
+            settings.SettingsSchemaVersion = 3;
             return settings;
         }
         catch
@@ -32,7 +32,7 @@ public sealed class SettingsService
     public void Save(HubSettings settings)
     {
         Directory.CreateDirectory(_folder);
-        settings.SettingsSchemaVersion = 2;
+        settings.SettingsSchemaVersion = 3;
         var temporaryPath = SettingsPath + ".tmp";
         File.WriteAllText(temporaryPath, JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));
         File.Move(temporaryPath, SettingsPath, overwrite: true);
