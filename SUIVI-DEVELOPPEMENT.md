@@ -162,6 +162,13 @@ pas le temps nécessaire.
   données lues/écrites, cycles, arrêts non sécurisés, erreurs média et avertissements critiques.
 
 
+### ✅ Audit des programmes au démarrage — Terminé
+- Inventaire en lecture seule des entrées du registre 32/64 bits et des dossiers Démarrage.
+- Affichage de la commande, de la portée, de la source et de l’état communiqué par Windows.
+- Analyse prudente des lancements essentiels, facultatifs ou à vérifier, avec justification.
+- Activation et désactivation confirmées par l’utilisateur et réversibles depuis la même page.
+
+
 ### 🟡 Tableau de monitoring CPU/RAM/GPU — 95 %
 - Affichage en temps réel du CPU, de sa température, de la RAM, du GPU NVIDIA,
   de la VRAM et de la température GPU.
@@ -204,7 +211,7 @@ pas le temps nécessaire.
 - [ ] **Vider le cache RAM et purger les fichiers temporaires en un clic.** *(Nettoyage temporaire sécurisé disponible ; cache RAM à étudier.)*
 - [ ] **Vider automatiquement la corbeille au-delà de X Go ou X jours.**
 - [x] **Afficher l'espace disque et la santé S.M.A.R.T. des SSD.**
-- [ ] **Auditer les programmes lancés au démarrage et proposer leur désactivation.**
+- [x] **Auditer les programmes lancés au démarrage et proposer leur désactivation.**
 - [ ] **Détecter les logiciels inutilisés depuis une durée configurable.**
 - [ ] **Scanner les fichiers en double par hash avec validation avant suppression.**
 - [ ] **Vérifier les pilotes GPU, audio et chipset sur les sites fabricants.**

@@ -34,6 +34,7 @@ public partial class MainWindow : Window
     private readonly SystemMonitoringService _systemMonitoringService = new();
     private readonly TemporaryFileCleanupService _temporaryFileCleanupService = new();
     private readonly StorageHealthService _storageHealthService = new();
+    private readonly StartupAuditService _startupAuditService = new();
     private readonly UpdateService _updateService = new();
     private readonly ApiQuotaService _apiQuotaService = new();
     private readonly HotkeyService _hotkeyService = new(9471);
@@ -116,6 +117,7 @@ public partial class MainWindow : Window
         MonitoringNav.Click += async (_, _) => { ShowPage("monitoring"); await RefreshMonitoringAsync(); };
         CleanupNav.Click += (_, _) => ShowPage("cleanup");
         StorageHealthNav.Click += async (_, _) => { ShowPage("storageHealth"); await RefreshStorageHealthAsync(); };
+        StartupAuditNav.Click += async (_, _) => { ShowPage("startupAudit"); await RefreshStartupAuditAsync(); };
         CorrectorNav.Click += (_, _) => ShowPage("corrector");
         ReformulateNav.Click += (_, _) => ShowPage("reformulate");
         SimplifyNav.Click += (_, _) => ShowPage("simplify");
@@ -180,6 +182,10 @@ public partial class MainWindow : Window
         CleanupFilesList.SelectionChanged += (_, _) =>
             DeleteSelectedTemporaryFiles.IsEnabled = CleanupFilesList.SelectedItems.Count > 0;
         RefreshStorageHealth.Click += async (_, _) => await RefreshStorageHealthAsync();
+        RefreshStartupAudit.Click += async (_, _) => await RefreshStartupAuditAsync();
+        StartupEntriesList.SelectionChanged += (_, _) => UpdateStartupAuditButtons();
+        DisableStartupEntry.Click += async (_, _) => await ChangeStartupEntryStateAsync(false);
+        EnableStartupEntry.Click += async (_, _) => await ChangeStartupEntryStateAsync(true);
         SaveXmp.Click += (_, _) => SaveXmpSettings();
         SaveKeyboardLayout.Click += (_, _) => SaveKeyboardLayoutSettings();
         TestKeyboardLayout.Click += (_, _) => TestKeyboardLayoutNow();
@@ -376,6 +382,7 @@ public partial class MainWindow : Window
         MonitoringPage.Visibility = page == "monitoring" ? Visibility.Visible : Visibility.Collapsed;
         CleanupPage.Visibility = page == "cleanup" ? Visibility.Visible : Visibility.Collapsed;
         StorageHealthPage.Visibility = page == "storageHealth" ? Visibility.Visible : Visibility.Collapsed;
+        StartupAuditPage.Visibility = page == "startupAudit" ? Visibility.Visible : Visibility.Collapsed;
         XmpPage.Visibility = page == "xmp" ? Visibility.Visible : Visibility.Collapsed;
         KeyboardLayoutPage.Visibility = page == "keyboardLayout" ? Visibility.Visible : Visibility.Collapsed;
         GeneralSettingsPage.Visibility = page == "general" ? Visibility.Visible : Visibility.Collapsed;
@@ -644,7 +651,7 @@ public partial class MainWindow : Window
 
     private void UpdateNavigationState()
     {
-        if (ReminderNav == null || CorrectorNav == null || ReformulateNav == null || SimplifyNav == null || ConversationSummaryNav == null || WordDefinitionNav == null || TranslatorNav == null || ResponseGeneratorNav == null || ActionWheelNav == null || MonitoringNav == null || CleanupNav == null || StorageHealthNav == null || NvidiaNav == null || XmpNav == null || KeyboardLayoutNav == null) return;
+        if (ReminderNav == null || CorrectorNav == null || ReformulateNav == null || SimplifyNav == null || ConversationSummaryNav == null || WordDefinitionNav == null || TranslatorNav == null || ResponseGeneratorNav == null || ActionWheelNav == null || MonitoringNav == null || CleanupNav == null || StorageHealthNav == null || StartupAuditNav == null || NvidiaNav == null || XmpNav == null || KeyboardLayoutNav == null) return;
         PlaceNavigationButton(ReminderNav, ReminderEnabled.IsChecked == true);
         PlaceNavigationButton(CorrectorNav, CorrectorEnabled.IsChecked == true);
         PlaceNavigationButton(ReformulateNav, ReformulatorEnabled.IsChecked == true);
@@ -657,6 +664,7 @@ public partial class MainWindow : Window
         PlaceNavigationButton(MonitoringNav, _settings.MonitoringEnabled);
         PlaceNavigationButton(CleanupNav, true);
         PlaceNavigationButton(StorageHealthNav, true);
+        PlaceNavigationButton(StartupAuditNav, true);
         PlaceNavigationButton(NvidiaNav, NvidiaEnabled.IsChecked == true);
         PlaceNavigationButton(XmpNav, XmpEnabled.IsChecked == true);
         PlaceNavigationButton(KeyboardLayoutNav, KeyboardLayoutEnabled.IsChecked == true);
@@ -693,7 +701,7 @@ public partial class MainWindow : Window
     }
 
     private int NavigationRank(System.Windows.Controls.Button button) =>
-        button == ReminderNav ? 0 : button == CorrectorNav ? 1 : button == ReformulateNav ? 2 : button == SimplifyNav ? 3 : button == ConversationSummaryNav ? 4 : button == WordDefinitionNav ? 5 : button == TranslatorNav ? 6 : button == ResponseGeneratorNav ? 7 : button == ActionWheelNav ? 8 : button == MonitoringNav ? 9 : button == CleanupNav ? 10 : button == StorageHealthNav ? 11 : button == NvidiaNav ? 12 : button == XmpNav ? 13 : 14;
+        button == ReminderNav ? 0 : button == CorrectorNav ? 1 : button == ReformulateNav ? 2 : button == SimplifyNav ? 3 : button == ConversationSummaryNav ? 4 : button == WordDefinitionNav ? 5 : button == TranslatorNav ? 6 : button == ResponseGeneratorNav ? 7 : button == ActionWheelNav ? 8 : button == MonitoringNav ? 9 : button == CleanupNav ? 10 : button == StorageHealthNav ? 11 : button == StartupAuditNav ? 12 : button == NvidiaNav ? 13 : button == XmpNav ? 14 : 15;
 
     private void ApplyEnabledStates()
     {
@@ -2267,6 +2275,71 @@ public partial class MainWindow : Window
             AppLog.Write($"Lecture du stockage impossible : {ex.Message}");
         }
         finally { RefreshStorageHealth.IsEnabled = true; }
+    }
+
+    private async Task RefreshStartupAuditAsync()
+    {
+        RefreshStartupAudit.IsEnabled = false;
+        DisableStartupEntry.IsEnabled = false;
+        EnableStartupEntry.IsEnabled = false;
+        StartupAuditStatus.Text = "Lecture des emplacements de démarrage…";
+        try
+        {
+            var result = await _startupAuditService.ScanAsync();
+            StartupEntriesList.ItemsSource = result.Entries;
+            var disabled = result.Entries.Count(entry => entry.Status == "Désactivé");
+            StartupAuditStatus.Text = result.Entries.Count == 0
+                ? "Aucun programme de démarrage trouvé."
+                : $"{result.Entries.Count} programme(s), dont {disabled} désactivé(s)" +
+                  (result.InaccessibleSources > 0 ? $" · {result.InaccessibleSources} source(s) inaccessible(s)." : ".");
+        }
+        catch (Exception ex)
+        {
+            StartupAuditStatus.Text = $"Analyse impossible : {ex.Message}";
+            AppLog.Write($"Audit du démarrage impossible : {ex.Message}");
+        }
+        finally { RefreshStartupAudit.IsEnabled = true; }
+    }
+
+    private void UpdateStartupAuditButtons()
+    {
+        var selected = StartupEntriesList.SelectedItem as StartupEntry;
+        DisableStartupEntry.IsEnabled = selected?.IsEnabled == true;
+        EnableStartupEntry.IsEnabled = selected is { IsEnabled: false } && selected.Status == "Désactivé";
+    }
+
+    private async Task ChangeStartupEntryStateAsync(bool enabled)
+    {
+        if (StartupEntriesList.SelectedItem is not StartupEntry entry) return;
+        var action = enabled ? "réactiver" : "désactiver";
+        var consequence = enabled
+            ? "Cette application pourra de nouveau se lancer automatiquement avec Windows."
+            : "L’application restera installée et pourra toujours être lancée manuellement.";
+        var confirmation = System.Windows.MessageBox.Show(this,
+            $"Voulez-vous {action} « {entry.Name} » au démarrage ?\n\n{entry.Reason}\n\n{consequence}",
+            "Modifier le démarrage", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
+        if (confirmation != MessageBoxResult.Yes) return;
+
+        DisableStartupEntry.IsEnabled = false;
+        EnableStartupEntry.IsEnabled = false;
+        StartupAuditStatus.Text = $"Modification de {entry.Name}…";
+        try
+        {
+            await _startupAuditService.SetEnabledAsync(entry, enabled);
+            AppLog.Write($"AUDIT DÉMARRAGE | {entry.Name}; État={(enabled ? "activé" : "désactivé")}; Source={entry.Source}");
+            await RefreshStartupAuditAsync();
+            StartupAuditStatus.Text = $"{entry.Name} a été {(enabled ? "réactivé" : "désactivé")}. Modification réversible depuis cette page.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            StartupAuditStatus.Text = "Windows refuse cette modification sans droits administrateur.";
+        }
+        catch (Exception ex)
+        {
+            StartupAuditStatus.Text = $"Modification impossible : {ex.Message}";
+            AppLog.Write($"Modification du démarrage impossible pour {entry.Name} : {ex.Message}");
+        }
+        finally { UpdateStartupAuditButtons(); }
     }
 
     private void TestReminderNow()

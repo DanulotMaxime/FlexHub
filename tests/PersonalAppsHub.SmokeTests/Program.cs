@@ -50,6 +50,14 @@ Check(StorageHealthService.MediaTypeName(4) == "SSD" && StorageHealthService.Med
     "interprétation du type de disque");
 Check(StorageHealthService.RemainingHealthPercent(3) == 97 &&
       StorageHealthService.RemainingHealthPercent(120) == 0, "calcul de santé restante du SSD");
+Check(StartupAuditService.ApprovalStatus(null) == "Actif" &&
+      StartupAuditService.ApprovalStatus([3]) == "Désactivé" &&
+      StartupAuditService.ApprovalStatus([2]) == "Actif", "interprétation de l’état des programmes au démarrage");
+Check(StartupAuditService.CreateApprovalValue(false)[0] == 3 &&
+      StartupAuditService.CreateApprovalValue(true)[0] == 2, "création des états de démarrage Windows");
+var startupAnalysis = StartupAuditService.Analyze("Discord", @"C:\Apps\Discord\Update.exe");
+Check(startupAnalysis.Recommendation == "Désactivation envisageable" && startupAnalysis.Reason.Contains("manuellement"),
+    "analyse prudente d’une application facultative au démarrage");
 var nvmeLog = new byte[512];
 BinaryPrimitives.WriteUInt16LittleEndian(nvmeLog.AsSpan(1, 2), 300);
 nvmeLog[5] = 4;
