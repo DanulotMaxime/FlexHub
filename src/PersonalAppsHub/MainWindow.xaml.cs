@@ -31,6 +31,9 @@ public partial class MainWindow : Window
     private readonly WiktionaryService _wiktionaryService = new();
     private readonly NvidiaProfileService _nvidiaProfileService = new();
     private readonly XmpMonitorService _xmpMonitorService = new();
+    private readonly SystemMonitoringService _systemMonitoringService = new();
+    private readonly TemporaryFileCleanupService _temporaryFileCleanupService = new();
+    private readonly StorageHealthService _storageHealthService = new();
     private readonly UpdateService _updateService = new();
     private readonly ApiQuotaService _apiQuotaService = new();
     private readonly HotkeyService _hotkeyService = new(9471);
@@ -41,6 +44,11 @@ public partial class MainWindow : Window
     private readonly GameChatKeyboardService _gameChatKeyboardService = new();
     private readonly DispatcherTimer _reminderTimer = new();
     private readonly DispatcherTimer _xmpTimer = new();
+    private readonly DispatcherTimer _monitoringTimer = new() { Interval = TimeSpan.FromSeconds(3) };
+    private readonly Queue<double> _cpuHistory = new();
+    private readonly Queue<double> _ramHistory = new();
+    private readonly Queue<double> _gpuHistory = new();
+    private readonly Queue<DateTime> _monitoringTimestamps = new();
     private readonly Forms.NotifyIcon _tray;
     private HubSettings _settings;
     private bool _exit;
@@ -49,11 +57,22 @@ public partial class MainWindow : Window
     private bool _initialXmpCheckDone;
     private bool _actionWheelOpen;
     private XmpAlertWindow? _xmpAlertWindow;
+    private MonitoringAlertWindow? _monitoringAlertWindow;
     private Action? _balloonClickAction;
     private UpdateCheckResult? _availableUpdate;
     private bool _updateInstallRunning;
     private double _sidebarScrollTarget;
     private bool _sidebarScrollAnimating;
+    private bool _monitoringRefreshRunning;
+    private bool _textToolsExpanded = true;
+    private int _highCpuSamples;
+    private int _highRamSamples;
+    private int _highCpuTemperatureSamples;
+    private int _highGpuTemperatureSamples;
+    private DateTime _lastCpuAlertUtc = DateTime.MinValue;
+    private DateTime _lastRamAlertUtc = DateTime.MinValue;
+    private DateTime _lastCpuTemperatureAlertUtc = DateTime.MinValue;
+    private DateTime _lastGpuTemperatureAlertUtc = DateTime.MinValue;
 
     public MainWindow()
     {
@@ -93,6 +112,10 @@ public partial class MainWindow : Window
         LoadSettings();
         _loadingSettings = false;
         ReminderNav.Click += (_, _) => ShowPage("reminder");
+        TextToolsToggle.Click += (_, _) => ToggleTextToolsSection();
+        MonitoringNav.Click += async (_, _) => { ShowPage("monitoring"); await RefreshMonitoringAsync(); };
+        CleanupNav.Click += (_, _) => ShowPage("cleanup");
+        StorageHealthNav.Click += async (_, _) => { ShowPage("storageHealth"); await RefreshStorageHealthAsync(); };
         CorrectorNav.Click += (_, _) => ShowPage("corrector");
         ReformulateNav.Click += (_, _) => ShowPage("reformulate");
         SimplifyNav.Click += (_, _) => ShowPage("simplify");
@@ -149,6 +172,14 @@ public partial class MainWindow : Window
         KeyboardLayoutEnabled.Checked += (_, _) => ApplyEnabledStates();
         KeyboardLayoutEnabled.Unchecked += (_, _) => ApplyEnabledStates();
         TestXmp.Click += async (_, _) => await CheckXmpAsync(true);
+        RefreshMonitoring.Click += async (_, _) => await RefreshMonitoringAsync();
+        ConfigureMonitoringAlerts.Click += (_, _) => OpenMonitoringAlertSettings();
+        ScanTemporaryFiles.Click += async (_, _) => await ScanTemporaryFilesAsync();
+        SelectAllCleanupFiles.Click += (_, _) => CleanupFilesList.SelectAll();
+        DeleteSelectedTemporaryFiles.Click += async (_, _) => await DeleteSelectedTemporaryFilesAsync();
+        CleanupFilesList.SelectionChanged += (_, _) =>
+            DeleteSelectedTemporaryFiles.IsEnabled = CleanupFilesList.SelectedItems.Count > 0;
+        RefreshStorageHealth.Click += async (_, _) => await RefreshStorageHealthAsync();
         SaveXmp.Click += (_, _) => SaveXmpSettings();
         SaveKeyboardLayout.Click += (_, _) => SaveKeyboardLayoutSettings();
         TestKeyboardLayout.Click += (_, _) => TestKeyboardLayoutNow();
@@ -205,6 +236,7 @@ public partial class MainWindow : Window
                 : "Mode chat en jeu terminé : disposition précédente restaurée.");
         _reminderTimer.Tick += (_, _) => ShowReminder();
         _xmpTimer.Tick += async (_, _) => await CheckXmpAsync(false);
+        _monitoringTimer.Tick += async (_, _) => await RefreshMonitoringAsync();
         SourceInitialized += (_, _) => { RegisterHotkey(); RegisterTranslatorHotkey(); RegisterResponseGeneratorHotkey(); RegisterActionWheelHotkey(); };
         ContentRendered += async (_, _) =>
         {
@@ -218,6 +250,7 @@ public partial class MainWindow : Window
         Closing += OnClosing;
         ConfigureReminderTimer();
         ConfigureXmpTimer();
+        _monitoringTimer.Start();
         ConfigureKeyboardLayoutMonitor();
         UpdateNavigationState();
     }
@@ -340,6 +373,9 @@ public partial class MainWindow : Window
         ResponseGeneratorPage.Visibility = page == "responseGenerator" ? Visibility.Visible : Visibility.Collapsed;
         ActionWheelPage.Visibility = page == "actionWheel" ? Visibility.Visible : Visibility.Collapsed;
         NvidiaPage.Visibility = page == "nvidia" ? Visibility.Visible : Visibility.Collapsed;
+        MonitoringPage.Visibility = page == "monitoring" ? Visibility.Visible : Visibility.Collapsed;
+        CleanupPage.Visibility = page == "cleanup" ? Visibility.Visible : Visibility.Collapsed;
+        StorageHealthPage.Visibility = page == "storageHealth" ? Visibility.Visible : Visibility.Collapsed;
         XmpPage.Visibility = page == "xmp" ? Visibility.Visible : Visibility.Collapsed;
         KeyboardLayoutPage.Visibility = page == "keyboardLayout" ? Visibility.Visible : Visibility.Collapsed;
         GeneralSettingsPage.Visibility = page == "general" ? Visibility.Visible : Visibility.Collapsed;
@@ -608,7 +644,7 @@ public partial class MainWindow : Window
 
     private void UpdateNavigationState()
     {
-        if (ReminderNav == null || CorrectorNav == null || ReformulateNav == null || SimplifyNav == null || ConversationSummaryNav == null || WordDefinitionNav == null || TranslatorNav == null || ResponseGeneratorNav == null || ActionWheelNav == null || NvidiaNav == null || XmpNav == null || KeyboardLayoutNav == null) return;
+        if (ReminderNav == null || CorrectorNav == null || ReformulateNav == null || SimplifyNav == null || ConversationSummaryNav == null || WordDefinitionNav == null || TranslatorNav == null || ResponseGeneratorNav == null || ActionWheelNav == null || MonitoringNav == null || CleanupNav == null || StorageHealthNav == null || NvidiaNav == null || XmpNav == null || KeyboardLayoutNav == null) return;
         PlaceNavigationButton(ReminderNav, ReminderEnabled.IsChecked == true);
         PlaceNavigationButton(CorrectorNav, CorrectorEnabled.IsChecked == true);
         PlaceNavigationButton(ReformulateNav, ReformulatorEnabled.IsChecked == true);
@@ -618,15 +654,19 @@ public partial class MainWindow : Window
         PlaceNavigationButton(TranslatorNav, TranslatorEnabled.IsChecked == true);
         PlaceNavigationButton(ResponseGeneratorNav, ResponseGeneratorEnabled.IsChecked == true);
         PlaceNavigationButton(ActionWheelNav, ActionWheelEnabled.IsChecked == true);
+        PlaceNavigationButton(MonitoringNav, _settings.MonitoringEnabled);
+        PlaceNavigationButton(CleanupNav, true);
+        PlaceNavigationButton(StorageHealthNav, true);
         PlaceNavigationButton(NvidiaNav, NvidiaEnabled.IsChecked == true);
         PlaceNavigationButton(XmpNav, XmpEnabled.IsChecked == true);
         PlaceNavigationButton(KeyboardLayoutNav, KeyboardLayoutEnabled.IsChecked == true);
         DisabledAppsSection.Visibility = DisabledAppsPanel.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        TextToolsSection.Visibility = TextToolsPanel.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void PlaceNavigationButton(System.Windows.Controls.Button button, bool enabled)
     {
-        var target = enabled ? ActiveAppsPanel : DisabledAppsPanel;
+        var target = enabled ? IsTextTool(button) ? TextToolsPanel : ActiveAppsPanel : DisabledAppsPanel;
         if (button.Parent is System.Windows.Controls.Panel current && current != target)
         {
             current.Children.Remove(button);
@@ -640,8 +680,20 @@ public partial class MainWindow : Window
         ApplyNavigationState(button, enabled);
     }
 
+    private bool IsTextTool(System.Windows.Controls.Button button) =>
+        button == CorrectorNav || button == ReformulateNav || button == SimplifyNav ||
+        button == ConversationSummaryNav || button == WordDefinitionNav ||
+        button == TranslatorNav || button == ResponseGeneratorNav;
+
+    private void ToggleTextToolsSection()
+    {
+        _textToolsExpanded = !_textToolsExpanded;
+        TextToolsPanel.Visibility = _textToolsExpanded ? Visibility.Visible : Visibility.Collapsed;
+        TextToolsChevron.Text = _textToolsExpanded ? "⌄" : "›";
+    }
+
     private int NavigationRank(System.Windows.Controls.Button button) =>
-        button == ReminderNav ? 0 : button == CorrectorNav ? 1 : button == ReformulateNav ? 2 : button == SimplifyNav ? 3 : button == ConversationSummaryNav ? 4 : button == WordDefinitionNav ? 5 : button == TranslatorNav ? 6 : button == ResponseGeneratorNav ? 7 : button == ActionWheelNav ? 8 : button == NvidiaNav ? 9 : button == XmpNav ? 10 : 11;
+        button == ReminderNav ? 0 : button == CorrectorNav ? 1 : button == ReformulateNav ? 2 : button == SimplifyNav ? 3 : button == ConversationSummaryNav ? 4 : button == WordDefinitionNav ? 5 : button == TranslatorNav ? 6 : button == ResponseGeneratorNav ? 7 : button == ActionWheelNav ? 8 : button == MonitoringNav ? 9 : button == CleanupNav ? 10 : button == StorageHealthNav ? 11 : button == NvidiaNav ? 12 : button == XmpNav ? 13 : 14;
 
     private void ApplyEnabledStates()
     {
@@ -1890,6 +1942,333 @@ public partial class MainWindow : Window
             : TimeSpan.FromSeconds(1);
         _reminderTimer.Start();
     }
+
+    private async Task RefreshMonitoringAsync()
+    {
+        if (_monitoringRefreshRunning) return;
+        _monitoringRefreshRunning = true;
+        RefreshMonitoring.IsEnabled = false;
+        try
+        {
+            var metrics = await _systemMonitoringService.CaptureAsync();
+            MonitorCpuText.Text = metrics.CpuTemperatureC.HasValue
+                ? $"{metrics.CpuPercent:0}%  ·  {metrics.CpuTemperatureC:0} °C"
+                : $"{metrics.CpuPercent:0}%";
+            MonitorRamText.Text = $"{metrics.RamPercent:0}%";
+            MonitorRamDetail.Text = $"{metrics.RamUsedGb:0.0} / {metrics.RamTotalGb:0.0} Go";
+            MonitorGpuText.Text = metrics.GpuPercent.HasValue
+                ? $"{metrics.GpuPercent:0}%  ·  {metrics.GpuTemperatureC:0} °C"
+                : "Indisponible";
+            MonitorVramText.Text = metrics.VramPercent.HasValue ? $"{metrics.VramPercent:0}%" : "Indisponible";
+            MonitorVramDetail.Text = metrics.VramUsedGb.HasValue
+                ? $"{metrics.VramUsedGb:0.0} / {metrics.VramTotalGb:0.0} Go"
+                : "Capteurs GPU compatibles non détectés";
+            MonitoringStatus.Text = $"Dernière mesure à {metrics.CapturedAt:HH:mm:ss}";
+            AddHistory(_cpuHistory, metrics.CpuPercent);
+            AddHistory(_ramHistory, metrics.RamPercent);
+            AddHistory(_gpuHistory, metrics.GpuPercent ?? 0);
+            _monitoringTimestamps.Enqueue(metrics.CapturedAt);
+            while (_monitoringTimestamps.Count > 60) _monitoringTimestamps.Dequeue();
+            DrawMonitoringChart();
+            CheckMonitoringAlerts(metrics);
+        }
+        catch (Exception ex)
+        {
+            MonitoringStatus.Text = $"Mesure impossible : {ex.Message}";
+            AppLog.Write($"Monitoring PC indisponible : {ex.Message}");
+        }
+        finally
+        {
+            RefreshMonitoring.IsEnabled = true;
+            _monitoringRefreshRunning = false;
+        }
+    }
+
+    private static void AddHistory(Queue<double> history, double value)
+    {
+        history.Enqueue(Math.Clamp(value, 0, 100));
+        while (history.Count > 60) history.Dequeue();
+    }
+
+    private void OpenMonitoringAlertSettings()
+    {
+        var dialog = new MonitoringSettingsWindow(
+            _settings.MonitoringAlertsEnabled,
+            _settings.MonitoringCpuAlertPercent,
+            _settings.MonitoringRamAlertPercent,
+            _settings.MonitoringCpuTemperatureAlertC,
+            _settings.MonitoringGpuTemperatureAlertC) { Owner = this };
+        dialog.TestRequested += (_, _) => ShowMonitoringAlert(
+            "Test de l’alerte",
+            "Les alertes du monitoring fonctionnent. Cette notification est un test.",
+            "Alerte de test envoyée à " + DateTime.Now.ToString("HH:mm:ss"));
+        if (dialog.ShowDialog() != true) return;
+
+        _settings.MonitoringAlertsEnabled = dialog.AlertsAreEnabled;
+        _settings.MonitoringCpuAlertPercent = dialog.CpuAlertPercent;
+        _settings.MonitoringRamAlertPercent = dialog.RamAlertPercent;
+        _settings.MonitoringCpuTemperatureAlertC = dialog.CpuTemperatureAlertC;
+        _settings.MonitoringGpuTemperatureAlertC = dialog.GpuTemperatureAlertC;
+        _settingsService.Save(_settings);
+        ResetMonitoringAlertCounters();
+        MonitoringAlertStatus.Text = _settings.MonitoringAlertsEnabled
+            ? "Alertes enregistrées. Trois mesures consécutives sont nécessaires avant une notification."
+            : "Alertes désactivées.";
+    }
+
+    public static bool TryReadThreshold(string value, int minimum, int maximum, out int threshold) =>
+        int.TryParse(value.Trim(), out threshold) && threshold >= minimum && threshold <= maximum;
+
+    private void CheckMonitoringAlerts(SystemMetrics metrics)
+    {
+        if (!_settings.MonitoringAlertsEnabled)
+        {
+            ResetMonitoringAlertCounters();
+            return;
+        }
+
+        _highCpuSamples = metrics.CpuPercent >= _settings.MonitoringCpuAlertPercent ? _highCpuSamples + 1 : 0;
+        _highRamSamples = metrics.RamPercent >= _settings.MonitoringRamAlertPercent ? _highRamSamples + 1 : 0;
+        _highCpuTemperatureSamples = metrics.CpuTemperatureC >= _settings.MonitoringCpuTemperatureAlertC
+            ? _highCpuTemperatureSamples + 1 : 0;
+        _highGpuTemperatureSamples = metrics.GpuTemperatureC >= _settings.MonitoringGpuTemperatureAlertC
+            ? _highGpuTemperatureSamples + 1 : 0;
+
+        var pending = Math.Max(Math.Max(_highCpuSamples, _highRamSamples),
+            Math.Max(_highCpuTemperatureSamples, _highGpuTemperatureSamples));
+        if (pending is > 0 and < 3)
+            MonitoringAlertStatus.Text = $"Seuil dépassé : confirmation en cours ({pending}/3 mesures).";
+        else if (pending == 0)
+            MonitoringAlertStatus.Text = "Aucune alerte récente.";
+
+        if (_highCpuSamples >= 3 && CanShowMonitoringAlert(_lastCpuAlertUtc))
+        {
+            _lastCpuAlertUtc = DateTime.UtcNow;
+            ShowMonitoringAlert("Alerte CPU",
+                $"Utilisation CPU élevée : {metrics.CpuPercent:0}% (seuil {_settings.MonitoringCpuAlertPercent}%).",
+                $"CPU élevé : {metrics.CpuPercent:0}% à {DateTime.Now:HH:mm:ss}");
+            AppLog.Write($"ALERTE MONITORING | CPU={metrics.CpuPercent:0}%");
+        }
+        if (_highRamSamples >= 3 && CanShowMonitoringAlert(_lastRamAlertUtc))
+        {
+            _lastRamAlertUtc = DateTime.UtcNow;
+            ShowMonitoringAlert("Alerte RAM",
+                $"Utilisation RAM élevée : {metrics.RamPercent:0}% (seuil {_settings.MonitoringRamAlertPercent}%).",
+                $"RAM élevée : {metrics.RamPercent:0}% à {DateTime.Now:HH:mm:ss}");
+            AppLog.Write($"ALERTE MONITORING | RAM={metrics.RamPercent:0}%");
+        }
+        if (_highCpuTemperatureSamples >= 3 && CanShowMonitoringAlert(_lastCpuTemperatureAlertUtc))
+        {
+            _lastCpuTemperatureAlertUtc = DateTime.UtcNow;
+            ShowMonitoringAlert("Alerte température CPU",
+                $"Le CPU atteint {metrics.CpuTemperatureC:0} °C (seuil {_settings.MonitoringCpuTemperatureAlertC} °C).",
+                $"Température CPU élevée : {metrics.CpuTemperatureC:0} °C à {DateTime.Now:HH:mm:ss}");
+            AppLog.Write($"ALERTE MONITORING | Température CPU={metrics.CpuTemperatureC:0}°C");
+        }
+        if (_highGpuTemperatureSamples >= 3 && CanShowMonitoringAlert(_lastGpuTemperatureAlertUtc))
+        {
+            _lastGpuTemperatureAlertUtc = DateTime.UtcNow;
+            ShowMonitoringAlert("Alerte température GPU",
+                $"Le GPU atteint {metrics.GpuTemperatureC:0} °C (seuil {_settings.MonitoringGpuTemperatureAlertC} °C).",
+                $"Température GPU élevée : {metrics.GpuTemperatureC:0} °C à {DateTime.Now:HH:mm:ss}");
+            AppLog.Write($"ALERTE MONITORING | Température GPU={metrics.GpuTemperatureC:0}°C");
+        }
+    }
+
+    private void ShowMonitoringAlert(string title, string message, string visibleStatus)
+    {
+        MonitoringAlertStatus.Text = "⚠ " + visibleStatus;
+        MonitoringAlertStatus.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 179, 107));
+        _monitoringAlertWindow?.Close();
+        _monitoringAlertWindow = new MonitoringAlertWindow(title, message);
+        _monitoringAlertWindow.OpenMonitoringRequested += (_, _) =>
+        {
+            ShowHub();
+            ShowPage("monitoring");
+        };
+        _monitoringAlertWindow.Closed += (_, _) => _monitoringAlertWindow = null;
+        _monitoringAlertWindow.Show();
+    }
+
+    private static bool CanShowMonitoringAlert(DateTime lastAlertUtc) =>
+        DateTime.UtcNow - lastAlertUtc >= TimeSpan.FromMinutes(15);
+
+    private void ResetMonitoringAlertCounters()
+    {
+        _highCpuSamples = 0;
+        _highRamSamples = 0;
+        _highCpuTemperatureSamples = 0;
+        _highGpuTemperatureSamples = 0;
+    }
+
+    private void MonitoringChart_OnSizeChanged(object sender, SizeChangedEventArgs e) => DrawMonitoringChart();
+
+    private void DrawMonitoringChart()
+    {
+        if (MonitoringChart.ActualWidth <= 0 || MonitoringChart.ActualHeight <= 0) return;
+        DrawMonitoringScale();
+        CpuHistoryLine.Points = CreateHistoryPoints(_cpuHistory);
+        RamHistoryLine.Points = CreateHistoryPoints(_ramHistory);
+        GpuHistoryLine.Points = CreateHistoryPoints(_gpuHistory);
+    }
+
+    private PointCollection CreateHistoryPoints(IEnumerable<double> values)
+    {
+        var samples = values.ToArray();
+        var points = new PointCollection(samples.Length);
+        const double left = 38;
+        const double top = 4;
+        const double bottom = 18;
+        var plotWidth = Math.Max(1, MonitoringChart.ActualWidth - left - 4);
+        var plotHeight = Math.Max(1, MonitoringChart.ActualHeight - top - bottom);
+        for (var index = 0; index < samples.Length; index++)
+        {
+            var x = samples.Length <= 1 ? left : left + index * plotWidth / (samples.Length - 1);
+            var y = top + plotHeight * (1 - samples[index] / 100d);
+            points.Add(new System.Windows.Point(x, y));
+        }
+        return points;
+    }
+
+    private void DrawMonitoringScale()
+    {
+        foreach (var element in MonitoringChart.Children.OfType<FrameworkElement>()
+                     .Where(element => Equals(element.Tag, "monitoring-scale")).ToArray())
+            MonitoringChart.Children.Remove(element);
+
+        const double left = 38;
+        const double top = 4;
+        const double bottom = 18;
+        var plotHeight = Math.Max(1, MonitoringChart.ActualHeight - top - bottom);
+        foreach (var value in new[] { 100, 75, 50, 25, 0 })
+        {
+            var y = top + plotHeight * (1 - value / 100d);
+            var line = new System.Windows.Shapes.Line
+            {
+                X1 = left, X2 = MonitoringChart.ActualWidth - 4, Y1 = y, Y2 = y,
+                Stroke = new SolidColorBrush(System.Windows.Media.Color.FromArgb(48, 255, 255, 255)),
+                StrokeThickness = 1, Tag = "monitoring-scale"
+            };
+            System.Windows.Controls.Panel.SetZIndex(line, 0);
+            MonitoringChart.Children.Add(line);
+            var label = new System.Windows.Controls.TextBlock
+            {
+                Text = $"{value}%", FontSize = 10, Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush"),
+                Tag = "monitoring-scale"
+            };
+            System.Windows.Controls.Canvas.SetLeft(label, 2);
+            System.Windows.Controls.Canvas.SetTop(label, Math.Clamp(y - 7, 0, Math.Max(0, MonitoringChart.ActualHeight - 15)));
+            System.Windows.Controls.Panel.SetZIndex(label, 1);
+            MonitoringChart.Children.Add(label);
+        }
+    }
+
+    private void MonitoringChart_OnMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        var cpu = _cpuHistory.ToArray();
+        var ram = _ramHistory.ToArray();
+        var gpu = _gpuHistory.ToArray();
+        var times = _monitoringTimestamps.ToArray();
+        var count = new[] { cpu.Length, ram.Length, gpu.Length, times.Length }.Min();
+        if (count == 0) return;
+
+        const double left = 38;
+        var plotWidth = Math.Max(1, MonitoringChart.ActualWidth - left - 4);
+        var position = e.GetPosition(MonitoringChart);
+        var ratio = Math.Clamp((position.X - left) / plotWidth, 0, 1);
+        var index = count <= 1 ? 0 : (int)Math.Round(ratio * (count - 1));
+        var x = count <= 1 ? left : left + index * plotWidth / (count - 1);
+
+        MonitoringHoverLine.X1 = x;
+        MonitoringHoverLine.X2 = x;
+        MonitoringHoverLine.Y1 = 4;
+        MonitoringHoverLine.Y2 = Math.Max(4, MonitoringChart.ActualHeight - 18);
+        MonitoringHoverText.Inlines.Clear();
+        MonitoringHoverText.Text = $"{times[index]:HH:mm:ss}\nCPU  {cpu[index]:0}%   RAM  {ram[index]:0}%   GPU  {gpu[index]:0}%";
+        MonitoringHoverLine.Visibility = Visibility.Visible;
+        MonitoringHoverTooltip.Visibility = Visibility.Visible;
+        MonitoringHoverTooltip.Measure(new System.Windows.Size(double.PositiveInfinity, double.PositiveInfinity));
+        var tooltipWidth = MonitoringHoverTooltip.DesiredSize.Width;
+        System.Windows.Controls.Canvas.SetLeft(MonitoringHoverTooltip, Math.Clamp(x + 9, left, Math.Max(left, MonitoringChart.ActualWidth - tooltipWidth - 4)));
+        System.Windows.Controls.Canvas.SetTop(MonitoringHoverTooltip, 8);
+    }
+
+    private void MonitoringChart_OnMouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        MonitoringHoverLine.Visibility = Visibility.Collapsed;
+        MonitoringHoverTooltip.Visibility = Visibility.Collapsed;
+    }
+
+    private async Task ScanTemporaryFilesAsync()
+    {
+        ScanTemporaryFiles.IsEnabled = false;
+        DeleteSelectedTemporaryFiles.IsEnabled = false;
+        SelectAllCleanupFiles.IsEnabled = false;
+        CleanupFilesList.ItemsSource = null;
+        CleanupSummary.Text = "Analyse du dossier temporaire en cours…";
+        CleanupStatus.Text = "";
+        try
+        {
+            var result = await _temporaryFileCleanupService.ScanAsync();
+            CleanupFilesList.ItemsSource = result.Files;
+            CleanupSummary.Text = result.Files.Count == 0
+                ? "Aucun fichier temporaire ancien de plus de 24 heures n’a été trouvé."
+                : $"{result.Files.Count} fichier(s) · {TemporaryFileCleanupService.FormatSize(result.TotalSizeBytes)} récupérables";
+            CleanupStatus.Text = result.SkippedFiles > 0
+                ? $"{result.SkippedFiles} élément(s) inaccessible(s) ont été ignorés."
+                : "Analyse terminée. Sélectionnez uniquement les fichiers à supprimer.";
+            SelectAllCleanupFiles.IsEnabled = result.Files.Count > 0;
+        }
+        catch (Exception ex)
+        {
+            CleanupSummary.Text = "Analyse impossible.";
+            CleanupStatus.Text = ex.Message;
+            AppLog.Write($"Analyse des fichiers temporaires impossible : {ex.Message}");
+        }
+        finally { ScanTemporaryFiles.IsEnabled = true; }
+    }
+
+    private async Task DeleteSelectedTemporaryFilesAsync()
+    {
+        var selected = CleanupFilesList.SelectedItems.Cast<TemporaryFileCandidate>().ToArray();
+        if (selected.Length == 0) return;
+        var total = selected.Sum(file => file.SizeBytes);
+        var confirmation = System.Windows.MessageBox.Show(this,
+            $"Supprimer définitivement {selected.Length} fichier(s) temporaire(s) représentant {TemporaryFileCleanupService.FormatSize(total)} ?\n\nLes fichiers utilisés par une application seront ignorés.",
+            "Confirmer le nettoyage", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+        if (confirmation != MessageBoxResult.Yes) return;
+
+        ScanTemporaryFiles.IsEnabled = false;
+        DeleteSelectedTemporaryFiles.IsEnabled = false;
+        CleanupStatus.Text = "Suppression en cours…";
+        var result = await Task.Run(() => _temporaryFileCleanupService.Delete(selected));
+        AppLog.Write($"NETTOYAGE TEMPORAIRE | Supprimés={result.DeletedFiles}; Récupéré={result.RecoveredBytes}; Échecs={result.FailedFiles}");
+        var resultMessage = $"{result.DeletedFiles} fichier(s) supprimé(s), {TemporaryFileCleanupService.FormatSize(result.RecoveredBytes)} récupérés" +
+                            (result.FailedFiles > 0 ? $" · {result.FailedFiles} fichier(s) ignoré(s)." : ".");
+        await ScanTemporaryFilesAsync();
+        CleanupStatus.Text = resultMessage;
+    }
+
+    private async Task RefreshStorageHealthAsync()
+    {
+        RefreshStorageHealth.IsEnabled = false;
+        StorageHealthStatus.Text = "Lecture des informations de stockage…";
+        try
+        {
+            var snapshot = await _storageHealthService.ReadAsync();
+            StorageVolumesList.ItemsSource = snapshot.Volumes;
+            PhysicalDisksList.ItemsSource = snapshot.PhysicalDisks;
+            StorageUnavailableText.Visibility = snapshot.PhysicalDisks.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            StorageHealthStatus.Text = $"Actualisé à {DateTime.Now:HH:mm:ss} · {snapshot.Volumes.Count} volume(s), {snapshot.PhysicalDisks.Count} disque(s) physique(s).";
+        }
+        catch (Exception ex)
+        {
+            StorageHealthStatus.Text = $"Lecture impossible : {ex.Message}";
+            AppLog.Write($"Lecture du stockage impossible : {ex.Message}");
+        }
+        finally { RefreshStorageHealth.IsEnabled = true; }
+    }
+
     private void TestReminderNow()
     {
         var duration = int.TryParse(ReminderDuration.Text, out var seconds) && seconds is >= 1 and <= 300
@@ -1931,7 +2310,7 @@ public partial class MainWindow : Window
         Focus();
     }
     private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e) { if (!_exit) { e.Cancel = true; Hide(); } }
-    private void ExitHub() { _exit = true; _gameChatKeyboardService.Dispose(); _keyboardLayoutMonitorService.Dispose(); _hotkeyService.Dispose(); _translatorHotkeyService.Dispose(); _responseGeneratorHotkeyService.Dispose(); _actionWheelHotkeyService.Dispose(); _reminderTimer.Stop(); _xmpTimer.Stop(); _tray.Visible = false; _tray.Dispose(); Close(); System.Windows.Application.Current.Shutdown(); }
+    private void ExitHub() { _exit = true; _systemMonitoringService.Dispose(); _gameChatKeyboardService.Dispose(); _keyboardLayoutMonitorService.Dispose(); _hotkeyService.Dispose(); _translatorHotkeyService.Dispose(); _responseGeneratorHotkeyService.Dispose(); _actionWheelHotkeyService.Dispose(); _reminderTimer.Stop(); _xmpTimer.Stop(); _monitoringTimer.Stop(); _tray.Visible = false; _tray.Dispose(); Close(); System.Windows.Application.Current.Shutdown(); }
 
     private sealed record LanguageChoice(string Name, string Code)
     {

@@ -15,7 +15,16 @@ public sealed class SettingsService
         try
         {
             var settings = JsonSerializer.Deserialize<HubSettings>(File.ReadAllText(SettingsPath)) ?? new();
-            settings.SettingsSchemaVersion = 3;
+            if (settings.SettingsSchemaVersion < 4) settings.MonitoringEnabled = true;
+            if (settings.SettingsSchemaVersion < 5)
+            {
+                settings.MonitoringAlertsEnabled = true;
+                settings.MonitoringCpuAlertPercent = 95;
+                settings.MonitoringRamAlertPercent = 90;
+                settings.MonitoringGpuTemperatureAlertC = 85;
+            }
+            if (settings.SettingsSchemaVersion < 6) settings.MonitoringCpuTemperatureAlertC = 90;
+            settings.SettingsSchemaVersion = 6;
             return settings;
         }
         catch
@@ -32,7 +41,7 @@ public sealed class SettingsService
     public void Save(HubSettings settings)
     {
         Directory.CreateDirectory(_folder);
-        settings.SettingsSchemaVersion = 3;
+        settings.SettingsSchemaVersion = 6;
         var temporaryPath = SettingsPath + ".tmp";
         File.WriteAllText(temporaryPath, JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));
         File.Move(temporaryPath, SettingsPath, overwrite: true);

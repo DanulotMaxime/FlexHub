@@ -1,6 +1,6 @@
 ﻿# 🚀 FlexHub — Suivi du développement
 
-*Dernière mise à jour : 22 septembre 2026*
+*Dernière mise à jour : 23 septembre 2026*
 
 
 ## Légende
@@ -93,6 +93,7 @@ pas le temps nécessaire.
 
 ### ✅ Paramètres généraux et sécurité — Terminé
 - Démarrage avec Windows, thèmes clair/sombre et tailles de police.
+- Menu latéral organisé avec une catégorie repliable dédiée aux outils de texte.
 - Clés API enregistrées localement et chiffrées pour le compte Windows.
 - Consentement explicite avant l'utilisation des services d'IA en ligne.
 - Liens vers les clés API et affichage de certains quotas.
@@ -143,9 +144,43 @@ pas le temps nécessaire.
 ## 2. FONCTIONS PARTIELLEMENT RÉALISÉES OU À ÉTENDRE
 
 
-### 🟡 Notification de consommation anormale CPU/RAM — 20 %
-- Le journal surveille déjà les hausses de mémoire de FlexHub.
-- Reste à surveiller tous les processus, le CPU, définir les seuils et envoyer une alerte.
+### 🟡 Nettoyage des fichiers temporaires — 70 %
+- Analyse en lecture seule du dossier temporaire de l’utilisateur.
+- Seuls les fichiers inutilisés depuis plus de 24 heures sont proposés.
+- Aperçu du nom, de la taille, de la date et de l’emplacement avant suppression.
+- Sélection explicite, confirmation obligatoire et contrôle du chemin avant suppression.
+- Reste à ajouter des règles dédiées aux caches des navigateurs et applications.
+
+
+### ✅ Santé et espace des disques — Terminé
+- Affichage des volumes fixes, de leur format, de l’espace libre et du pourcentage utilisé.
+- Lecture en consultation seule du type, de la taille et de l’état de santé des disques physiques
+  communiqué par le service de stockage Windows.
+- Affichage de la santé restante estimée depuis l’usure, de la température et des heures de
+  fonctionnement lorsque le périphérique transmet ces compteurs à Windows.
+- Lecture native et strictement en lecture seule de la page S.M.A.R.T./Health des disques NVMe :
+  données lues/écrites, cycles, arrêts non sécurisés, erreurs média et avertissements critiques.
+
+
+### 🟡 Tableau de monitoring CPU/RAM/GPU — 95 %
+- Affichage en temps réel du CPU, de sa température, de la RAM, du GPU NVIDIA,
+  de la VRAM et de la température GPU.
+- Historique graphique des 60 dernières mesures avec actualisation automatique.
+- Échelle de 0 à 100 %, lignes de repère et détail CPU/RAM/GPU de chaque mesure au survol.
+- Alertes configurables pour l’utilisation CPU/RAM et la température GPU, déclenchées après
+  trois mesures consécutives et limitées à une notification toutes les 15 minutes.
+- Panneau de réglage explicite, progression de la confirmation, bandeau d’alerte intégré
+  et bouton permettant de tester immédiatement les notifications.
+- Fenêtre d’alerte dédiée reprenant le style du module XMP, avec accès direct au monitoring,
+  sans notification Windows superposée.
+- Prise en charge des capteurs GPU NVIDIA et AMD compatibles.
+- Reste à prendre en charge les GPU Intel lorsqu’une source de capteurs fiable sera disponible.
+
+
+### 🟡 Notification de consommation anormale CPU/RAM — 75 %
+- Le monitoring surveille l’utilisation globale du CPU et de la RAM avec des seuils configurables.
+- Les alertes exigent trois mesures consécutives et respectent un délai de 15 minutes.
+- Reste à identifier les processus responsables d’une consommation anormale.
 
 
 ### 🟡 Mise à jour automatique des applications — 25 %
@@ -166,9 +201,9 @@ pas le temps nécessaire.
 
 ## 3. RESTE À FAIRE - SYSTÈME, NETTOYAGE ET MAINTENANCE
 
-- [ ] **Vider le cache RAM et purger les fichiers temporaires en un clic.**
+- [ ] **Vider le cache RAM et purger les fichiers temporaires en un clic.** *(Nettoyage temporaire sécurisé disponible ; cache RAM à étudier.)*
 - [ ] **Vider automatiquement la corbeille au-delà de X Go ou X jours.**
-- [ ] **Afficher l'espace disque et la santé S.M.A.R.T. des SSD.**
+- [x] **Afficher l'espace disque et la santé S.M.A.R.T. des SSD.**
 - [ ] **Auditer les programmes lancés au démarrage et proposer leur désactivation.**
 - [ ] **Détecter les logiciels inutilisés depuis une durée configurable.**
 - [ ] **Scanner les fichiers en double par hash avec validation avant suppression.**
@@ -181,9 +216,9 @@ pas le temps nécessaire.
 
 ## 4. RESTE À FAIRE - MONITORING ET RÉSEAU
 
-- [ ] **Afficher RAM et VRAM avec un mini-graphe historique.**
-- [ ] **Afficher les températures CPU/GPU en temps réel.**
-- [ ] **Alerter lorsque CPU/GPU dépasse un seuil de température configurable.**
+- [x] **Afficher RAM et VRAM avec un mini-graphe historique.**
+- [x] **Afficher les températures CPU/GPU en temps réel.**
+- [x] **Alerter lorsque CPU/GPU dépasse un seuil de température configurable.**
 - [ ] **Tester le ping vers la box, Discord, Steam ou des serveurs personnalisés.**
 - [ ] **Mesurer en continu ping, jitter et perte de paquets vers les serveurs de jeu.**
 - [ ] **Alerter lorsque le jitter dépasse un seuil avant une partie classée.**

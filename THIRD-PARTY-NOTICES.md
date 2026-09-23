@@ -1,5 +1,16 @@
 # Composants tiers
 
+## LibreHardwareMonitorLib
+
+FlexHub utilise LibreHardwareMonitorLib 0.9.6 pour lire les capteurs de température du processeur.
+
+Projet officiel : https://github.com/LibreHardwareMonitor/LibreHardwareMonitor
+
+Ce composant est distribué sous licence Mozilla Public License 2.0 (MPL-2.0).
+Le texte de la licence est disponible à l’adresse : https://www.mozilla.org/MPL/2.0/
+
+## NVIDIA Profile Inspector
+
 FlexHub distribue NVIDIA Profile Inspector, projet open source de Orbmu2k, sous licence MIT.
 
 Projet officiel : https://github.com/Orbmu2k/nvidiaProfileInspector

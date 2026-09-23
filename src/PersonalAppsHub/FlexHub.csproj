@@ -33,4 +33,7 @@
     <Content Include="..\..\tools\nvidia-profile-inspector\Reference.xml" Link="Tools\Reference.xml" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\nvidia-profiles\NVIDIA-Global-Profile-Baseline.nip" Link="Profiles\NVIDIA-Global-Profile-Baseline.nip" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
+  </ItemGroup>
 </Project>

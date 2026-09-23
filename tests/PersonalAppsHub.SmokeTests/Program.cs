@@ -1,5 +1,7 @@
+using PersonalAppsHub;
 using PersonalAppsHub.Models;
 using PersonalAppsHub.Services;
+using System.Buffers.Binary;
 
 var failures = new List<string>();
 void Check(bool condition, string name)
@@ -27,6 +29,45 @@ Check(defaults.TranslationSourceLanguage == "EN" && defaults.TranslationTargetLa
 Check(!defaults.GeminiSetupCompleted, "configuration Gemini demandée au premier lancement");
 Check(!defaults.XmpMonitorEnabled && !defaults.MemorySetupCompleted, "surveillance désactivée avant l’assistant");
 Check(!defaults.AiPrivacyConsentAccepted, "consentement API explicite");
+Check(defaults.MonitoringEnabled, "monitoring activé par défaut");
+Check(defaults.MonitoringAlertsEnabled && defaults.MonitoringCpuAlertPercent == 95 &&
+      defaults.MonitoringRamAlertPercent == 90 && defaults.MonitoringGpuTemperatureAlertC == 85,
+    "seuils de monitoring prudents par défaut");
+Check(defaults.MonitoringCpuTemperatureAlertC == 90, "seuil de température CPU prudent par défaut");
+Check(Math.Abs(SystemMonitoringService.Percentage(25, 100) - 25) < 0.01, "calcul de pourcentage monitoring");
+Check(MainWindow.TryReadThreshold("85", 50, 100, out var threshold) && threshold == 85 &&
+      !MainWindow.TryReadThreshold("120", 50, 100, out _), "validation des seuils monitoring");
+var temporaryRoot = Path.Combine(Path.GetTempPath(), "flexhub-test-root");
+Check(TemporaryFileCleanupService.IsWithinRoot(Path.Combine(temporaryRoot, "sub", "file.tmp"), temporaryRoot),
+    "validation d’un fichier dans le dossier temporaire");
+Check(!TemporaryFileCleanupService.IsWithinRoot(Path.Combine(Path.GetTempPath(), "outside.tmp"), temporaryRoot),
+    "refus d’un fichier hors du dossier temporaire");
+Check(TemporaryFileCleanupService.FormatSize(2 * 1024 * 1024).Contains("2,0") ||
+      TemporaryFileCleanupService.FormatSize(2 * 1024 * 1024).Contains("2.0"), "formatage de la taille temporaire");
+Check(StorageHealthService.HealthStatusName(0) == "Sain" &&
+      StorageHealthService.HealthStatusName(2) == "Défaillant", "interprétation de la santé du disque");
+Check(StorageHealthService.MediaTypeName(4) == "SSD" && StorageHealthService.MediaTypeName(3) == "HDD",
+    "interprétation du type de disque");
+Check(StorageHealthService.RemainingHealthPercent(3) == 97 &&
+      StorageHealthService.RemainingHealthPercent(120) == 0, "calcul de santé restante du SSD");
+var nvmeLog = new byte[512];
+BinaryPrimitives.WriteUInt16LittleEndian(nvmeLog.AsSpan(1, 2), 300);
+nvmeLog[5] = 4;
+BinaryPrimitives.WriteUInt64LittleEndian(nvmeLog.AsSpan(32, 8), 2);
+BinaryPrimitives.WriteUInt64LittleEndian(nvmeLog.AsSpan(48, 8), 3);
+BinaryPrimitives.WriteUInt64LittleEndian(nvmeLog.AsSpan(112, 8), 42);
+BinaryPrimitives.WriteUInt64LittleEndian(nvmeLog.AsSpan(128, 8), 1234);
+BinaryPrimitives.WriteUInt64LittleEndian(nvmeLog.AsSpan(144, 8), 5);
+BinaryPrimitives.WriteUInt64LittleEndian(nvmeLog.AsSpan(160, 8), 1);
+var nvmeSmart = NvmeSmartService.ParseHealthLog(nvmeLog);
+Check(nvmeSmart.TemperatureC == 27 && nvmeSmart.PercentageUsed == 4 && nvmeSmart.PowerOnHours == 1234,
+    "décodage température, usure et heures NVMe");
+Check(nvmeSmart.PowerCycles == 42 && nvmeSmart.UnsafeShutdowns == 5 && nvmeSmart.MediaErrors == 1 &&
+      nvmeSmart.DataReadBytes == 1_024_000 && nvmeSmart.DataWrittenBytes == 1_536_000,
+    "décodage des compteurs SMART NVMe");
+var monitoringSample = await new SystemMonitoringService().CaptureAsync();
+Check(monitoringSample.RamTotalGb > 0 && monitoringSample.RamPercent is >= 0 and <= 100,
+    "lecture des métriques mémoire Windows");
 
 Check(defaults.ReformulatorEnabled && defaults.SimplifierEnabled, "transformations de texte activées par défaut");
 var reformulateInstruction = ResponseGenerationService.BuildTransformationInstruction(TextTransformationMode.Reformulate, "Discours médiéval");

@@ -2,7 +2,7 @@ namespace PersonalAppsHub.Models;
 
 public sealed class HubSettings
 {
-    public int SettingsSchemaVersion { get; set; } = 3;
+    public int SettingsSchemaVersion { get; set; } = 6;
     public bool StartWithWindows { get; set; } = true;
     public string FontSizePreference { get; set; } = "Moyen";
     public string ThemePreference { get; set; } = "Sombre";
@@ -55,6 +55,12 @@ public sealed class HubSettings
     public bool ActionWheelEnabled { get; set; } = true;
     public string ActionWheelHotkey { get; set; } = "Ctrl+Alt+Space";
     public bool NvidiaOptimizerEnabled { get; set; } = true;
+    public bool MonitoringEnabled { get; set; } = true;
+    public bool MonitoringAlertsEnabled { get; set; } = true;
+    public int MonitoringCpuAlertPercent { get; set; } = 95;
+    public int MonitoringRamAlertPercent { get; set; } = 90;
+    public int MonitoringGpuTemperatureAlertC { get; set; } = 85;
+    public int MonitoringCpuTemperatureAlertC { get; set; } = 90;
     public DateTime? LastNvidiaOptimizationUtc { get; set; }
     public bool XmpMonitorEnabled { get; set; }
     public int XmpCheckIntervalMinutes { get; set; } = 360;
