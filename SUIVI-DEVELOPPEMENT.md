@@ -141,6 +141,7 @@ pas le temps nécessaire.
 ### ✅ Installation et publication — Terminé
 - Installeur Windows x64, scripts d'installation/désinstallation et logo.
 - Tests de contrôle et publication GitHub Release par tag de version.
+- Option d’installation explicite, cochée par défaut, pour activer l’historique du Presse-papiers Windows (`Win + V`) sans activer sa synchronisation entre appareils.
 
 
 

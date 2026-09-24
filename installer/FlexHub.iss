@@ -1,7 +1,7 @@
 #define AppName "FlexHub"
 #define AppExeName "FlexHub.exe"
 #ifndef AppVersion
-  #define AppVersion "1.4.0"
+  #define AppVersion "1.4.1"
 #endif
 #ifndef SourceDir
   #define SourceDir "..\publish\installer\win-x64"
@@ -44,6 +44,7 @@ Name: "french"; MessagesFile: "compiler:Languages\French.isl"
 [Tasks]
 Name: "desktopicon"; Description: "Créer un raccourci sur le Bureau"; GroupDescription: "Raccourcis :"; Flags: unchecked
 Name: "startup"; Description: "Lancer automatiquement avec Windows"; GroupDescription: "Démarrage :"; Flags: checkedonce
+Name: "clipboardhistory"; Description: "Activer l’historique du Presse-papiers Windows (Win + V)"; GroupDescription: "Fonctions Windows :"; Flags: checkedonce
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -55,6 +56,7 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; WorkingDir: "
 
 [Registry]
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "FlexHub"; ValueData: """{app}\{#AppExeName}"""; Flags: uninsdeletevalue; Tasks: startup
+Root: HKCU; Subkey: "Software\Microsoft\Clipboard"; ValueType: dword; ValueName: "EnableClipboardHistory"; ValueData: "1"; Tasks: clipboardhistory
 
 [Run]
 Filename: "{app}\{#AppExeName}"; Description: "Lancer {#AppName}"; Flags: nowait postinstall

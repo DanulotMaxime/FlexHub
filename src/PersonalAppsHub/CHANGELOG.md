@@ -1,5 +1,11 @@
 # Notes de version
 
+## 1.4.1
+
+- Ajout d’une option d’installation, cochée par défaut, pour activer l’historique du Presse-papiers Windows accessible avec `Win + V`.
+- L’option reste désactivable pendant l’installation et n’active pas la synchronisation du Presse-papiers entre appareils.
+- Mise à jour de la documentation de confidentialité pour préciser le fonctionnement et la conservation de cette préférence Windows.
+
 ## 1.4.0
 
 - Ajout d’un tableau de monitoring CPU, RAM, GPU, VRAM et température GPU avec historique graphique et alertes configurables.
