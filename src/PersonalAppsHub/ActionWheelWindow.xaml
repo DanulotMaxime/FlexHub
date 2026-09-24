@@ -58,13 +58,13 @@
       </StackPanel>
     </Border>
 
-    <Border x:Name="CancelZone" Width="230" Height="230" CornerRadius="115" Canvas.Left="365" Canvas.Top="265"
+    <Border x:Name="CancelZone" Width="170" Height="170" CornerRadius="85" Canvas.Left="395" Canvas.Top="295"
             Background="#F0171616" BorderBrush="{DynamicResource AccentBrightBrush}" BorderThickness="2">
       <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-        <TextBlock Text="×" FontSize="44" Foreground="#FFFF7F7F" HorizontalAlignment="Center"/>
-        <TextBlock Text="ANNULER" Foreground="White" FontSize="17" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+        <TextBlock Text="×" FontSize="34" Foreground="#FFFF7F7F" HorizontalAlignment="Center"/>
+        <TextBlock Text="ANNULER" Foreground="White" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center"/>
         <TextBlock x:Name="CurrentActionText" Text="Déplacez le pointeur" Foreground="#FFBDB7B2"
-                   FontSize="11" Margin="0,7,0,0" HorizontalAlignment="Center"/>
+                   FontSize="10" Margin="0,5,0,0" HorizontalAlignment="Center"/>
       </StackPanel>
     </Border>
 

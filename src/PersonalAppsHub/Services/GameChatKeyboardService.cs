@@ -4,30 +4,49 @@ using System.Windows.Input;
 
 namespace PersonalAppsHub.Services;
 
-/// <summary>Observes (but never consumes) a configurable key used to open/close in-game chat.</summary>
+/// <summary>
+/// Memorizes the first QWERTY window in which the chat shortcut is pressed as the game.
+/// The game keeps QWERTY outside chat; every other window uses AZERTY.
+/// </summary>
 public sealed class GameChatKeyboardService : IDisposable
 {
     private const int WhKeyboardLl = 13;
+    private const int WhMouseLl = 14;
     private const int WmKeyDown = 0x0100;
     private const int WmKeyUp = 0x0101;
     private const int WmSysKeyDown = 0x0104;
     private const int WmSysKeyUp = 0x0105;
+    private const int WmLButtonDown = 0x0201;
+    private const int WmRButtonDown = 0x0204;
+    private const int WmMButtonDown = 0x0207;
+    private const int WmXButtonDown = 0x020B;
     private const uint WmInputLangChangeRequest = 0x0050;
     private const uint SmtoAbortIfHung = 0x0002;
     private const ushort EnglishPrimaryLanguage = 0x09;
     private const ushort FrenchPrimaryLanguage = 0x0c;
+    private const uint VkEscape = 0x1B;
 
-    private readonly KeyboardHookDelegate _callback;
+    private readonly KeyboardHookDelegate _keyboardCallback;
+    private readonly MouseHookDelegate _mouseCallback;
     private readonly object _sync = new();
-    private IntPtr _hook;
+    private IntPtr _keyboardHook;
+    private IntPtr _mouseHook;
     private System.Threading.Timer? _foregroundTimer;
     private Shortcut _shortcut = new(0x0D, false, false, false, false);
     private bool _keyDown;
-    private ManualOverride? _manualOverride;
+    private bool _shortcutPressAccepted;
+    private bool _escapeDown;
+    private bool _chatActive;
+    private RegisteredGame? _registeredGame;
+    private IntPtr _lastForeground;
 
     public event EventHandler<bool>? StateChanged;
 
-    public GameChatKeyboardService() => _callback = HookCallback;
+    public GameChatKeyboardService()
+    {
+        _keyboardCallback = KeyboardHookCallback;
+        _mouseCallback = MouseHookCallback;
+    }
 
     public bool Configure(bool enabled, string shortcut)
     {
@@ -36,11 +55,16 @@ public sealed class GameChatKeyboardService : IDisposable
 
         using var process = Process.GetCurrentProcess();
         using var module = process.MainModule;
-        _hook = SetWindowsHookEx(WhKeyboardLl, _callback,
-            module == null ? IntPtr.Zero : GetModuleHandle(module.ModuleName), 0);
-        if (_hook == IntPtr.Zero) return false;
+        var moduleHandle = module == null ? IntPtr.Zero : GetModuleHandle(module.ModuleName);
+        _keyboardHook = SetWindowsHookEx(WhKeyboardLl, _keyboardCallback, moduleHandle, 0);
+        _mouseHook = SetWindowsHookEx(WhMouseLl, _mouseCallback, moduleHandle, 0);
+        if (_keyboardHook == IntPtr.Zero || _mouseHook == IntPtr.Zero)
+        {
+            Stop();
+            return false;
+        }
 
-        _foregroundTimer = new System.Threading.Timer(CheckForeground, null, 250, 250);
+        _foregroundTimer = new System.Threading.Timer(CheckForeground, null, 100, 100);
         return true;
     }
 
@@ -48,32 +72,93 @@ public sealed class GameChatKeyboardService : IDisposable
     {
         _foregroundTimer?.Dispose();
         _foregroundTimer = null;
-        RestorePreviousLayout();
-        if (_hook != IntPtr.Zero)
+        lock (_sync)
         {
-            UnhookWindowsHookEx(_hook);
-            _hook = IntPtr.Zero;
+            EndChat(restoreGameLayout: true);
+            _registeredGame = null;
+            _lastForeground = IntPtr.Zero;
+        }
+        if (_keyboardHook != IntPtr.Zero)
+        {
+            UnhookWindowsHookEx(_keyboardHook);
+            _keyboardHook = IntPtr.Zero;
+        }
+        if (_mouseHook != IntPtr.Zero)
+        {
+            UnhookWindowsHookEx(_mouseHook);
+            _mouseHook = IntPtr.Zero;
         }
         _keyDown = false;
+        _escapeDown = false;
     }
 
-    private IntPtr HookCallback(int code, IntPtr wParam, IntPtr lParam)
+    private IntPtr KeyboardHookCallback(int code, IntPtr wParam, IntPtr lParam)
     {
         if (code >= 0)
         {
             var message = wParam.ToInt32();
             var data = Marshal.PtrToStructure<KeyboardHookData>(lParam);
-            if ((message == WmKeyUp || message == WmSysKeyUp) && data.VirtualKey == _shortcut.VirtualKey)
-                _keyDown = false;
-            else if ((message == WmKeyDown || message == WmSysKeyDown) &&
-                     data.VirtualKey == _shortcut.VirtualKey && !_keyDown && ModifiersMatch())
+            var isKeyDown = message is WmKeyDown or WmSysKeyDown;
+            var isKeyUp = message is WmKeyUp or WmSysKeyUp;
+
+            lock (_sync)
             {
-                _keyDown = true;
-                ToggleForForegroundApplication();
+                if (data.VirtualKey == VkEscape)
+                {
+                    if (isKeyUp)
+                    {
+                        var mustEndChat = _escapeDown && _chatActive;
+                        _escapeDown = false;
+                        if (mustEndChat) QueueAfterInput(() => EndChat(restoreGameLayout: true));
+                    }
+                    else if (isKeyDown && !_escapeDown)
+                    {
+                        _escapeDown = true;
+                    }
+                }
+
+                if (data.VirtualKey == _shortcut.VirtualKey)
+                {
+                    if (isKeyUp)
+                    {
+                        var mustToggle = _keyDown && _shortcutPressAccepted;
+                        _keyDown = false;
+                        _shortcutPressAccepted = false;
+                        if (mustToggle) QueueAfterInput(ToggleChatForForegroundWindow);
+                    }
+                    else if (isKeyDown && !_keyDown)
+                    {
+                        _keyDown = true;
+                        _shortcutPressAccepted = ModifiersMatch();
+                    }
+                }
             }
         }
 
-        return CallNextHookEx(_hook, code, wParam, lParam);
+        return CallNextHookEx(_keyboardHook, code, wParam, lParam);
+    }
+
+    private IntPtr MouseHookCallback(int code, IntPtr wParam, IntPtr lParam)
+    {
+        if (code >= 0 && wParam.ToInt32() is WmLButtonDown or WmRButtonDown or WmMButtonDown or WmXButtonDown)
+        {
+            lock (_sync)
+            {
+                if (_chatActive) EndChat(restoreGameLayout: true);
+            }
+        }
+        return CallNextHookEx(_mouseHook, code, wParam, lParam);
+    }
+
+    private void QueueAfterInput(Action action)
+    {
+        _ = Task.Delay(30).ContinueWith(_ =>
+        {
+            lock (_sync)
+            {
+                if (_keyboardHook != IntPtr.Zero) action();
+            }
+        }, TaskScheduler.Default);
     }
 
     private bool ModifiersMatch() =>
@@ -84,48 +169,89 @@ public sealed class GameChatKeyboardService : IDisposable
 
     private static bool IsPressed(int virtualKey) => (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
 
-    private void ToggleForForegroundApplication()
+    private void ToggleChatForForegroundWindow()
     {
-        lock (_sync)
+        var foreground = GetForegroundWindow();
+        var threadId = GetWindowThreadProcessId(foreground, out var processId);
+        if (foreground == IntPtr.Zero || threadId == 0 || processId == (uint)Environment.ProcessId) return;
+
+        if (_registeredGame is { } game)
         {
-            if (_manualOverride != null)
+            if (foreground != game.Window) return;
+            if (_chatActive)
             {
-                RestorePreviousLayout();
+                EndChat(restoreGameLayout: true);
                 return;
             }
 
-            var foreground = GetForegroundWindow();
-            var threadId = GetWindowThreadProcessId(foreground, out var processId);
-            if (foreground == IntPtr.Zero || threadId == 0 || processId == (uint)Environment.ProcessId) return;
-
-            var previousLayout = GetKeyboardLayout(threadId);
-            if (!HasPrimaryLanguage(previousLayout, EnglishPrimaryLanguage)) return;
-            var frenchLayout = FindInstalledLayout(FrenchPrimaryLanguage);
-            if (frenchLayout == IntPtr.Zero || !RequestLayout(foreground, frenchLayout)) return;
-
-            _manualOverride = new ManualOverride(foreground, previousLayout);
-            StateChanged?.Invoke(this, true);
+            StartChat(game);
+            return;
         }
+
+        var currentLayout = GetKeyboardLayout(threadId);
+        if (!HasPrimaryLanguage(currentLayout, EnglishPrimaryLanguage)) return;
+
+        var registered = new RegisteredGame(foreground, processId, currentLayout);
+        _registeredGame = registered;
+        _lastForeground = foreground;
+        AppLog.Write($"Clavier de jeu : fenêtre QWERTY mémorisée (PID {processId}).");
+        StartChat(registered);
+    }
+
+    private void StartChat(RegisteredGame game)
+    {
+        var frenchLayout = FindInstalledLayout(FrenchPrimaryLanguage);
+        if (frenchLayout == IntPtr.Zero || !RequestLayout(game.Window, frenchLayout)) return;
+
+        _chatActive = true;
+        StateChanged?.Invoke(this, true);
+    }
+
+    private void EndChat(bool restoreGameLayout)
+    {
+        if (!_chatActive) return;
+        _chatActive = false;
+        if (restoreGameLayout && _registeredGame is { } game && IsWindow(game.Window))
+            RequestLayout(game.Window, game.Layout);
+        StateChanged?.Invoke(this, false);
     }
 
     private void CheckForeground(object? state)
     {
         lock (_sync)
         {
-            if (_manualOverride is { } active && GetForegroundWindow() != active.ForegroundWindow)
-                RestorePreviousLayout();
+            var foreground = GetForegroundWindow();
+            if (foreground == _lastForeground) return;
+            _lastForeground = foreground;
+
+            if (_registeredGame is not { } game) return;
+            if (!IsWindow(game.Window))
+            {
+                EndChat(restoreGameLayout: false);
+                _registeredGame = null;
+                EnsureFrenchLayout(foreground);
+                AppLog.Write("Clavier de jeu : fenêtre mémorisée fermée.");
+                return;
+            }
+
+            if (foreground == game.Window)
+            {
+                EndChat(restoreGameLayout: false);
+                RequestLayout(game.Window, game.Layout);
+            }
+            else
+            {
+                EndChat(restoreGameLayout: false);
+                EnsureFrenchLayout(foreground);
+            }
         }
     }
 
-    private void RestorePreviousLayout()
+    private static void EnsureFrenchLayout(IntPtr window)
     {
-        var previous = _manualOverride;
-        if (previous is null) return;
-        _manualOverride = null;
-
-        var foreground = GetForegroundWindow();
-        if (foreground != IntPtr.Zero) RequestLayout(foreground, previous.Layout);
-        StateChanged?.Invoke(this, false);
+        if (window == IntPtr.Zero) return;
+        var frenchLayout = FindInstalledLayout(FrenchPrimaryLanguage);
+        if (frenchLayout != IntPtr.Zero) RequestLayout(window, frenchLayout);
     }
 
     private static bool TryParseShortcut(string value, out Shortcut shortcut)
@@ -167,7 +293,7 @@ public sealed class GameChatKeyboardService : IDisposable
     public void Dispose() => Stop();
 
     private readonly record struct Shortcut(uint VirtualKey, bool Control, bool Alt, bool Shift, bool Windows);
-    private sealed record ManualOverride(IntPtr ForegroundWindow, IntPtr Layout);
+    private sealed record RegisteredGame(IntPtr Window, uint ProcessId, IntPtr Layout);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct KeyboardHookData
@@ -180,9 +306,12 @@ public sealed class GameChatKeyboardService : IDisposable
     }
 
     private delegate IntPtr KeyboardHookDelegate(int code, IntPtr wParam, IntPtr lParam);
+    private delegate IntPtr MouseHookDelegate(int code, IntPtr wParam, IntPtr lParam);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern IntPtr SetWindowsHookEx(int hookId, KeyboardHookDelegate callback, IntPtr module, uint threadId);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SetWindowsHookEx(int hookId, MouseHookDelegate callback, IntPtr module, uint threadId);
     [DllImport("user32.dll")]
     private static extern bool UnhookWindowsHookEx(IntPtr hook);
     [DllImport("user32.dll")]
@@ -199,6 +328,9 @@ public sealed class GameChatKeyboardService : IDisposable
     private static extern IntPtr GetKeyboardLayout(uint threadId);
     [DllImport("user32.dll")]
     private static extern int GetKeyboardLayoutList(int count, [Out] IntPtr[]? layouts);
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindow(IntPtr window);
     [DllImport("user32.dll", SetLastError = true)]
     private static extern IntPtr SendMessageTimeout(IntPtr window, uint message, IntPtr wParam,
         IntPtr lParam, uint flags, uint timeout, out IntPtr result);

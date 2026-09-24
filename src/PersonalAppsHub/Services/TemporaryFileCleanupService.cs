@@ -2,7 +2,8 @@ using System.IO;
 
 namespace PersonalAppsHub.Services;
 
-public sealed record TemporaryFileCandidate(string Path, long SizeBytes, DateTime LastWriteTime)
+public sealed record TemporaryFileCandidate(string Path, long SizeBytes, DateTime LastWriteTime,
+    string Category = "Temporaire Windows", string AllowedRoot = "")
 {
     public string Name => System.IO.Path.GetFileName(Path);
     public string SizeText => TemporaryFileCleanupService.FormatSize(SizeBytes);
@@ -23,30 +24,30 @@ public sealed class TemporaryFileCleanupService
     public Task<TemporaryFileScanResult> ScanAsync(CancellationToken cancellationToken = default) =>
         Task.Run(() => Scan(cancellationToken), cancellationToken);
 
-    private TemporaryFileScanResult Scan(CancellationToken cancellationToken)
+    public Task<TemporaryFileScanResult> ScanWindowsTemporaryAsync(TimeSpan minimumAge,
+        CancellationToken cancellationToken = default) => Task.Run(() =>
+            ScanSources([new CleanupSource("Temporaire Windows", _temporaryRoot, minimumAge)], cancellationToken), cancellationToken);
+
+    private TemporaryFileScanResult Scan(CancellationToken cancellationToken) =>
+        ScanSources(GetScanSources(), cancellationToken);
+
+    private static TemporaryFileScanResult ScanSources(IEnumerable<CleanupSource> sources, CancellationToken cancellationToken)
     {
         var files = new List<TemporaryFileCandidate>();
         var skipped = 0;
-        IEnumerable<string> paths;
-        try
+        foreach (var source in sources)
         {
-            paths = Directory.EnumerateFiles(_temporaryRoot, "*", new EnumerationOptions
-            {
-                RecurseSubdirectories = true,
-                IgnoreInaccessible = true,
-                ReturnSpecialDirectories = false
-            });
-        }
-        catch { return new TemporaryFileScanResult(files, 1); }
-
-        foreach (var path in paths)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
+            IEnumerable<string> paths;
+            try { paths = EnumerateFiles(source.Root); }
+            catch { skipped++; continue; }
+            foreach (var path in paths)
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var info = new FileInfo(path);
-                if (!info.Exists || info.LastWriteTime > DateTime.Now.AddHours(-24)) continue;
-                files.Add(new TemporaryFileCandidate(info.FullName, info.Length, info.LastWriteTime));
+                if (!info.Exists || info.LastWriteTime > DateTime.Now - source.MinimumAge) continue;
+                files.Add(new TemporaryFileCandidate(info.FullName, info.Length, info.LastWriteTime,
+                    source.Category, source.Root));
             }
             catch { skipped++; }
         }
@@ -62,11 +63,27 @@ public sealed class TemporaryFileCleanupService
         {
             try
             {
-                if (!IsWithinRoot(candidate.Path, _temporaryRoot)) { failed++; continue; }
+                var allowedRoot = string.IsNullOrWhiteSpace(candidate.AllowedRoot) ? _temporaryRoot : candidate.AllowedRoot;
+                if (!IsWithinRoot(candidate.Path, allowedRoot)) { failed++; continue; }
                 var info = new FileInfo(candidate.Path);
                 if (!info.Exists) continue;
                 var size = info.Length;
-                info.Delete();
+                var originalAttributes = info.Attributes;
+                var readOnlyRemoved = (originalAttributes & FileAttributes.ReadOnly) != 0;
+                if (readOnlyRemoved) info.Attributes = originalAttributes & ~FileAttributes.ReadOnly;
+                try
+                {
+                    info.Delete();
+                }
+                catch
+                {
+                    if (readOnlyRemoved && info.Exists)
+                    {
+                        try { info.Attributes = originalAttributes; }
+                        catch { }
+                    }
+                    throw;
+                }
                 deleted++;
                 recovered += size;
             }
@@ -74,6 +91,50 @@ public sealed class TemporaryFileCleanupService
         }
         return new TemporaryFileDeleteResult(deleted, recovered, failed);
     }
+
+    private IEnumerable<CleanupSource> GetScanSources()
+    {
+        yield return new CleanupSource("Temporaire Windows", _temporaryRoot, TimeSpan.FromHours(24));
+        var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        foreach (var source in ExistingSources(local, "Google Chrome", @"Google\Chrome\User Data", "Cache", "Code Cache", "GPUCache")) yield return source;
+        foreach (var source in ExistingSources(local, "Microsoft Edge", @"Microsoft\Edge\User Data", "Cache", "Code Cache", "GPUCache")) yield return source;
+        foreach (var source in ExistingSources(local, "Mozilla Firefox", @"Mozilla\Firefox\Profiles", "cache2")) yield return source;
+        foreach (var source in ExistingSources(local, "Discord", "Discord", "Cache", "Code Cache", "GPUCache")) yield return source;
+        foreach (var source in ExistingSources(local, "Steam", "Steam", "htmlcache")) yield return source;
+        foreach (var source in ExistingSources(local, "Visual Studio", @"Microsoft\VisualStudio", "ComponentModelCache")) yield return source;
+    }
+
+    private static IEnumerable<CleanupSource> ExistingSources(string local, string category, string parentRelative, params string[] cacheNames)
+    {
+        var parent = Path.Combine(local, parentRelative);
+        if (!Directory.Exists(parent)) yield break;
+        var wanted = cacheNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        IEnumerable<string> directories;
+        try
+        {
+            directories = Directory.EnumerateDirectories(parent, "*", new EnumerationOptions
+            {
+                RecurseSubdirectories = true,
+                IgnoreInaccessible = true,
+                ReturnSpecialDirectories = false,
+                AttributesToSkip = FileAttributes.ReparsePoint
+            });
+        }
+        catch { yield break; }
+        foreach (var directory in directories)
+            if (wanted.Contains(Path.GetFileName(directory)))
+                yield return new CleanupSource(category, Path.GetFullPath(directory), TimeSpan.FromDays(7));
+    }
+
+    private static IEnumerable<string> EnumerateFiles(string root) => Directory.EnumerateFiles(root, "*", new EnumerationOptions
+    {
+        RecurseSubdirectories = true,
+        IgnoreInaccessible = true,
+        ReturnSpecialDirectories = false,
+        AttributesToSkip = FileAttributes.ReparsePoint
+    });
+
+    private sealed record CleanupSource(string Category, string Root, TimeSpan MinimumAge);
 
     public static bool IsWithinRoot(string path, string root)
     {

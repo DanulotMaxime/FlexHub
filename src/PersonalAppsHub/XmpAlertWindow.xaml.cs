@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Windows;
+using PersonalAppsHub.Services;
 
 namespace PersonalAppsHub;
 
@@ -8,6 +9,7 @@ public partial class XmpAlertWindow : Window
     public XmpAlertWindow(int detectedSpeed, int expectedSpeed)
     {
         InitializeComponent();
+        SourceInitialized += (_, _) => NonActivatingWindowService.Apply(this);
         AlertMessage.Text = $"La RAM fonctionne à {detectedSpeed} MT/s au lieu de {expectedSpeed} MT/s. Activez XMP dans le BIOS, puis redémarrez l’ordinateur.";
         Loaded += (_, _) =>
         {

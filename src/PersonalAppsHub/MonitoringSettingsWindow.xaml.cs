@@ -8,16 +8,14 @@ public partial class MonitoringSettingsWindow : Window
     public int CpuAlertPercent { get; private set; }
     public int RamAlertPercent { get; private set; }
     public int GpuTemperatureAlertC { get; private set; }
-    public int CpuTemperatureAlertC { get; private set; }
     public event EventHandler? TestRequested;
 
-    public MonitoringSettingsWindow(bool enabled, int cpu, int ram, int cpuTemperature, int gpuTemperature)
+    public MonitoringSettingsWindow(bool enabled, int cpu, int ram, int gpuTemperature)
     {
         InitializeComponent();
         AlertsEnabled.IsChecked = enabled;
         CpuThreshold.Text = cpu.ToString();
         RamThreshold.Text = ram.ToString();
-        CpuTemperatureThreshold.Text = cpuTemperature.ToString();
         GpuTemperatureThreshold.Text = gpuTemperature.ToString();
         TestAlert.Click += (_, _) => TestRequested?.Invoke(this, EventArgs.Empty);
         Cancel.Click += (_, _) => DialogResult = false;
@@ -28,7 +26,6 @@ public partial class MonitoringSettingsWindow : Window
     {
         if (!MainWindow.TryReadThreshold(CpuThreshold.Text, 50, 100, out var cpu) ||
             !MainWindow.TryReadThreshold(RamThreshold.Text, 50, 100, out var ram) ||
-            !MainWindow.TryReadThreshold(CpuTemperatureThreshold.Text, 50, 110, out var cpuTemperature) ||
             !MainWindow.TryReadThreshold(GpuTemperatureThreshold.Text, 50, 110, out var gpuTemperature))
         {
             ValidationStatus.Text = "CPU et RAM : 50 à 100 %. Température GPU : 50 à 110 °C.";
@@ -36,7 +33,6 @@ public partial class MonitoringSettingsWindow : Window
         }
         CpuAlertPercent = cpu;
         RamAlertPercent = ram;
-        CpuTemperatureAlertC = cpuTemperature;
         GpuTemperatureAlertC = gpuTemperature;
         DialogResult = true;
     }

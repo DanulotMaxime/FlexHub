@@ -24,7 +24,35 @@ public sealed class SettingsService
                 settings.MonitoringGpuTemperatureAlertC = 85;
             }
             if (settings.SettingsSchemaVersion < 6) settings.MonitoringCpuTemperatureAlertC = 90;
-            settings.SettingsSchemaVersion = 6;
+            if (settings.SettingsSchemaVersion < 7 && string.IsNullOrWhiteSpace(settings.NetworkMonitoringTargets))
+                settings.NetworkMonitoringTargets = "passerelle;Discord=discord.com;Steam=store.steampowered.com;jeu";
+            if (settings.SettingsSchemaVersion < 8 && !settings.NetworkMonitoringTargets.Split(';', StringSplitOptions.TrimEntries)
+                    .Any(target => target.Equals("jeu", StringComparison.OrdinalIgnoreCase)))
+                settings.NetworkMonitoringTargets += ";jeu";
+            if (settings.SettingsSchemaVersion < 9 && !settings.NetworkMonitoringTargets.Split(';', StringSplitOptions.TrimEntries)
+                    .Any(target => target.StartsWith("Internet=", StringComparison.OrdinalIgnoreCase)))
+                settings.NetworkMonitoringTargets = settings.NetworkMonitoringTargets.Replace("passerelle", "passerelle;Internet=1.1.1.1", StringComparison.OrdinalIgnoreCase);
+            if (settings.SettingsSchemaVersion < 10) settings.GameSessionAlertHours = 2;
+            if (settings.SettingsSchemaVersion < 11) settings.GameSessionAlertEnabled = true;
+            if (settings.SettingsSchemaVersion < 12)
+            {
+                settings.NetworkJitterAlertEnabled = true;
+                settings.NetworkJitterAlertMs = 30;
+            }
+            if (settings.SettingsSchemaVersion < 13)
+                settings.ActiveNvidiaProfileName = "Non identifié";
+            if (settings.SettingsSchemaVersion < 14)
+                settings.AutomaticTemporaryCleanupEnabled = false;
+            if (settings.SettingsSchemaVersion < 15)
+            {
+                settings.GameSessionsModuleEnabled = true;
+                settings.NetworkMonitoringModuleEnabled = true;
+                settings.TemporaryCleanupModuleEnabled = true;
+                settings.DuplicateFilesModuleEnabled = true;
+                settings.StorageHealthModuleEnabled = true;
+                settings.StartupAuditModuleEnabled = true;
+            }
+            settings.SettingsSchemaVersion = 15;
             return settings;
         }
         catch
@@ -41,7 +69,7 @@ public sealed class SettingsService
     public void Save(HubSettings settings)
     {
         Directory.CreateDirectory(_folder);
-        settings.SettingsSchemaVersion = 6;
+        settings.SettingsSchemaVersion = 15;
         var temporaryPath = SettingsPath + ".tmp";
         File.WriteAllText(temporaryPath, JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));
         File.Move(temporaryPath, SettingsPath, overwrite: true);

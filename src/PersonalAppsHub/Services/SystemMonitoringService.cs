@@ -5,9 +5,9 @@ using LibreHardwareMonitor.Hardware;
 
 namespace PersonalAppsHub.Services;
 
-public sealed record SystemMetrics(double CpuPercent, double? CpuTemperatureC, double RamPercent, double RamUsedGb, double RamTotalGb,
+public sealed record SystemMetrics(double CpuPercent, double RamPercent, double RamUsedGb, double RamTotalGb,
     double? GpuPercent, double? VramPercent, double? VramUsedGb, double? VramTotalGb,
-    double? GpuTemperatureC, DateTime CapturedAt);
+    double? GpuTemperatureC, string? TopCpuProcessText, string? TopRamProcessText, DateTime CapturedAt);
 
 public sealed class SystemMonitoringService : IDisposable
 {
@@ -15,37 +15,55 @@ public sealed class SystemMonitoringService : IDisposable
     private bool _hardwareOpened;
     private ulong? _previousIdle;
     private ulong? _previousTotal;
+    private readonly Dictionary<int, TimeSpan> _previousProcessCpu = new();
+    private DateTime? _previousProcessSampleUtc;
 
     public async Task<SystemMetrics> CaptureAsync(CancellationToken cancellationToken = default)
     {
         var cpu = ReadCpuPercent();
         var (ramPercent, ramUsed, ramTotal) = ReadMemory();
+        var processesTask = Task.Run(ReadTopProcesses, cancellationToken);
         var gpu = await ReadNvidiaMetricsAsync(cancellationToken) ?? ReadHardwareGpuMetrics();
-        var cpuTemperature = ReadCpuTemperature();
-        return new SystemMetrics(cpu, cpuTemperature, ramPercent, ramUsed, ramTotal, gpu?.Usage,
-            gpu?.VramPercent, gpu?.VramUsedGb, gpu?.VramTotalGb, gpu?.Temperature, DateTime.Now);
+        var processes = await processesTask;
+        return new SystemMetrics(cpu, ramPercent, ramUsed, ramTotal, gpu?.Usage,
+            gpu?.VramPercent, gpu?.VramUsedGb, gpu?.VramTotalGb, gpu?.Temperature,
+            processes.TopCpu, processes.TopRam, DateTime.Now);
     }
 
-    private double? ReadCpuTemperature()
+    private (string? TopCpu, string? TopRam) ReadTopProcesses()
     {
-        try
+        var now = DateTime.UtcNow;
+        var elapsedSeconds = _previousProcessSampleUtc.HasValue ? (now - _previousProcessSampleUtc.Value).TotalSeconds : 0;
+        var currentCpu = new Dictionary<int, TimeSpan>();
+        (string Name, double Percent)? topCpu = null;
+        (string Name, long Bytes)? topRam = null;
+        foreach (var process in Process.GetProcesses())
         {
-            EnsureHardwareOpen();
-            var temperatures = new List<double>();
-            foreach (var hardware in _hardware.Hardware.Where(item => item.HardwareType == HardwareType.Cpu))
+            using (process)
             {
-                hardware.Update();
-                temperatures.AddRange(hardware.Sensors
-                    .Where(sensor => sensor.SensorType == SensorType.Temperature && sensor.Value.HasValue)
-                    .Select(sensor => (double)sensor.Value!.Value));
+                try
+                {
+                    var name = process.ProcessName;
+                    var cpuTime = process.TotalProcessorTime;
+                    var memory = process.WorkingSet64;
+                    currentCpu[process.Id] = cpuTime;
+                    if (elapsedSeconds > 0 && _previousProcessCpu.TryGetValue(process.Id, out var previousCpu))
+                    {
+                        var percent = Math.Clamp((cpuTime - previousCpu).TotalSeconds /
+                            (elapsedSeconds * Environment.ProcessorCount) * 100d, 0, 100);
+                        if (topCpu is null || percent > topCpu.Value.Percent) topCpu = (name, percent);
+                    }
+                    if (topRam is null || memory > topRam.Value.Bytes) topRam = (name, memory);
+                }
+                catch (InvalidOperationException) { }
+                catch (System.ComponentModel.Win32Exception) { }
             }
-            return temperatures.Count == 0 ? null : temperatures.Max();
         }
-        catch (Exception ex)
-        {
-            AppLog.Write($"Température CPU indisponible : {ex.Message}");
-            return null;
-        }
+        _previousProcessCpu.Clear();
+        foreach (var sample in currentCpu) _previousProcessCpu[sample.Key] = sample.Value;
+        _previousProcessSampleUtc = now;
+        return (topCpu is { Percent: >= 0.1 } ? $"{topCpu.Value.Name} · {topCpu.Value.Percent:0.0}%" : null,
+            topRam is not null ? $"{topRam.Value.Name} · {topRam.Value.Bytes / 1024d / 1024d:0} Mo" : null);
     }
 
     private NvidiaMetrics? ReadHardwareGpuMetrics()
@@ -54,7 +72,7 @@ public sealed class SystemMonitoringService : IDisposable
         {
             EnsureHardwareOpen();
             foreach (var hardware in _hardware.Hardware.Where(item =>
-                         item.HardwareType is HardwareType.GpuAmd or HardwareType.GpuNvidia))
+                         item.HardwareType is HardwareType.GpuAmd or HardwareType.GpuNvidia or HardwareType.GpuIntel))
             {
                 hardware.Update();
                 var sensors = hardware.Sensors.Where(sensor => sensor.Value.HasValue).ToArray();

@@ -32,7 +32,11 @@ public partial class MainWindow : Window
     private readonly NvidiaProfileService _nvidiaProfileService = new();
     private readonly XmpMonitorService _xmpMonitorService = new();
     private readonly SystemMonitoringService _systemMonitoringService = new();
+    private readonly NetworkMonitoringService _networkMonitoringService = new();
+    private readonly GameSessionService _gameSessionService = new();
+    private readonly GameSessionHistoryService _gameSessionHistoryService = new();
     private readonly TemporaryFileCleanupService _temporaryFileCleanupService = new();
+    private readonly DuplicateFileService _duplicateFileService = new();
     private readonly StorageHealthService _storageHealthService = new();
     private readonly StartupAuditService _startupAuditService = new();
     private readonly UpdateService _updateService = new();
@@ -65,14 +69,32 @@ public partial class MainWindow : Window
     private double _sidebarScrollTarget;
     private bool _sidebarScrollAnimating;
     private bool _monitoringRefreshRunning;
-    private bool _textToolsExpanded = true;
+    private bool _networkMonitoringRunning;
+    private bool _gameSessionRefreshRunning;
+    private bool _automaticTemporaryCleanupRunning;
+    private bool _duplicateScanRunning;
+    private CancellationTokenSource? _duplicateScanCancellation;
+    private IReadOnlyList<DuplicateFileCandidate> _duplicateResults = Array.Empty<DuplicateFileCandidate>();
+    private string? _duplicateScanRoot;
+    private DateTime _lastAutomaticNetworkMeasureUtc = DateTime.MinValue;
+    private DateTime _lastGameSessionRefreshUtc = DateTime.MinValue;
+    private int _networkAnomalySamples;
+    private DateTime _lastNetworkAlertUtc = DateTime.MinValue;
+    private readonly Queue<double> _networkPingHistory = new();
+    private readonly Queue<double> _networkJitterHistory = new();
+    private readonly Queue<double> _networkLossHistory = new();
+    private readonly Queue<DateTime> _networkHistoryTimestamps = new();
+    private readonly HashSet<int> _alertedGameSessionProcessIds = new();
+    private IReadOnlyList<WeeklyGameSummary> _currentGameSummaries = Array.Empty<WeeklyGameSummary>();
+    private bool _textToolsExpanded;
+    private bool _monitoringGamesExpanded;
+    private bool _maintenanceExpanded;
+    private bool _automationExpanded;
     private int _highCpuSamples;
     private int _highRamSamples;
-    private int _highCpuTemperatureSamples;
     private int _highGpuTemperatureSamples;
     private DateTime _lastCpuAlertUtc = DateTime.MinValue;
     private DateTime _lastRamAlertUtc = DateTime.MinValue;
-    private DateTime _lastCpuTemperatureAlertUtc = DateTime.MinValue;
     private DateTime _lastGpuTemperatureAlertUtc = DateTime.MinValue;
 
     public MainWindow()
@@ -114,8 +136,14 @@ public partial class MainWindow : Window
         _loadingSettings = false;
         ReminderNav.Click += (_, _) => ShowPage("reminder");
         TextToolsToggle.Click += (_, _) => ToggleTextToolsSection();
+        MonitoringGamesToggle.Click += (_, _) => ToggleNavigationSection(MonitoringGamesPanel, MonitoringGamesChevron, ref _monitoringGamesExpanded);
+        MaintenanceToggle.Click += (_, _) => ToggleNavigationSection(MaintenancePanel, MaintenanceChevron, ref _maintenanceExpanded);
+        AutomationToggle.Click += (_, _) => ToggleNavigationSection(AutomationPanel, AutomationChevron, ref _automationExpanded);
         MonitoringNav.Click += async (_, _) => { ShowPage("monitoring"); await RefreshMonitoringAsync(); };
+        GameSessionsNav.Click += async (_, _) => { ShowPage("gameSessions"); await RefreshGameSessionsAsync(true); };
+        NetworkMonitoringNav.Click += async (_, _) => { ShowPage("networkMonitoring"); await RefreshNetworkMonitoringAsync(); };
         CleanupNav.Click += (_, _) => ShowPage("cleanup");
+        DuplicateFilesNav.Click += (_, _) => ShowPage("duplicateFiles");
         StorageHealthNav.Click += async (_, _) => { ShowPage("storageHealth"); await RefreshStorageHealthAsync(); };
         StartupAuditNav.Click += async (_, _) => { ShowPage("startupAudit"); await RefreshStartupAuditAsync(); };
         CorrectorNav.Click += (_, _) => ShowPage("corrector");
@@ -173,12 +201,42 @@ public partial class MainWindow : Window
         XmpEnabled.Unchecked += (_, _) => ApplyEnabledStates();
         KeyboardLayoutEnabled.Checked += (_, _) => ApplyEnabledStates();
         KeyboardLayoutEnabled.Unchecked += (_, _) => ApplyEnabledStates();
+        MonitoringModuleEnabled.Checked += (_, _) => ApplyEnabledStates();
+        MonitoringModuleEnabled.Unchecked += (_, _) => ApplyEnabledStates();
+        GameSessionsModuleEnabled.Checked += (_, _) => ApplyEnabledStates();
+        GameSessionsModuleEnabled.Unchecked += (_, _) => ApplyEnabledStates();
+        NetworkMonitoringModuleEnabled.Checked += (_, _) => ApplyEnabledStates();
+        NetworkMonitoringModuleEnabled.Unchecked += (_, _) => ApplyEnabledStates();
+        TemporaryCleanupModuleEnabled.Checked += (_, _) => ApplyEnabledStates();
+        TemporaryCleanupModuleEnabled.Unchecked += (_, _) => ApplyEnabledStates();
+        DuplicateFilesModuleEnabled.Checked += (_, _) => ApplyEnabledStates();
+        DuplicateFilesModuleEnabled.Unchecked += (_, _) => ApplyEnabledStates();
+        StorageHealthModuleEnabled.Checked += (_, _) => ApplyEnabledStates();
+        StorageHealthModuleEnabled.Unchecked += (_, _) => ApplyEnabledStates();
+        StartupAuditModuleEnabled.Checked += (_, _) => ApplyEnabledStates();
+        StartupAuditModuleEnabled.Unchecked += (_, _) => ApplyEnabledStates();
         TestXmp.Click += async (_, _) => await CheckXmpAsync(true);
         RefreshMonitoring.Click += async (_, _) => await RefreshMonitoringAsync();
         ConfigureMonitoringAlerts.Click += (_, _) => OpenMonitoringAlertSettings();
+        RefreshNetworkMonitoring.Click += async (_, _) => await RefreshNetworkMonitoringAsync();
+        SaveNetworkTargets.Click += (_, _) => SaveNetworkMonitoringTargets();
+        SaveGameSessionAlert.Click += (_, _) => SaveGameSessionAlertSettings();
+        GameSessionPeriodBox.SelectionChanged += (_, _) => RefreshGameSessionSummary();
+        ClearGameSessionHistory.Click += (_, _) => ClearGameSessionHistory_OnClick();
+        ExportGameSessionHistory.Click += (_, _) => ExportGameSessionHistory_OnClick();
+        SaveNetworkJitterAlert.Click += (_, _) => SaveNetworkJitterAlertSettings();
         ScanTemporaryFiles.Click += async (_, _) => await ScanTemporaryFilesAsync();
         SelectAllCleanupFiles.Click += (_, _) => CleanupFilesList.SelectAll();
         DeleteSelectedTemporaryFiles.Click += async (_, _) => await DeleteSelectedTemporaryFilesAsync();
+        SaveAutomaticTemporaryCleanup.Click += async (_, _) => await SaveAutomaticTemporaryCleanupAsync();
+        ChooseDuplicateFolder.Click += (_, _) => ChooseDuplicateFolderNow();
+        ScanDuplicateFiles.Click += async (_, _) => await ScanDuplicateFilesAsync();
+        CancelDuplicateScan.Click += (_, _) => _duplicateScanCancellation?.Cancel();
+        DuplicateFilesList.SelectionChanged += (_, _) =>
+            OpenDuplicateFileLocation.IsEnabled = DuplicateFilesList.SelectedItem is DuplicateFileCandidate;
+        OpenDuplicateFileLocation.Click += (_, _) => OpenSelectedDuplicateLocation();
+        AutoSelectDuplicateFiles.Click += (_, _) => AutoSelectDuplicateFilesNow();
+        DeleteSelectedDuplicateFiles.Click += async (_, _) => await DeleteSelectedDuplicateFilesAsync();
         CleanupFilesList.SelectionChanged += (_, _) =>
             DeleteSelectedTemporaryFiles.IsEnabled = CleanupFilesList.SelectedItems.Count > 0;
         RefreshStorageHealth.Click += async (_, _) => await RefreshStorageHealthAsync();
@@ -238,11 +296,22 @@ public partial class MainWindow : Window
         _actionWheelHotkeyService.Pressed += async (_, _) => await ShowActionWheelAsync();
         _gameChatKeyboardService.StateChanged += (_, active) => Dispatcher.BeginInvoke(() =>
             KeyboardLayoutStatus.Text = active
-                ? "Mode chat en jeu : AZERTY actif. Utilisez à nouveau le raccourci pour revenir au QWERTY."
-                : "Mode chat en jeu terminé : disposition précédente restaurée.");
+                ? "Mode chat en jeu : AZERTY actif. Entrée, Échap ou un clic restaure le QWERTY."
+                : "Mode chat terminé : QWERTY restauré dans le jeu.");
         _reminderTimer.Tick += (_, _) => ShowReminder();
         _xmpTimer.Tick += async (_, _) => await CheckXmpAsync(false);
-        _monitoringTimer.Tick += async (_, _) => await RefreshMonitoringAsync();
+        _monitoringTimer.Tick += async (_, _) =>
+        {
+            await RefreshMonitoringAsync();
+            if (_settings.NetworkMonitoringModuleEnabled && NetworkMonitoringPage.Visibility == Visibility.Visible &&
+                DateTime.UtcNow - _lastAutomaticNetworkMeasureUtc >= TimeSpan.FromSeconds(15))
+            {
+                _lastAutomaticNetworkMeasureUtc = DateTime.UtcNow;
+                await RefreshNetworkMonitoringAsync();
+            }
+            await RefreshGameSessionsAsync();
+            await RunAutomaticTemporaryCleanupAsync();
+        };
         SourceInitialized += (_, _) => { RegisterHotkey(); RegisterTranslatorHotkey(); RegisterResponseGeneratorHotkey(); RegisterActionWheelHotkey(); };
         ContentRendered += async (_, _) =>
         {
@@ -251,6 +320,7 @@ public partial class MainWindow : Window
             ShowMemorySetupIfNeeded();
             ShowGeminiSetupIfNeeded();
             if (_settings.XmpMonitorEnabled) await CheckXmpAsync(false);
+            await RunAutomaticTemporaryCleanupAsync();
             await CheckForUpdatesAtStartupAsync();
         };
         Closing += OnClosing;
@@ -342,6 +412,7 @@ public partial class MainWindow : Window
         ActionWheelEnabled.IsChecked = _settings.ActionWheelEnabled;
         ActionWheelHotkeyBox.Text = _settings.ActionWheelHotkey.Replace("+", " + ");
         NvidiaEnabled.IsChecked = _settings.NvidiaOptimizerEnabled;
+        MonitoringModuleEnabled.IsChecked = _settings.MonitoringEnabled;
         UpdateNvidiaPage();
         XmpEnabled.IsChecked = _settings.XmpMonitorEnabled;
         MemoryTypeBox.SelectedIndex = _settings.MemoryType == "DDR5" ? 1 : 0;
@@ -351,6 +422,18 @@ public partial class MainWindow : Window
         XmpIntervalBox.Text = _settings.XmpCheckIntervalMinutes.ToString();
         KeyboardLayoutEnabled.IsChecked = _settings.AutoFrenchKeyboardInDialogs;
         GameChatShortcutBox.Text = _settings.GameChatKeyboardShortcut.Replace("+", " + ");
+        NetworkTargetsBox.Text = _settings.NetworkMonitoringTargets;
+        GameSessionAlertHoursBox.Text = _settings.GameSessionAlertHours.ToString();
+        GameSessionAlertEnabled.IsChecked = _settings.GameSessionAlertEnabled;
+        NetworkJitterAlertEnabled.IsChecked = _settings.NetworkJitterAlertEnabled;
+        NetworkJitterAlertMsBox.Text = _settings.NetworkJitterAlertMs.ToString();
+        GameSessionsModuleEnabled.IsChecked = _settings.GameSessionsModuleEnabled;
+        NetworkMonitoringModuleEnabled.IsChecked = _settings.NetworkMonitoringModuleEnabled;
+        TemporaryCleanupModuleEnabled.IsChecked = _settings.TemporaryCleanupModuleEnabled;
+        DuplicateFilesModuleEnabled.IsChecked = _settings.DuplicateFilesModuleEnabled;
+        StorageHealthModuleEnabled.IsChecked = _settings.StorageHealthModuleEnabled;
+        StartupAuditModuleEnabled.IsChecked = _settings.StartupAuditModuleEnabled;
+        AutomaticTemporaryCleanupEnabled.IsChecked = _settings.AutomaticTemporaryCleanupEnabled;
         UpdateXmpLastCheck();
         StartWithWindowsToggle.IsChecked = _settings.StartWithWindows;
         FontSizeBox.SelectedIndex = _settings.FontSizePreference switch { "Petit" => 0, "Grand" => 2, _ => 1 };
@@ -380,7 +463,10 @@ public partial class MainWindow : Window
         ActionWheelPage.Visibility = page == "actionWheel" ? Visibility.Visible : Visibility.Collapsed;
         NvidiaPage.Visibility = page == "nvidia" ? Visibility.Visible : Visibility.Collapsed;
         MonitoringPage.Visibility = page == "monitoring" ? Visibility.Visible : Visibility.Collapsed;
+        GameSessionsPage.Visibility = page == "gameSessions" ? Visibility.Visible : Visibility.Collapsed;
+        NetworkMonitoringPage.Visibility = page == "networkMonitoring" ? Visibility.Visible : Visibility.Collapsed;
         CleanupPage.Visibility = page == "cleanup" ? Visibility.Visible : Visibility.Collapsed;
+        DuplicateFilesPage.Visibility = page == "duplicateFiles" ? Visibility.Visible : Visibility.Collapsed;
         StorageHealthPage.Visibility = page == "storageHealth" ? Visibility.Visible : Visibility.Collapsed;
         StartupAuditPage.Visibility = page == "startupAudit" ? Visibility.Visible : Visibility.Collapsed;
         XmpPage.Visibility = page == "xmp" ? Visibility.Visible : Visibility.Collapsed;
@@ -456,6 +542,7 @@ public partial class MainWindow : Window
     private void SaveKeyboardLayoutSettings()
     {
         _settings.AutoFrenchKeyboardInDialogs = KeyboardLayoutEnabled.IsChecked == true;
+        _settings.MonitoringEnabled = MonitoringModuleEnabled.IsChecked == true;
         _settings.GameChatKeyboardShortcut = GameChatShortcutBox.Text.Replace(" ", "");
         _settingsService.Save(_settings);
         LogModuleStates();
@@ -607,9 +694,12 @@ public partial class MainWindow : Window
             StartWithWindowsLabel.Text = StartWithWindowsToggle.IsChecked == true ? "Oui" : "Non";
     }
 
-    private void GeneralSettingsScrollViewer_OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    private void ContentScrollViewer_OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
-        GeneralSettingsScrollViewer.ScrollToVerticalOffset(GeneralSettingsScrollViewer.VerticalOffset - e.Delta);
+        if (sender is not System.Windows.Controls.ScrollViewer viewer || viewer.ScrollableHeight <= 0) return;
+        var target = Math.Clamp(viewer.VerticalOffset - e.Delta, 0, viewer.ScrollableHeight);
+        if (Math.Abs(target - viewer.VerticalOffset) < 0.5) return;
+        viewer.ScrollToVerticalOffset(target);
         e.Handled = true;
     }
 
@@ -651,7 +741,7 @@ public partial class MainWindow : Window
 
     private void UpdateNavigationState()
     {
-        if (ReminderNav == null || CorrectorNav == null || ReformulateNav == null || SimplifyNav == null || ConversationSummaryNav == null || WordDefinitionNav == null || TranslatorNav == null || ResponseGeneratorNav == null || ActionWheelNav == null || MonitoringNav == null || CleanupNav == null || StorageHealthNav == null || StartupAuditNav == null || NvidiaNav == null || XmpNav == null || KeyboardLayoutNav == null) return;
+        if (ReminderNav == null || CorrectorNav == null || ReformulateNav == null || SimplifyNav == null || ConversationSummaryNav == null || WordDefinitionNav == null || TranslatorNav == null || ResponseGeneratorNav == null || ActionWheelNav == null || MonitoringNav == null || GameSessionsNav == null || NetworkMonitoringNav == null || CleanupNav == null || DuplicateFilesNav == null || StorageHealthNav == null || StartupAuditNav == null || NvidiaNav == null || XmpNav == null || KeyboardLayoutNav == null) return;
         PlaceNavigationButton(ReminderNav, ReminderEnabled.IsChecked == true);
         PlaceNavigationButton(CorrectorNav, CorrectorEnabled.IsChecked == true);
         PlaceNavigationButton(ReformulateNav, ReformulatorEnabled.IsChecked == true);
@@ -662,19 +752,31 @@ public partial class MainWindow : Window
         PlaceNavigationButton(ResponseGeneratorNav, ResponseGeneratorEnabled.IsChecked == true);
         PlaceNavigationButton(ActionWheelNav, ActionWheelEnabled.IsChecked == true);
         PlaceNavigationButton(MonitoringNav, _settings.MonitoringEnabled);
-        PlaceNavigationButton(CleanupNav, true);
-        PlaceNavigationButton(StorageHealthNav, true);
-        PlaceNavigationButton(StartupAuditNav, true);
+        PlaceNavigationButton(GameSessionsNav, _settings.GameSessionsModuleEnabled);
+        PlaceNavigationButton(NetworkMonitoringNav, _settings.NetworkMonitoringModuleEnabled);
+        PlaceNavigationButton(CleanupNav, _settings.TemporaryCleanupModuleEnabled);
+        PlaceNavigationButton(DuplicateFilesNav, _settings.DuplicateFilesModuleEnabled);
+        PlaceNavigationButton(StorageHealthNav, _settings.StorageHealthModuleEnabled);
+        PlaceNavigationButton(StartupAuditNav, _settings.StartupAuditModuleEnabled);
         PlaceNavigationButton(NvidiaNav, NvidiaEnabled.IsChecked == true);
         PlaceNavigationButton(XmpNav, XmpEnabled.IsChecked == true);
         PlaceNavigationButton(KeyboardLayoutNav, KeyboardLayoutEnabled.IsChecked == true);
         DisabledAppsSection.Visibility = DisabledAppsPanel.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        TextToolsSection.Visibility = TextToolsPanel.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        TextToolsSection.Visibility = Visibility.Visible;
+        MonitoringGamesSection.Visibility = Visibility.Visible;
+        MaintenanceSection.Visibility = Visibility.Visible;
+        AutomationSection.Visibility = Visibility.Visible;
+        UpdateCategoryCount(TextToolsModuleCount, CorrectorNav, ReformulateNav, SimplifyNav,
+            ConversationSummaryNav, WordDefinitionNav, TranslatorNav, ResponseGeneratorNav);
+        UpdateCategoryCount(MonitoringGamesModuleCount, MonitoringNav, GameSessionsNav,
+            NetworkMonitoringNav, NvidiaNav, XmpNav);
+        UpdateCategoryCount(MaintenanceModuleCount, CleanupNav, DuplicateFilesNav, StorageHealthNav, StartupAuditNav);
+        UpdateCategoryCount(AutomationModuleCount, ReminderNav, ActionWheelNav, KeyboardLayoutNav);
     }
 
     private void PlaceNavigationButton(System.Windows.Controls.Button button, bool enabled)
     {
-        var target = enabled ? IsTextTool(button) ? TextToolsPanel : ActiveAppsPanel : DisabledAppsPanel;
+        var target = enabled ? NavigationPanelFor(button) : DisabledAppsPanel;
         if (button.Parent is System.Windows.Controls.Panel current && current != target)
         {
             current.Children.Remove(button);
@@ -693,6 +795,16 @@ public partial class MainWindow : Window
         button == ConversationSummaryNav || button == WordDefinitionNav ||
         button == TranslatorNav || button == ResponseGeneratorNav;
 
+    private System.Windows.Controls.Panel NavigationPanelFor(System.Windows.Controls.Button button)
+    {
+        if (IsTextTool(button)) return TextToolsPanel;
+        if (button == MonitoringNav || button == GameSessionsNav || button == NetworkMonitoringNav ||
+            button == NvidiaNav || button == XmpNav) return MonitoringGamesPanel;
+        if (button == CleanupNav || button == DuplicateFilesNav || button == StorageHealthNav ||
+            button == StartupAuditNav) return MaintenancePanel;
+        return AutomationPanel;
+    }
+
     private void ToggleTextToolsSection()
     {
         _textToolsExpanded = !_textToolsExpanded;
@@ -700,8 +812,26 @@ public partial class MainWindow : Window
         TextToolsChevron.Text = _textToolsExpanded ? "⌄" : "›";
     }
 
+    private static void ToggleNavigationSection(System.Windows.Controls.StackPanel panel,
+        System.Windows.Controls.TextBlock chevron, ref bool expanded)
+    {
+        expanded = !expanded;
+        panel.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
+        chevron.Text = expanded ? "⌄" : "›";
+    }
+
+    private void UpdateCategoryCount(System.Windows.Controls.TextBlock label,
+        params System.Windows.Controls.Button[] buttons)
+    {
+        var disabled = buttons.Count(button => button.Parent == DisabledAppsPanel);
+        var active = buttons.Length - disabled;
+        label.Text = disabled == 0
+            ? $"{active} module{(active > 1 ? "s" : "")}"
+            : $"{active} actif{(active > 1 ? "s" : "")} · {disabled} désactivé{(disabled > 1 ? "s" : "")}";
+    }
+
     private int NavigationRank(System.Windows.Controls.Button button) =>
-        button == ReminderNav ? 0 : button == CorrectorNav ? 1 : button == ReformulateNav ? 2 : button == SimplifyNav ? 3 : button == ConversationSummaryNav ? 4 : button == WordDefinitionNav ? 5 : button == TranslatorNav ? 6 : button == ResponseGeneratorNav ? 7 : button == ActionWheelNav ? 8 : button == MonitoringNav ? 9 : button == CleanupNav ? 10 : button == StorageHealthNav ? 11 : button == StartupAuditNav ? 12 : button == NvidiaNav ? 13 : button == XmpNav ? 14 : 15;
+        button == ReminderNav ? 0 : button == CorrectorNav ? 1 : button == ReformulateNav ? 2 : button == SimplifyNav ? 3 : button == ConversationSummaryNav ? 4 : button == WordDefinitionNav ? 5 : button == TranslatorNav ? 6 : button == ResponseGeneratorNav ? 7 : button == ActionWheelNav ? 8 : button == MonitoringNav ? 9 : button == GameSessionsNav ? 10 : button == NetworkMonitoringNav ? 11 : button == CleanupNav ? 12 : button == DuplicateFilesNav ? 13 : button == StorageHealthNav ? 14 : button == StartupAuditNav ? 15 : button == NvidiaNav ? 16 : button == XmpNav ? 17 : 18;
 
     private void ApplyEnabledStates()
     {
@@ -717,6 +847,12 @@ public partial class MainWindow : Window
         _settings.NvidiaOptimizerEnabled = NvidiaEnabled.IsChecked == true;
         _settings.XmpMonitorEnabled = XmpEnabled.IsChecked == true;
         _settings.AutoFrenchKeyboardInDialogs = KeyboardLayoutEnabled.IsChecked == true;
+        _settings.GameSessionsModuleEnabled = GameSessionsModuleEnabled.IsChecked == true;
+        _settings.NetworkMonitoringModuleEnabled = NetworkMonitoringModuleEnabled.IsChecked == true;
+        _settings.TemporaryCleanupModuleEnabled = TemporaryCleanupModuleEnabled.IsChecked == true;
+        _settings.DuplicateFilesModuleEnabled = DuplicateFilesModuleEnabled.IsChecked == true;
+        _settings.StorageHealthModuleEnabled = StorageHealthModuleEnabled.IsChecked == true;
+        _settings.StartupAuditModuleEnabled = StartupAuditModuleEnabled.IsChecked == true;
         _settingsService.Save(_settings);
         LogModuleStates();
         ConfigureReminderTimer();
@@ -1490,11 +1626,14 @@ public partial class MainWindow : Window
             PreviewSummarizeZone, PreviewDefineWordZone
         ];
         var visibleZones = previewZones.Where(zone => zone.Visibility == Visibility.Visible).ToArray();
+        PreviewActionCount.Text = visibleZones.Length == 1
+            ? "Aperçu · 1 action active"
+            : $"Aperçu · {visibleZones.Length} actions actives";
         for (var index = 0; index < visibleZones.Length; index++)
         {
             var angle = -Math.PI / 2 + index * 2 * Math.PI / visibleZones.Length;
-            var centerX = 325 + 225 * Math.Cos(angle);
-            var centerY = 305 + 230 * Math.Sin(angle);
+            var centerX = 325 + 190 * Math.Cos(angle);
+            var centerY = 305 + 190 * Math.Sin(angle);
             System.Windows.Controls.Canvas.SetLeft(visibleZones[index], centerX - visibleZones[index].Width / 2);
             System.Windows.Controls.Canvas.SetTop(visibleZones[index], centerY - visibleZones[index].Height / 2);
         }
@@ -1635,14 +1774,14 @@ public partial class MainWindow : Window
     private async Task OptimizeNvidiaAsync()
     {
         if (System.Windows.MessageBox.Show(this, "Appliquer le profil d’optimisation NVIDIA global ?", "Confirmation NVIDIA", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-        await RunNvidiaActionAsync(async () => { await _nvidiaProfileService.BackupThenOptimizeAsync(); }, true, "Profil d’optimisation NVIDIA appliqué. L’état précédent a été sauvegardé.");
+        await RunNvidiaActionAsync(async () => { await _nvidiaProfileService.BackupThenOptimizeAsync(); }, true, "Optimisation FlexHub", "Profil d’optimisation NVIDIA appliqué. L’état précédent a été sauvegardé.");
     }
 
     private async Task RestoreNvidiaAsync()
     {
         if (!_nvidiaProfileService.CanRestore) { ShowVisibleMessage("Restauration NVIDIA", "Aucune sauvegarde antérieure à une optimisation n’est disponible."); return; }
         if (System.Windows.MessageBox.Show(this, "Restaurer l’état NVIDIA enregistré juste avant la dernière optimisation ?", "Restauration NVIDIA", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-        await RunNvidiaActionAsync(_nvidiaProfileService.RestorePreviousAsync, false, "État NVIDIA antérieur à l’optimisation restauré.");
+        await RunNvidiaActionAsync(_nvidiaProfileService.RestorePreviousAsync, false, "Profil restauré", "État NVIDIA antérieur à l’optimisation restauré.");
     }
 
     private void RefreshNvidiaProfiles(string? selectPath = null)
@@ -1667,7 +1806,7 @@ public partial class MainWindow : Window
     {
         if (NvidiaProfilesBox.SelectedItem is not NvidiaSavedProfile profile) return;
         if (System.Windows.MessageBox.Show(this, $"Appliquer le profil « {profile.Name} » ?", "Profil NVIDIA", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-        await RunNvidiaActionAsync(async () => { await _nvidiaProfileService.BackupThenApplyAsync(profile); }, false, $"Profil « {profile.Name} » appliqué. L’état précédent a été sauvegardé.");
+        await RunNvidiaActionAsync(async () => { await _nvidiaProfileService.BackupThenApplyAsync(profile); }, false, profile.Name, $"Profil « {profile.Name} » appliqué. L’état précédent a été sauvegardé.");
     }
 
     private void DeleteSelectedNvidiaProfileNow()
@@ -1679,7 +1818,7 @@ public partial class MainWindow : Window
         catch (Exception ex) { ShowVisibleMessage("Erreur NVIDIA", ex.Message); }
     }
 
-    private async Task RunNvidiaActionAsync(Func<Task> action, bool optimization, string successMessage)
+    private async Task RunNvidiaActionAsync(Func<Task> action, bool optimization, string activeProfileName, string successMessage)
     {
         try
         {
@@ -1687,6 +1826,7 @@ public partial class MainWindow : Window
             NvidiaProfileState.Text = "Traitement du profil NVIDIA en cours…";
             await action();
             if (optimization) _settings.LastNvidiaOptimizationUtc = DateTime.UtcNow;
+            _settings.ActiveNvidiaProfileName = activeProfileName;
             _settingsService.Save(_settings);
             NvidiaProfileState.Text = successMessage;
             ShowTrayMessage("Optimisation NVIDIA", successMessage);
@@ -1951,19 +2091,471 @@ public partial class MainWindow : Window
         _reminderTimer.Start();
     }
 
+    private void SaveNetworkMonitoringTargets()
+    {
+        var targets = NetworkTargetsBox.Text.Trim();
+        if (targets.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Length == 0)
+        {
+            NetworkMonitoringStatus.Text = "Ajoutez au moins une cible valide.";
+            return;
+        }
+
+        _settings.NetworkMonitoringTargets = targets;
+        _settingsService.Save(_settings);
+        NetworkMonitoringStatus.Text = "Cibles enregistrées.";
+    }
+
+    private void SaveGameSessionAlertSettings()
+    {
+        if (!int.TryParse(GameSessionAlertHoursBox.Text.Trim(), out var hours) || hours is < 1 or > 24)
+        {
+            ActiveGameSessionSummary.Text = "Choisissez une durée de 1 à 24 heures.";
+            return;
+        }
+        _settings.GameSessionAlertHours = hours;
+        _settings.GameSessionAlertEnabled = GameSessionAlertEnabled.IsChecked == true;
+        _settingsService.Save(_settings);
+        _alertedGameSessionProcessIds.Clear();
+        ActiveGameSessionSummary.Text = _settings.GameSessionAlertEnabled
+            ? $"Alerte activée après {hours} h."
+            : "Alerte de pause désactivée.";
+    }
+
+    private void SaveNetworkJitterAlertSettings()
+    {
+        if (!int.TryParse(NetworkJitterAlertMsBox.Text.Trim(), out var threshold) || threshold is < 5 or > 200)
+        {
+            NetworkDiagnosticText.Text = "Le seuil de jitter doit être compris entre 5 et 200 ms.";
+            return;
+        }
+        _settings.NetworkJitterAlertEnabled = NetworkJitterAlertEnabled.IsChecked == true;
+        _settings.NetworkJitterAlertMs = threshold;
+        _settingsService.Save(_settings);
+        _networkAnomalySamples = 0;
+        NetworkDiagnosticText.Text = _settings.NetworkJitterAlertEnabled
+            ? $"Alerte jitter activée à partir de {threshold} ms."
+            : "Alerte jitter désactivée.";
+    }
+
+    private async Task RefreshGameSessionsAsync(bool force = false)
+    {
+        if (!_settings.GameSessionsModuleEnabled) return;
+        if (_gameSessionRefreshRunning || (!force && DateTime.UtcNow - _lastGameSessionRefreshUtc < TimeSpan.FromSeconds(15))) return;
+        _gameSessionRefreshRunning = true;
+        try
+        {
+            var sessions = await Task.Run(_gameSessionService.DetectActiveSessions);
+            _lastGameSessionRefreshUtc = DateTime.UtcNow;
+            ActiveGameSessionsList.ItemsSource = sessions;
+            GameSessionHistoryList.ItemsSource = _gameSessionHistoryService.Update(sessions, _settings.ActiveNvidiaProfileName);
+            RefreshGameSessionSummary();
+            ActiveGameSessionEmpty.Visibility = sessions.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            ActiveGameSessionSummary.Text = sessions.Count == 0
+                ? "Aucune session de jeu détectée."
+                : sessions.Count == 1 ? "1 jeu actif" : $"{sessions.Count} jeux actifs";
+            var activeIds = sessions.Select(session => session.ProcessId).ToHashSet();
+            _alertedGameSessionProcessIds.RemoveWhere(processId => !activeIds.Contains(processId));
+            if (!_settings.GameSessionAlertEnabled) return;
+            var threshold = TimeSpan.FromHours(_settings.GameSessionAlertHours);
+            foreach (var session in sessions.Where(session => session.Duration >= threshold &&
+                         !_alertedGameSessionProcessIds.Contains(session.ProcessId)))
+            {
+                _alertedGameSessionProcessIds.Add(session.ProcessId);
+                ShowGameSessionAlert("Pause conseillée",
+                    $"Vous jouez à {session.Name} depuis {session.DurationText}. Pensez à faire une pause.");
+            }
+        }
+        finally
+        {
+            _gameSessionRefreshRunning = false;
+        }
+    }
+
+    private void RefreshGameSessionSummary()
+    {
+        if (WeeklyGameSummaryList is null || GameSessionPeriodBox is null) return;
+        var now = DateTime.Now;
+        DateTime? start = GameSessionPeriodBox.SelectedIndex switch
+        {
+            0 => now.AddDays(-7),
+            1 => now.AddDays(-30),
+            2 => new DateTime(now.Year, 1, 1),
+            _ => null
+        };
+        _currentGameSummaries = _gameSessionHistoryService.GetSummary(start);
+        WeeklyGameSummaryList.ItemsSource = _currentGameSummaries;
+        DrawGameTimeChart();
+    }
+
+    private void GameTimeChart_OnSizeChanged(object sender, SizeChangedEventArgs e) => DrawGameTimeChart();
+
+    private void DrawGameTimeChart()
+    {
+        if (GameTimeChart is null || GameTimeChart.ActualWidth < 100 || GameTimeChart.ActualHeight < 80) return;
+        GameTimeChart.Children.Clear();
+        const double left = 42;
+        const double bottom = 32;
+        const double top = 10;
+        var width = GameTimeChart.ActualWidth - left - 8;
+        var height = GameTimeChart.ActualHeight - top - bottom;
+        var summaries = _currentGameSummaries.Take(8).ToArray();
+        var maximumHours = Math.Max(1, Math.Ceiling(summaries.Select(item => item.TotalDuration.TotalHours).DefaultIfEmpty(0).Max()));
+
+        for (var step = 0; step <= 4; step++)
+        {
+            var y = top + height - height * step / 4d;
+            var value = maximumHours * step / 4d;
+            GameTimeChart.Children.Add(new System.Windows.Shapes.Line
+            {
+                X1 = left, X2 = left + width, Y1 = y, Y2 = y,
+                Stroke = new SolidColorBrush(System.Windows.Media.Color.FromArgb(45, 210, 205, 200)), StrokeThickness = 1
+            });
+            var scale = new System.Windows.Controls.TextBlock
+            {
+                Text = $"{value:0.#} h", FontSize = 10,
+                Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush")
+            };
+            System.Windows.Controls.Canvas.SetLeft(scale, 2);
+            System.Windows.Controls.Canvas.SetTop(scale, y - 7);
+            GameTimeChart.Children.Add(scale);
+        }
+
+        if (summaries.Length == 0) return;
+        var slot = width / summaries.Length;
+        var barWidth = Math.Min(70, slot * 0.58);
+        for (var index = 0; index < summaries.Length; index++)
+        {
+            var item = summaries[index];
+            var barHeight = Math.Max(3, item.TotalDuration.TotalHours / maximumHours * height);
+            var x = left + index * slot + (slot - barWidth) / 2;
+            var rectangle = new System.Windows.Shapes.Rectangle
+            {
+                Width = barWidth, Height = barHeight, RadiusX = 4, RadiusY = 4,
+                Fill = new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 162, 76)),
+                ToolTip = $"{item.GameName} : {item.TotalDurationText}"
+            };
+            System.Windows.Controls.Canvas.SetLeft(rectangle, x);
+            System.Windows.Controls.Canvas.SetTop(rectangle, top + height - barHeight);
+            GameTimeChart.Children.Add(rectangle);
+            var label = new System.Windows.Controls.TextBlock
+            {
+                Text = item.GameName.Length > 12 ? item.GameName[..11] + "…" : item.GameName,
+                FontSize = 10, Width = slot, TextAlignment = TextAlignment.Center,
+                Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush")
+            };
+            System.Windows.Controls.Canvas.SetLeft(label, left + index * slot);
+            System.Windows.Controls.Canvas.SetTop(label, top + height + 7);
+            GameTimeChart.Children.Add(label);
+        }
+    }
+
+    private void ClearGameSessionHistory_OnClick()
+    {
+        var confirmation = System.Windows.MessageBox.Show(this,
+            "Effacer tout l’historique des sessions de jeu ? Cette action est irréversible.",
+            "Effacer l’historique", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        if (confirmation != MessageBoxResult.Yes) return;
+        _gameSessionHistoryService.Clear();
+        GameSessionHistoryList.ItemsSource = Array.Empty<GameSessionReport>();
+        WeeklyGameSummaryList.ItemsSource = Array.Empty<WeeklyGameSummary>();
+        _currentGameSummaries = Array.Empty<WeeklyGameSummary>();
+        DrawGameTimeChart();
+        ActiveGameSessionSummary.Text = "Historique effacé.";
+        AppLog.Write("Historique des sessions de jeu effacé par l’utilisateur.");
+    }
+
+    private void SetReferenceSession_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.Button { DataContext: GameSessionReport report }) return;
+        if (!_gameSessionHistoryService.SetReference(report))
+        {
+            ActiveGameSessionSummary.Text = "Terminez la session avant de l’utiliser comme référence.";
+            return;
+        }
+        GameSessionHistoryList.ItemsSource = null;
+        GameSessionHistoryList.ItemsSource = _gameSessionHistoryService.GetRecentReports();
+        ActiveGameSessionSummary.Text = $"Référence enregistrée pour {report.GameName}.";
+    }
+
+    private void ExportGameSessionHistory_OnClick()
+    {
+        var reports = _gameSessionHistoryService.GetAllReports();
+        if (reports.Count == 0)
+        {
+            ActiveGameSessionSummary.Text = "Aucune session à exporter.";
+            return;
+        }
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Exporter les sessions de jeu",
+            Filter = "Fichier CSV (*.csv)|*.csv",
+            FileName = $"sessions-jeu-{DateTime.Now:yyyy-MM-dd}.csv",
+            DefaultExt = ".csv",
+            AddExtension = true
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        static string Csv(string value) => "\"" + value.Replace("\"", "\"\"") + "\"";
+        var lines = new List<string>
+        {
+            "Jeu;Reference;Profil_NVIDIA;Debut;Fin;Duree_minutes;CPU_max_pct;RAM_max_pct;GPU_moy_pct;GPU_max_pct;GPU_max_C"
+        };
+        foreach (var report in reports)
+        {
+            var end = report.IsActive ? DateTime.Now : report.LastSeenAt;
+            var duration = Math.Max(0, (end - report.StartedAt).TotalMinutes);
+            var gpuAverage = report.GpuUsageSampleCount > 0 ? report.GpuUsageTotal / report.GpuUsageSampleCount : (double?)null;
+            lines.Add(string.Join(';', Csv(report.GameName), report.IsReference ? "oui" : "non", Csv(report.NvidiaProfileName), report.StartedAt.ToString("yyyy-MM-dd HH:mm:ss"),
+                end.ToString("yyyy-MM-dd HH:mm:ss"), duration.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture),
+                report.PeakCpuUsagePercent?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? "",
+                report.PeakRamUsagePercent?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? "",
+                gpuAverage?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? "",
+                report.PeakGpuUsagePercent?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? "",
+                report.PeakGpuTemperatureC?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? ""));
+        }
+        try
+        {
+            File.WriteAllLines(dialog.FileName, lines, new System.Text.UTF8Encoding(true));
+            ActiveGameSessionSummary.Text = $"Historique exporté : {Path.GetFileName(dialog.FileName)}";
+            AppLog.Write($"Historique des sessions exporté vers {dialog.FileName}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            ActiveGameSessionSummary.Text = $"Export impossible : {ex.Message}";
+            AppLog.Write($"Export des sessions impossible : {ex.Message}");
+        }
+    }
+
+    private async Task RefreshNetworkMonitoringAsync()
+    {
+        if (_networkMonitoringRunning) return;
+        _networkMonitoringRunning = true;
+        RefreshNetworkMonitoring.IsEnabled = false;
+        NetworkMonitoringStatus.Text = "Mesure en arrière-plan (4 paquets par cible)…";
+        try
+        {
+            var targets = NetworkTargetsBox.Text.Split(';',
+                StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            var results = await _networkMonitoringService.MeasureAsync(targets);
+            NetworkResultsList.ItemsSource = results;
+            NetworkMonitoringStatus.Text = results.Count == 0
+                ? "Aucune cible utilisable. Vérifiez la passerelle ou les adresses saisies."
+                : $"Dernière mesure à {DateTime.Now:HH:mm:ss} · {results.Count} cible(s).";
+            UpdateNetworkDiagnosis(results);
+            RecordNetworkHistory(results);
+        }
+        catch (Exception ex)
+        {
+            NetworkMonitoringStatus.Text = $"Mesure réseau impossible : {ex.Message}";
+            AppLog.Write($"Monitoring réseau indisponible : {ex.Message}");
+        }
+        finally
+        {
+            RefreshNetworkMonitoring.IsEnabled = true;
+            _networkMonitoringRunning = false;
+        }
+    }
+
+    private void UpdateNetworkDiagnosis(IReadOnlyList<NetworkTargetMetrics> results)
+    {
+        var gateway = results.FirstOrDefault(result => result.Name.StartsWith("Box /", StringComparison.OrdinalIgnoreCase));
+        var internet = results.FirstOrDefault(result => result.Name.Equals("Internet", StringComparison.OrdinalIgnoreCase));
+        var game = results.FirstOrDefault(result => result.Name.StartsWith("Jeu ·", StringComparison.OrdinalIgnoreCase));
+
+        var gatewayUnstable = gateway is not null && (gateway.SuccessfulSamples == 0 ||
+            gateway.PacketLossPercent > 0 || gateway.JitterMs > 10 || gateway.AveragePingMs > 15);
+        var internetUnstable = internet is not null && (internet.SuccessfulSamples == 0 ||
+            internet.PacketLossPercent > 0 || internet.JitterMs > 30 || internet.AveragePingMs > 120);
+        var gameUnstable = game is { StatusOverride: null } && (game.SuccessfulSamples == 0 ||
+            game.PacketLossPercent > 0 || game.JitterMs > 30 || game.AveragePingMs > 120);
+
+        NetworkDiagnosticText.Text = gateway is null || internet is null
+            ? "Diagnostic incomplet : ajoutez « passerelle » et « Internet=1.1.1.1 » aux cibles pour séparer un problème local d’un problème extérieur."
+            : gatewayUnstable
+                ? "Diagnostic local : problème probable entre ce PC et la box (Wi-Fi, câble, carte réseau ou routeur)."
+                : internetUnstable
+                    ? "Diagnostic Internet : la box répond correctement, mais la connexion extérieure est instable ou indisponible."
+                    : gameUnstable
+                        ? "Diagnostic serveur distant : le réseau local et Internet fonctionnent, mais le trajet vers le serveur du jeu est instable ou refuse le ping."
+                        : game is { StatusOverride: not null }
+                            ? "Diagnostic partiel : réseau local et Internet stables ; le serveur UDP du jeu ne peut pas être mesuré directement."
+                            : "Diagnostic stable : réseau local et accès Internet fonctionnent normalement.";
+
+        var measurable = results.Where(result => result.StatusOverride is null && result.SuccessfulSamples > 0).ToArray();
+        var anomaly = measurable.Any(result => result.PacketLossPercent >= 5 ||
+            (_settings.NetworkJitterAlertEnabled && result.JitterMs >= _settings.NetworkJitterAlertMs) ||
+            result.AveragePingMs >= 120);
+        _networkAnomalySamples = anomaly ? _networkAnomalySamples + 1 : 0;
+        if (_networkAnomalySamples < 3 || DateTime.UtcNow - _lastNetworkAlertUtc < TimeSpan.FromMinutes(15)) return;
+
+        _lastNetworkAlertUtc = DateTime.UtcNow;
+        _networkAnomalySamples = 0;
+        var worst = measurable.OrderByDescending(result => result.PacketLossPercent)
+            .ThenByDescending(result => result.JitterMs).ThenByDescending(result => result.AveragePingMs).First();
+        ShowNetworkAlert("Alerte réseau",
+            $"Instabilité sur {worst.Name} : {worst.PingText}, jitter {worst.JitterText}, pertes {worst.LossText}.");
+    }
+
+    private void RecordNetworkHistory(IReadOnlyList<NetworkTargetMetrics> results)
+    {
+        var source = results.FirstOrDefault(result => result.Name.StartsWith("Jeu ·", StringComparison.OrdinalIgnoreCase) && result.SuccessfulSamples > 0)
+            ?? results.FirstOrDefault(result => result.Name.Equals("Internet", StringComparison.OrdinalIgnoreCase) && result.SuccessfulSamples > 0);
+        if (source is null) return;
+        EnqueueNetworkValue(_networkPingHistory, Math.Min(200, source.AveragePingMs));
+        EnqueueNetworkValue(_networkJitterHistory, Math.Min(200, source.JitterMs));
+        EnqueueNetworkValue(_networkLossHistory, Math.Min(100, source.PacketLossPercent));
+        _networkHistoryTimestamps.Enqueue(DateTime.Now);
+        while (_networkHistoryTimestamps.Count > 60) _networkHistoryTimestamps.Dequeue();
+        DrawNetworkHistory();
+    }
+
+    private static void EnqueueNetworkValue(Queue<double> queue, double value)
+    {
+        queue.Enqueue(value);
+        while (queue.Count > 60) queue.Dequeue();
+    }
+
+    private void NetworkHistoryChart_OnSizeChanged(object sender, SizeChangedEventArgs e) => DrawNetworkHistory();
+
+    private void NetworkHistoryChart_OnMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        var ping = _networkPingHistory.ToArray();
+        var jitter = _networkJitterHistory.ToArray();
+        var loss = _networkLossHistory.ToArray();
+        var times = _networkHistoryTimestamps.ToArray();
+        if (ping.Length == 0 || NetworkHistoryChart.ActualWidth <= 42) return;
+
+        const double left = 42;
+        var plotWidth = NetworkHistoryChart.ActualWidth - left;
+        var position = e.GetPosition(NetworkHistoryChart);
+        var ratio = Math.Clamp((position.X - left) / plotWidth, 0, 1);
+        var index = ping.Length == 1 ? 0 : (int)Math.Round(ratio * (ping.Length - 1));
+        var x = left + (ping.Length == 1 ? 0 : index * plotWidth / (ping.Length - 1));
+
+        NetworkHoverLine.X1 = x;
+        NetworkHoverLine.X2 = x;
+        NetworkHoverLine.Y1 = 0;
+        NetworkHoverLine.Y2 = Math.Max(0, NetworkHistoryChart.ActualHeight - 18);
+        NetworkHoverText.Text = $"{times[index]:HH:mm:ss}\nPing  {ping[index]:0.0} ms\nJitter  {jitter[index]:0.0} ms\nPertes  {loss[index]:0.0} %";
+        NetworkHoverLine.Visibility = Visibility.Visible;
+        NetworkHoverTooltip.Visibility = Visibility.Visible;
+        NetworkHoverTooltip.Measure(new System.Windows.Size(double.PositiveInfinity, double.PositiveInfinity));
+        var tooltipWidth = NetworkHoverTooltip.DesiredSize.Width;
+        var tooltipLeft = x + 10;
+        if (tooltipLeft + tooltipWidth > NetworkHistoryChart.ActualWidth)
+            tooltipLeft = x - tooltipWidth - 10;
+        System.Windows.Controls.Canvas.SetLeft(NetworkHoverTooltip, Math.Max(left, tooltipLeft));
+        System.Windows.Controls.Canvas.SetTop(NetworkHoverTooltip, 8);
+    }
+
+    private void NetworkHistoryChart_OnMouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        NetworkHoverLine.Visibility = Visibility.Collapsed;
+        NetworkHoverTooltip.Visibility = Visibility.Collapsed;
+    }
+
+    private void DrawNetworkHistory()
+    {
+        if (NetworkHistoryChart.ActualWidth <= 0 || NetworkHistoryChart.ActualHeight <= 0) return;
+        var maximumValue = _networkPingHistory.Concat(_networkJitterHistory).Concat(_networkLossHistory)
+            .DefaultIfEmpty(0).Max();
+        var scaleMaximum = Math.Max(25, Math.Ceiling(maximumValue / 25d) * 25);
+        DrawNetworkScale(scaleMaximum);
+        DrawNetworkSeries(NetworkPingLine, _networkPingHistory, scaleMaximum);
+        DrawNetworkSeries(NetworkJitterLine, _networkJitterHistory, scaleMaximum);
+        DrawNetworkSeries(NetworkLossLine, _networkLossHistory, scaleMaximum);
+    }
+
+    private void DrawNetworkScale(double scaleMaximum)
+    {
+        foreach (var element in NetworkHistoryChart.Children.OfType<FrameworkElement>()
+                     .Where(element => Equals(element.Tag, "NetworkScale")).ToArray())
+            NetworkHistoryChart.Children.Remove(element);
+
+        const double left = 42;
+        const double bottom = 18;
+        var plotHeight = Math.Max(1, NetworkHistoryChart.ActualHeight - bottom);
+        for (var step = 0; step <= 4; step++)
+        {
+            var value = scaleMaximum * step / 4d;
+            var y = plotHeight - plotHeight * step / 4d;
+            var gridLine = new System.Windows.Shapes.Line
+            {
+                X1 = left, X2 = NetworkHistoryChart.ActualWidth, Y1 = y, Y2 = y,
+                Stroke = new SolidColorBrush(System.Windows.Media.Color.FromArgb(55, 190, 185, 180)),
+                StrokeThickness = 1, Tag = "NetworkScale"
+            };
+            var label = new System.Windows.Controls.TextBlock
+            {
+                Text = $"{value:0}", FontSize = 10, Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush"),
+                Tag = "NetworkScale"
+            };
+            System.Windows.Controls.Canvas.SetLeft(label, 2);
+            System.Windows.Controls.Canvas.SetTop(label, Math.Clamp(y - 7, 0, plotHeight));
+            NetworkHistoryChart.Children.Add(gridLine);
+            NetworkHistoryChart.Children.Add(label);
+            System.Windows.Controls.Panel.SetZIndex(gridLine, 0);
+        }
+    }
+
+    private void DrawNetworkSeries(System.Windows.Shapes.Polyline line, Queue<double> values, double scaleMaximum)
+    {
+        line.Points.Clear();
+        var samples = values.ToArray();
+        if (samples.Length == 0) return;
+        const double left = 42;
+        const double bottom = 18;
+        var width = Math.Max(1, NetworkHistoryChart.ActualWidth - left);
+        var height = Math.Max(1, NetworkHistoryChart.ActualHeight - bottom);
+        for (var index = 0; index < samples.Length; index++)
+        {
+            var x = left + (samples.Length == 1 ? 0 : index * width / (samples.Length - 1));
+            var y = height - Math.Clamp(samples[index], 0, scaleMaximum) / scaleMaximum * height;
+            line.Points.Add(new System.Windows.Point(x, y));
+        }
+    }
+
+    private void ShowNetworkAlert(string title, string message)
+    {
+        _monitoringAlertWindow?.Close();
+        _monitoringAlertWindow = new MonitoringAlertWindow(title, message);
+        _monitoringAlertWindow.OpenMonitoringRequested += (_, _) =>
+        {
+            ShowHub();
+            ShowPage("networkMonitoring");
+        };
+        _monitoringAlertWindow.Closed += (_, _) => _monitoringAlertWindow = null;
+        _monitoringAlertWindow.Show();
+    }
+
+    private void ShowGameSessionAlert(string title, string message)
+    {
+        _monitoringAlertWindow?.Close();
+        _monitoringAlertWindow = new MonitoringAlertWindow(title, message);
+        _monitoringAlertWindow.OpenMonitoringRequested += (_, _) =>
+        {
+            ShowHub();
+            ShowPage("gameSessions");
+        };
+        _monitoringAlertWindow.Closed += (_, _) => _monitoringAlertWindow = null;
+        _monitoringAlertWindow.Show();
+    }
+
     private async Task RefreshMonitoringAsync()
     {
+        if (!_settings.MonitoringEnabled) return;
         if (_monitoringRefreshRunning) return;
         _monitoringRefreshRunning = true;
         RefreshMonitoring.IsEnabled = false;
         try
         {
             var metrics = await _systemMonitoringService.CaptureAsync();
-            MonitorCpuText.Text = metrics.CpuTemperatureC.HasValue
-                ? $"{metrics.CpuPercent:0}%  ·  {metrics.CpuTemperatureC:0} °C"
-                : $"{metrics.CpuPercent:0}%";
+            _gameSessionHistoryService.RecordPerformanceMetrics(metrics.CpuPercent, metrics.RamPercent,
+                metrics.GpuPercent, metrics.GpuTemperatureC);
+            MonitorCpuText.Text = $"{metrics.CpuPercent:0}%";
+            MonitorCpuDetail.Text = metrics.TopCpuProcessText is null ? "Mesure du processus…" : "Top : " + metrics.TopCpuProcessText;
             MonitorRamText.Text = $"{metrics.RamPercent:0}%";
             MonitorRamDetail.Text = $"{metrics.RamUsedGb:0.0} / {metrics.RamTotalGb:0.0} Go";
+            MonitorRamProcessDetail.Text = metrics.TopRamProcessText is null ? string.Empty : "Top : " + metrics.TopRamProcessText;
             MonitorGpuText.Text = metrics.GpuPercent.HasValue
                 ? $"{metrics.GpuPercent:0}%  ·  {metrics.GpuTemperatureC:0} °C"
                 : "Indisponible";
@@ -2004,7 +2596,6 @@ public partial class MainWindow : Window
             _settings.MonitoringAlertsEnabled,
             _settings.MonitoringCpuAlertPercent,
             _settings.MonitoringRamAlertPercent,
-            _settings.MonitoringCpuTemperatureAlertC,
             _settings.MonitoringGpuTemperatureAlertC) { Owner = this };
         dialog.TestRequested += (_, _) => ShowMonitoringAlert(
             "Test de l’alerte",
@@ -2015,7 +2606,6 @@ public partial class MainWindow : Window
         _settings.MonitoringAlertsEnabled = dialog.AlertsAreEnabled;
         _settings.MonitoringCpuAlertPercent = dialog.CpuAlertPercent;
         _settings.MonitoringRamAlertPercent = dialog.RamAlertPercent;
-        _settings.MonitoringCpuTemperatureAlertC = dialog.CpuTemperatureAlertC;
         _settings.MonitoringGpuTemperatureAlertC = dialog.GpuTemperatureAlertC;
         _settingsService.Save(_settings);
         ResetMonitoringAlertCounters();
@@ -2037,13 +2627,10 @@ public partial class MainWindow : Window
 
         _highCpuSamples = metrics.CpuPercent >= _settings.MonitoringCpuAlertPercent ? _highCpuSamples + 1 : 0;
         _highRamSamples = metrics.RamPercent >= _settings.MonitoringRamAlertPercent ? _highRamSamples + 1 : 0;
-        _highCpuTemperatureSamples = metrics.CpuTemperatureC >= _settings.MonitoringCpuTemperatureAlertC
-            ? _highCpuTemperatureSamples + 1 : 0;
         _highGpuTemperatureSamples = metrics.GpuTemperatureC >= _settings.MonitoringGpuTemperatureAlertC
             ? _highGpuTemperatureSamples + 1 : 0;
 
-        var pending = Math.Max(Math.Max(_highCpuSamples, _highRamSamples),
-            Math.Max(_highCpuTemperatureSamples, _highGpuTemperatureSamples));
+        var pending = Math.Max(Math.Max(_highCpuSamples, _highRamSamples), _highGpuTemperatureSamples);
         if (pending is > 0 and < 3)
             MonitoringAlertStatus.Text = $"Seuil dépassé : confirmation en cours ({pending}/3 mesures).";
         else if (pending == 0)
@@ -2053,7 +2640,7 @@ public partial class MainWindow : Window
         {
             _lastCpuAlertUtc = DateTime.UtcNow;
             ShowMonitoringAlert("Alerte CPU",
-                $"Utilisation CPU élevée : {metrics.CpuPercent:0}% (seuil {_settings.MonitoringCpuAlertPercent}%).",
+                $"Utilisation CPU élevée : {metrics.CpuPercent:0}% (seuil {_settings.MonitoringCpuAlertPercent}%).\nProcessus principal : {metrics.TopCpuProcessText ?? "indéterminé"}.",
                 $"CPU élevé : {metrics.CpuPercent:0}% à {DateTime.Now:HH:mm:ss}");
             AppLog.Write($"ALERTE MONITORING | CPU={metrics.CpuPercent:0}%");
         }
@@ -2061,17 +2648,9 @@ public partial class MainWindow : Window
         {
             _lastRamAlertUtc = DateTime.UtcNow;
             ShowMonitoringAlert("Alerte RAM",
-                $"Utilisation RAM élevée : {metrics.RamPercent:0}% (seuil {_settings.MonitoringRamAlertPercent}%).",
+                $"Utilisation RAM élevée : {metrics.RamPercent:0}% (seuil {_settings.MonitoringRamAlertPercent}%).\nProcessus principal : {metrics.TopRamProcessText ?? "indéterminé"}.",
                 $"RAM élevée : {metrics.RamPercent:0}% à {DateTime.Now:HH:mm:ss}");
             AppLog.Write($"ALERTE MONITORING | RAM={metrics.RamPercent:0}%");
-        }
-        if (_highCpuTemperatureSamples >= 3 && CanShowMonitoringAlert(_lastCpuTemperatureAlertUtc))
-        {
-            _lastCpuTemperatureAlertUtc = DateTime.UtcNow;
-            ShowMonitoringAlert("Alerte température CPU",
-                $"Le CPU atteint {metrics.CpuTemperatureC:0} °C (seuil {_settings.MonitoringCpuTemperatureAlertC} °C).",
-                $"Température CPU élevée : {metrics.CpuTemperatureC:0} °C à {DateTime.Now:HH:mm:ss}");
-            AppLog.Write($"ALERTE MONITORING | Température CPU={metrics.CpuTemperatureC:0}°C");
         }
         if (_highGpuTemperatureSamples >= 3 && CanShowMonitoringAlert(_lastGpuTemperatureAlertUtc))
         {
@@ -2105,7 +2684,6 @@ public partial class MainWindow : Window
     {
         _highCpuSamples = 0;
         _highRamSamples = 0;
-        _highCpuTemperatureSamples = 0;
         _highGpuTemperatureSamples = 0;
     }
 
@@ -2207,6 +2785,167 @@ public partial class MainWindow : Window
         MonitoringHoverTooltip.Visibility = Visibility.Collapsed;
     }
 
+    private void ChooseDuplicateFolderNow()
+    {
+        using var dialog = new Forms.FolderBrowserDialog
+        {
+            Description = "Choisissez le dossier dans lequel rechercher les fichiers en double.",
+            UseDescriptionForTitle = true,
+            ShowNewFolderButton = false
+        };
+        if (dialog.ShowDialog() != Forms.DialogResult.OK) return;
+        DuplicateFolderBox.Text = dialog.SelectedPath;
+        ScanDuplicateFiles.IsEnabled = Directory.Exists(dialog.SelectedPath);
+        DuplicateFilesStatus.Text = "Dossier sélectionné. L’analyse compare uniquement les fichiers de même taille.";
+    }
+
+    private async Task ScanDuplicateFilesAsync()
+    {
+        var folder = DuplicateFolderBox.Text.Trim();
+        if (_duplicateScanRunning || !Directory.Exists(folder)) return;
+        _duplicateScanRunning = true;
+        _duplicateScanCancellation?.Dispose();
+        _duplicateScanCancellation = new CancellationTokenSource();
+        ChooseDuplicateFolder.IsEnabled = false;
+        ScanDuplicateFiles.IsEnabled = false;
+        CancelDuplicateScan.IsEnabled = true;
+        DuplicateFilesList.ItemsSource = null;
+        _duplicateResults = Array.Empty<DuplicateFileCandidate>();
+        _duplicateScanRoot = null;
+        AutoSelectDuplicateFiles.IsEnabled = false;
+        DeleteSelectedDuplicateFiles.IsEnabled = false;
+        DuplicateProgressPanel.Visibility = Visibility.Visible;
+        DuplicateProgressBar.IsIndeterminate = true;
+        DuplicateProgressBar.Value = 0;
+        DuplicateProgressText.Text = "Inventaire des fichiers…";
+        DuplicateProgressPercent.Text = "";
+        DuplicateFilesStatus.Text = "Analyse en lecture seule en cours… Les dossiers volumineux peuvent demander plusieurs minutes.";
+        try
+        {
+            var progress = new Progress<DuplicateScanProgress>(value =>
+            {
+                DuplicateProgressBar.IsIndeterminate = value.IsIndeterminate;
+                DuplicateProgressText.Text = value.IsIndeterminate
+                    ? $"{value.Phase} · {value.ProcessedFiles} fichier(s) trouvé(s)"
+                    : $"{value.Phase} · {value.ProcessedFiles}/{value.TotalFiles}";
+                if (!value.IsIndeterminate)
+                {
+                    var percent = value.TotalFiles == 0 ? 100 : value.ProcessedFiles * 100d / value.TotalFiles;
+                    DuplicateProgressBar.Value = percent;
+                    DuplicateProgressPercent.Text = $"{percent:0}%";
+                }
+            });
+            var result = await _duplicateFileService.ScanAsync(folder, progress, _duplicateScanCancellation.Token);
+            _duplicateResults = result.Files;
+            _duplicateScanRoot = folder;
+            DuplicateFilesList.ItemsSource = result.Files;
+            AutoSelectDuplicateFiles.IsEnabled = result.Files.Count > 0;
+            DeleteSelectedDuplicateFiles.IsEnabled = result.Files.Count > 0;
+            DuplicateProgressBar.IsIndeterminate = false;
+            DuplicateProgressBar.Value = 100;
+            DuplicateProgressText.Text = "Analyse terminée";
+            DuplicateProgressPercent.Text = "100%";
+            DuplicateFilesStatus.Text = result.Files.Count == 0
+                ? "Aucun fichier en double trouvé."
+                : $"{result.GroupCount} groupe(s) · {result.Files.Count} fichiers · jusqu’à {TemporaryFileCleanupService.FormatSize(result.RecoverableBytes)} récupérables après validation" +
+                  (result.SkippedFiles > 0 ? $" · {result.SkippedFiles} fichier(s) inaccessible(s) ignoré(s)." : ".");
+            AppLog.Write($"DOUBLONS | Dossier={folder}; Groupes={result.GroupCount}; Fichiers={result.Files.Count}; Ignorés={result.SkippedFiles}");
+        }
+        catch (OperationCanceledException)
+        {
+            DuplicateProgressPanel.Visibility = Visibility.Collapsed;
+            DuplicateFilesStatus.Text = "Analyse annulée. Aucun fichier n’a été modifié.";
+            AppLog.Write($"Analyse des doublons annulée : {folder}");
+        }
+        catch (Exception ex)
+        {
+            DuplicateFilesStatus.Text = $"Analyse impossible : {ex.Message}";
+            AppLog.Write($"Analyse des doublons impossible : {ex.Message}");
+        }
+        finally
+        {
+            _duplicateScanRunning = false;
+            CancelDuplicateScan.IsEnabled = false;
+            ChooseDuplicateFolder.IsEnabled = true;
+            ScanDuplicateFiles.IsEnabled = Directory.Exists(folder);
+            _duplicateScanCancellation?.Dispose();
+            _duplicateScanCancellation = null;
+        }
+    }
+
+    private void DuplicateFilesList_OnMouseDoubleClick(object sender, MouseButtonEventArgs e) =>
+        OpenSelectedDuplicateLocation();
+
+    private void OpenSelectedDuplicateLocation()
+    {
+        if (DuplicateFilesList.SelectedItem is not DuplicateFileCandidate candidate) return;
+        if (!File.Exists(candidate.Path))
+        {
+            DuplicateFilesStatus.Text = "Ce fichier n’existe plus à cet emplacement.";
+            return;
+        }
+        try
+        {
+            var startInfo = new ProcessStartInfo("explorer.exe") { UseShellExecute = true };
+            startInfo.ArgumentList.Add("/select,");
+            startInfo.ArgumentList.Add(candidate.Path);
+            Process.Start(startInfo);
+            DuplicateFilesStatus.Text = $"Emplacement ouvert : {candidate.Name}";
+        }
+        catch (Exception ex)
+        {
+            DuplicateFilesStatus.Text = $"Impossible d’ouvrir l’emplacement : {ex.Message}";
+        }
+    }
+
+    private void AutoSelectDuplicateFilesNow()
+    {
+        foreach (var group in _duplicateResults.GroupBy(file => file.GroupNumber))
+        {
+            var keep = group.OrderBy(file => file.LastWriteTime).ThenBy(file => file.Path.Length).First();
+            foreach (var file in group) file.IsSelected = file != keep;
+        }
+        var selected = _duplicateResults.Count(file => file.IsSelected);
+        DuplicateFilesStatus.Text = $"{selected} doublon(s) sélectionné(s). Le fichier le plus ancien de chaque groupe est conservé.";
+    }
+
+    private async Task DeleteSelectedDuplicateFilesAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_duplicateScanRoot)) return;
+        var selected = _duplicateResults.Where(file => file.IsSelected).ToArray();
+        if (selected.Length == 0)
+        {
+            DuplicateFilesStatus.Text = "Cochez au moins un fichier à supprimer.";
+            return;
+        }
+        var unsafeGroup = _duplicateResults.GroupBy(file => file.GroupNumber)
+            .FirstOrDefault(group => group.All(file => file.IsSelected));
+        if (unsafeGroup is not null)
+        {
+            DuplicateFilesStatus.Text = $"Sélection refusée : conservez au moins un fichier dans le groupe {unsafeGroup.Key}.";
+            return;
+        }
+        var total = selected.Sum(file => file.SizeBytes);
+        var confirmation = System.Windows.MessageBox.Show(this,
+            $"Déplacer {selected.Length} fichier(s) en double ({TemporaryFileCleanupService.FormatSize(total)}) vers la Corbeille ?\n\nUn exemplaire non coché sera conservé dans chaque groupe.",
+            "Confirmer la suppression des doublons", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+        if (confirmation != MessageBoxResult.Yes) return;
+
+        DeleteSelectedDuplicateFiles.IsEnabled = false;
+        AutoSelectDuplicateFiles.IsEnabled = false;
+        DuplicateFilesStatus.Text = "Déplacement vers la Corbeille en cours…";
+        var result = await Task.Run(() => _duplicateFileService.MoveToRecycleBin(selected, _duplicateScanRoot));
+        var deletedPaths = selected.Where(file => !File.Exists(file.Path)).Select(file => file.Path)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        _duplicateResults = _duplicateResults.Where(file => !deletedPaths.Contains(file.Path)).ToArray();
+        DuplicateFilesList.ItemsSource = _duplicateResults;
+        AutoSelectDuplicateFiles.IsEnabled = _duplicateResults.Count > 1;
+        DeleteSelectedDuplicateFiles.IsEnabled = _duplicateResults.Count > 1;
+        DuplicateFilesStatus.Text = $"{result.DeletedFiles} fichier(s) déplacé(s) vers la Corbeille · {TemporaryFileCleanupService.FormatSize(result.RecoveredBytes)}" +
+            (result.FailedFiles > 0 ? $" · {result.FailedFiles} échec(s)." : ".");
+        AppLog.Write($"DOUBLONS SUPPRESSION | Corbeille={result.DeletedFiles}; Taille={result.RecoveredBytes}; Échecs={result.FailedFiles}");
+    }
+
     private async Task ScanTemporaryFilesAsync()
     {
         ScanTemporaryFiles.IsEnabled = false;
@@ -2234,6 +2973,58 @@ public partial class MainWindow : Window
             AppLog.Write($"Analyse des fichiers temporaires impossible : {ex.Message}");
         }
         finally { ScanTemporaryFiles.IsEnabled = true; }
+    }
+
+    private async Task SaveAutomaticTemporaryCleanupAsync()
+    {
+        var enable = AutomaticTemporaryCleanupEnabled.IsChecked == true;
+        if (enable && !_settings.AutomaticTemporaryCleanupEnabled)
+        {
+            var confirmation = System.Windows.MessageBox.Show(this,
+                "Activer le nettoyage automatique quotidien ?\n\nFlexHub supprimera sans nouvelle confirmation les fichiers du dossier temporaire Windows inutilisés depuis plus de 3 jours. Les fichiers verrouillés seront ignorés et les caches d’applications ne seront pas concernés.",
+                "Activer le nettoyage automatique", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+            if (confirmation != MessageBoxResult.Yes)
+            {
+                AutomaticTemporaryCleanupEnabled.IsChecked = false;
+                return;
+            }
+        }
+        _settings.AutomaticTemporaryCleanupEnabled = enable;
+        if (_settings.AutomaticTemporaryCleanupEnabled)
+            _settings.LastAutomaticTemporaryCleanupUtc = null;
+        _settingsService.Save(_settings);
+        CleanupStatus.Text = _settings.AutomaticTemporaryCleanupEnabled
+            ? "Nettoyage automatique activé. Premier contrôle en cours…"
+            : "Nettoyage automatique désactivé.";
+        if (_settings.AutomaticTemporaryCleanupEnabled)
+            await RunAutomaticTemporaryCleanupAsync(true);
+    }
+
+    private async Task RunAutomaticTemporaryCleanupAsync(bool force = false)
+    {
+        if (!_settings.TemporaryCleanupModuleEnabled || !_settings.AutomaticTemporaryCleanupEnabled || _automaticTemporaryCleanupRunning) return;
+        if (!force && _settings.LastAutomaticTemporaryCleanupUtc.HasValue &&
+            DateTime.UtcNow - _settings.LastAutomaticTemporaryCleanupUtc.Value < TimeSpan.FromDays(1)) return;
+
+        _automaticTemporaryCleanupRunning = true;
+        try
+        {
+            var scan = await _temporaryFileCleanupService.ScanWindowsTemporaryAsync(TimeSpan.FromDays(3));
+            var result = await Task.Run(() => _temporaryFileCleanupService.Delete(scan.Files));
+            _settings.LastAutomaticTemporaryCleanupUtc = DateTime.UtcNow;
+            _settingsService.Save(_settings);
+            AppLog.Write($"NETTOYAGE AUTOMATIQUE | Trouvés={scan.Files.Count}; Supprimés={result.DeletedFiles}; Récupéré={result.RecoveredBytes}; Échecs={result.FailedFiles}");
+            CleanupStatus.Text = result.DeletedFiles == 0
+                ? "Nettoyage automatique : aucun fichier de plus de 3 jours à supprimer."
+                : $"Nettoyage automatique : {result.DeletedFiles} fichier(s), {TemporaryFileCleanupService.FormatSize(result.RecoveredBytes)} récupérés" +
+                  (result.FailedFiles > 0 ? $" · {result.FailedFiles} ignoré(s)." : ".");
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write($"Nettoyage automatique impossible : {ex.Message}");
+            CleanupStatus.Text = $"Nettoyage automatique impossible : {ex.Message}";
+        }
+        finally { _automaticTemporaryCleanupRunning = false; }
     }
 
     private async Task DeleteSelectedTemporaryFilesAsync()

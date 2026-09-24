@@ -1,6 +1,6 @@
 ﻿# 🚀 FlexHub — Suivi du développement
 
-*Dernière mise à jour : 23 septembre 2026*
+*Dernière mise à jour : 24 septembre 2026*
 
 
 ## Légende
@@ -82,7 +82,8 @@ pas le temps nécessaire.
 
 ### ✅ Azerty > Qwerty automatique — Terminé
 - Passage temporaire en AZERTY dans les zones de saisie Windows.
-- Raccourci spécial pour les chats en jeu et restauration de la disposition précédente.
+- Mémorisation de la fenêtre QWERTY du jeu : AZERTY hors jeu, QWERTY au retour dans le jeu.
+- Fin du mode chat par le raccourci, Échap, un clic ou un changement de fenêtre.
 
 
 ### ✅ Mise à jour automatique de FlexHub — Terminé
@@ -94,6 +95,7 @@ pas le temps nécessaire.
 ### ✅ Paramètres généraux et sécurité — Terminé
 - Démarrage avec Windows, thèmes clair/sombre et tailles de police.
 - Menu latéral organisé avec une catégorie repliable dédiée aux outils de texte.
+- Tous les modules disposent d'un interrupteur et les modules désactivés sont regroupés séparément avec des compteurs par catégorie.
 - Clés API enregistrées localement et chiffrées pour le compte Windows.
 - Consentement explicite avant l'utilisation des services d'IA en ligne.
 - Liens vers les clés API et affichage de certains quotas.
@@ -102,6 +104,7 @@ pas le temps nécessaire.
 ### ✅ Diagnostic et journalisation de FlexHub — Terminé
 - Journal global avec rotation, erreurs, opérations et consommation mémoire du Hub.
 - Notes de version intégrées et effacement des données personnelles.
+- Les alertes automatiques monitoring et XMP utilisent le mode Windows sans activation et ne volent pas le focus.
 
 ### ✅ Reformulation du texte sélectionné — Terminé
 - Action dédiée dans la roue avec Gemini ou OpenAI.
@@ -144,12 +147,15 @@ pas le temps nécessaire.
 ## 2. FONCTIONS PARTIELLEMENT RÉALISÉES OU À ÉTENDRE
 
 
-### 🟡 Nettoyage des fichiers temporaires — 70 %
+### ✅ Nettoyage des fichiers temporaires — Terminé
 - Analyse en lecture seule du dossier temporaire de l’utilisateur.
 - Seuls les fichiers inutilisés depuis plus de 24 heures sont proposés.
 - Aperçu du nom, de la taille, de la date et de l’emplacement avant suppression.
 - Sélection explicite, confirmation obligatoire et contrôle du chemin avant suppression.
-- Reste à ajouter des règles dédiées aux caches des navigateurs et applications.
+- Règles dédiées aux caches anciens de Chrome, Edge, Firefox, Discord, Steam et Visual Studio.
+- La source de chaque fichier est affichée et chaque suppression est limitée à la racine autorisée analysée.
+- Les fichiers temporaires marqués en lecture seule peuvent être supprimés après validation ; leur attribut est restauré si la suppression échoue.
+- Option désactivable de nettoyage quotidien automatique des fichiers du dossier temporaire Windows âgés de plus de 3 jours ; les caches d'applications restent manuels.
 
 
 ### ✅ Santé et espace des disques — Terminé
@@ -169,8 +175,8 @@ pas le temps nécessaire.
 - Activation et désactivation confirmées par l’utilisateur et réversibles depuis la même page.
 
 
-### 🟡 Tableau de monitoring CPU/RAM/GPU — 95 %
-- Affichage en temps réel du CPU, de sa température, de la RAM, du GPU NVIDIA,
+### ✅ Tableau de monitoring CPU/RAM/GPU — Terminé
+- Affichage en temps réel du CPU, de la RAM, du GPU NVIDIA,
   de la VRAM et de la température GPU.
 - Historique graphique des 60 dernières mesures avec actualisation automatique.
 - Échelle de 0 à 100 %, lignes de repère et détail CPU/RAM/GPU de chaque mesure au survol.
@@ -180,14 +186,13 @@ pas le temps nécessaire.
   et bouton permettant de tester immédiatement les notifications.
 - Fenêtre d’alerte dédiée reprenant le style du module XMP, avec accès direct au monitoring,
   sans notification Windows superposée.
-- Prise en charge des capteurs GPU NVIDIA et AMD compatibles.
-- Reste à prendre en charge les GPU Intel lorsqu’une source de capteurs fiable sera disponible.
+- Prise en charge des capteurs GPU NVIDIA, AMD et Intel compatibles exposés par LibreHardwareMonitor.
 
 
-### 🟡 Notification de consommation anormale CPU/RAM — 75 %
+### ✅ Notification de consommation anormale CPU/RAM — Terminé
 - Le monitoring surveille l’utilisation globale du CPU et de la RAM avec des seuils configurables.
 - Les alertes exigent trois mesures consécutives et respectent un délai de 15 minutes.
-- Reste à identifier les processus responsables d’une consommation anormale.
+- Les processus consommant le plus de CPU et de RAM sont affichés et ajoutés aux alertes.
 
 
 ### 🟡 Mise à jour automatique des applications — 25 %
@@ -195,9 +200,10 @@ pas le temps nécessaire.
 - Reste à gérer une liste d'applications tierces, leurs sources et les installations nocturnes.
 
 
-### 🟡 Comparaison avant/après un réglage NVIDIA — 20 %
+### 🟡 Comparaison avant/après un réglage NVIDIA — 70 %
 - L'application sait appliquer, sauvegarder et restaurer un profil NVIDIA.
-- Reste à enregistrer les performances des sessions et à calculer la comparaison.
+- Les sessions enregistrent le profil NVIDIA actif et comparent leurs mesures à une session de référence du même jeu.
+- Reste à intégrer les FPS lorsqu'une source compatible sera disponible.
 
 
 ### 🟡 Rapport et analyse des erreurs — 15 %
@@ -213,9 +219,9 @@ pas le temps nécessaire.
 - [x] **Afficher l'espace disque et la santé S.M.A.R.T. des SSD.**
 - [x] **Auditer les programmes lancés au démarrage et proposer leur désactivation.**
 - [ ] **Détecter les logiciels inutilisés depuis une durée configurable.**
-- [ ] **Scanner les fichiers en double par hash avec validation avant suppression.**
+- [x] **Scanner les fichiers en double par hash avec validation avant suppression.** *(Analyse SHA-256, sélection manuelle ou automatique, conservation obligatoire d'un exemplaire et déplacement récupérable vers la Corbeille.)*
 - [ ] **Vérifier les pilotes GPU, audio et chipset sur les sites fabricants.**
-- [ ] **Nettoyer précisément les caches de navigateurs, Steam, Visual Studio, etc.**
+- [x] **Nettoyer précisément les caches de navigateurs, Steam, Visual Studio, etc.**
 - [ ] **Organiser automatiquement le dossier Téléchargements selon des règles.**
 - [ ] **Renommer des fichiers en masse selon leur contexte (EXIF, lieu, date, etc.).**
 
@@ -223,13 +229,19 @@ pas le temps nécessaire.
 
 ## 4. RESTE À FAIRE - MONITORING ET RÉSEAU
 
+### 🟡 Diagnostic réseau avancé — En cours
+- Qualité locale, Internet et jeu, détection des anomalies et diagnostic automatique.
+- Le diagnostic sépare les incidents locaux, l'accès Internet et les serveurs distants, et signale lorsque les cibles nécessaires manquent.
+- Historique de session et analyse ponctuelle par application avec élévation à finaliser.
+
 - [x] **Afficher RAM et VRAM avec un mini-graphe historique.**
-- [x] **Afficher les températures CPU/GPU en temps réel.**
-- [x] **Alerter lorsque CPU/GPU dépasse un seuil de température configurable.**
-- [ ] **Tester le ping vers la box, Discord, Steam ou des serveurs personnalisés.**
-- [ ] **Mesurer en continu ping, jitter et perte de paquets vers les serveurs de jeu.**
-- [ ] **Alerter lorsque le jitter dépasse un seuil avant une partie classée.**
-- [ ] **Distinguer une panne locale (Wi-Fi/LAN) d'un problème extérieur.**
+- [x] **Afficher la température GPU en temps réel.** *(Température CPU retirée : capteur non fiable sur le Ryzen 7 9800X3D.)*
+- [x] **Alerter lorsque le GPU dépasse un seuil de température configurable.**
+- [x] **Tester le ping vers la box, Discord, Steam ou des serveurs personnalisés.**
+- [x] **Mesurer en continu ping, jitter et perte de paquets vers les serveurs de jeu.**
+- [x] **Détecter les connexions TCP des jeux actifs et ajouter automatiquement leurs serveurs mesurables.**
+- [x] **Alerter lorsque le jitter dépasse un seuil avant une partie classée.**
+- [x] **Distinguer une panne locale (Wi-Fi/LAN) d'un problème extérieur.**
 - [ ] **Simuler une charge CPU/GPU avec graphe de température en direct.**
 
 
@@ -237,9 +249,13 @@ pas le temps nécessaire.
 ## 5. RESTE À FAIRE - JEUX ET PERFORMANCES
 
 - [ ] **Estimer les FPS en arrière-plan sans overlay.**
-- [ ] **Détecter le jeu lancé, chronométrer la session et alerter après X heures.**
-- [ ] **Générer un rapport de session : durée, températures, FPS et chutes de FPS.**
-- [ ] **Conserver l'historique des sessions et afficher des graphes par jeu/semaine.**
+- [x] **Détecter le jeu lancé, chronométrer la session et alerter après X heures.**
+- Le suivi des sessions reste actif en arrière-plan toutes les 15 secondes, quelle que soit la page affichée.
+- [~] **Générer un rapport de session : durée, températures, FPS et chutes de FPS.** *(Durée, pics CPU/RAM/GPU, moyenne GPU et pic de température GPU disponibles. PresentMon/FrameView ne fournit aucune trame pour le jeu testé ; FPS à finaliser avec une source compatible.)*
+- [x] **Conserver l'historique des sessions et afficher des graphes par jeu/semaine.** *(Historique local sans limite et graphique comparatif filtrable sur 7 jours, 30 jours, l'année ou toute la période.)*
+- Export CSV complet des sessions et de leurs mesures CPU/RAM/GPU.
+- Une session terminée peut être définie comme référence par jeu ; les sessions suivantes affichent leurs écarts CPU, RAM, GPU et température GPU.
+- Le profil NVIDIA actif au démarrage est conservé avec chaque session afin d'identifier clairement les comparaisons avant/après.
 - [ ] **Passer automatiquement le processus d'un jeu en priorité CPU haute.**
 - [ ] **Isoler des cœurs CPU pour le jeu et déplacer les autres processus.**
 - [ ] **Calculer l'eDPI et comparer la sensibilité aux joueurs professionnels.**

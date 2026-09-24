@@ -34,6 +34,10 @@ Check(defaults.MonitoringAlertsEnabled && defaults.MonitoringCpuAlertPercent == 
       defaults.MonitoringRamAlertPercent == 90 && defaults.MonitoringGpuTemperatureAlertC == 85,
     "seuils de monitoring prudents par défaut");
 Check(defaults.MonitoringCpuTemperatureAlertC == 90, "seuil de température CPU prudent par défaut");
+Check(defaults.GameSessionAlertHours == 2, "alerte de session de jeu après 2 heures par défaut");
+Check(defaults.GameSessionAlertEnabled, "alerte de session de jeu activée par défaut");
+Check(defaults.NetworkJitterAlertEnabled && defaults.NetworkJitterAlertMs == 30,
+    "alerte jitter activée à 30 ms par défaut");
 Check(Math.Abs(SystemMonitoringService.Percentage(25, 100) - 25) < 0.01, "calcul de pourcentage monitoring");
 Check(MainWindow.TryReadThreshold("85", 50, 100, out var threshold) && threshold == 85 &&
       !MainWindow.TryReadThreshold("120", 50, 100, out _), "validation des seuils monitoring");

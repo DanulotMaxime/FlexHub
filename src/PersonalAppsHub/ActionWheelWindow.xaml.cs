@@ -100,8 +100,8 @@ public partial class ActionWheelWindow : Window
         for (var index = 0; index < actionElements.Length; index++)
         {
             var angle = -Math.PI / 2 + index * 2 * Math.PI / actionElements.Length;
-            var centerX = AnchorX + 335 * Math.Cos(angle);
-            var centerY = AnchorY + 285 * Math.Sin(angle);
+            var centerX = AnchorX + 285 * Math.Cos(angle);
+            var centerY = AnchorY + 235 * Math.Sin(angle);
             System.Windows.Controls.Canvas.SetLeft(actionElements[index], centerX - actionElements[index].Width / 2);
             System.Windows.Controls.Canvas.SetTop(actionElements[index], centerY - actionElements[index].Height / 2);
         }

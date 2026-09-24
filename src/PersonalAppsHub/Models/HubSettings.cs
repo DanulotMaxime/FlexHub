@@ -2,7 +2,7 @@ namespace PersonalAppsHub.Models;
 
 public sealed class HubSettings
 {
-    public int SettingsSchemaVersion { get; set; } = 6;
+    public int SettingsSchemaVersion { get; set; } = 15;
     public bool StartWithWindows { get; set; } = true;
     public string FontSizePreference { get; set; } = "Moyen";
     public string ThemePreference { get; set; } = "Sombre";
@@ -61,7 +61,21 @@ public sealed class HubSettings
     public int MonitoringRamAlertPercent { get; set; } = 90;
     public int MonitoringGpuTemperatureAlertC { get; set; } = 85;
     public int MonitoringCpuTemperatureAlertC { get; set; } = 90;
+    public string NetworkMonitoringTargets { get; set; } = "passerelle;Internet=1.1.1.1;Discord=discord.com;Steam=store.steampowered.com;jeu";
+    public int GameSessionAlertHours { get; set; } = 2;
+    public bool GameSessionAlertEnabled { get; set; } = true;
+    public bool NetworkJitterAlertEnabled { get; set; } = true;
+    public int NetworkJitterAlertMs { get; set; } = 30;
     public DateTime? LastNvidiaOptimizationUtc { get; set; }
+    public string ActiveNvidiaProfileName { get; set; } = "Non identifié";
+    public bool AutomaticTemporaryCleanupEnabled { get; set; }
+    public DateTime? LastAutomaticTemporaryCleanupUtc { get; set; }
+    public bool GameSessionsModuleEnabled { get; set; } = true;
+    public bool NetworkMonitoringModuleEnabled { get; set; } = true;
+    public bool TemporaryCleanupModuleEnabled { get; set; } = true;
+    public bool DuplicateFilesModuleEnabled { get; set; } = true;
+    public bool StorageHealthModuleEnabled { get; set; } = true;
+    public bool StartupAuditModuleEnabled { get; set; } = true;
     public bool XmpMonitorEnabled { get; set; }
     public int XmpCheckIntervalMinutes { get; set; } = 360;
     public bool MemorySetupCompleted { get; set; }
