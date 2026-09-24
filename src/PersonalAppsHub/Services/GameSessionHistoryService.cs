@@ -21,6 +21,7 @@ public sealed class GameSessionReport
     public string NvidiaProfileName { get; set; } = "Non identifié";
     [JsonIgnore] public bool CanSetReference => !IsActive;
     [JsonIgnore] public string ReferenceButtonText => IsReference ? "Référence active" : "Choisir référence";
+    [JsonIgnore] public string ReferenceStarText => IsReference ? "★" : "☆";
     [JsonIgnore] public string ComparisonText { get; set; } = "";
     [JsonIgnore] public string NvidiaProfileText => $"Profil NVIDIA : {NvidiaProfileName}";
     public string DateText => StartedAt.ToString("dd/MM/yyyy");
@@ -34,6 +35,10 @@ public sealed class GameSessionReport
         }
     }
     public string PeakGpuTemperatureText => PeakGpuTemperatureC.HasValue ? $"{PeakGpuTemperatureC:0} °C" : "—";
+    public string CpuPeakText => PeakCpuUsagePercent.HasValue ? $"{PeakCpuUsagePercent:0}%" : "—";
+    public string RamPeakText => PeakRamUsagePercent.HasValue ? $"{PeakRamUsagePercent:0}%" : "—";
+    public string GpuAverageText => GpuUsageSampleCount > 0 ? $"{GpuUsageTotal / GpuUsageSampleCount:0}%" : "—";
+    public string GpuUsagePeakText => PeakGpuUsagePercent.HasValue ? $"{PeakGpuUsagePercent:0}%" : "—";
     public string GpuPeakText => PeakGpuUsagePercent.HasValue || PeakGpuTemperatureC.HasValue
         ? $"{(PeakGpuUsagePercent.HasValue ? $"{PeakGpuUsagePercent:0}%" : "—")} / {(PeakGpuTemperatureC.HasValue ? $"{PeakGpuTemperatureC:0} °C" : "—")}" : "—";
     public string PerformanceText

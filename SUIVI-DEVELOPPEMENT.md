@@ -229,10 +229,12 @@ pas le temps nécessaire.
 
 ## 4. RESTE À FAIRE - MONITORING ET RÉSEAU
 
-### 🟡 Diagnostic réseau avancé — En cours
+### ✅ Diagnostic réseau avancé — Terminé
 - Qualité locale, Internet et jeu, détection des anomalies et diagnostic automatique.
 - Le diagnostic sépare les incidents locaux, l'accès Internet et les serveurs distants, et signale lorsque les cibles nécessaires manquent.
-- Historique de session et analyse ponctuelle par application avec élévation à finaliser.
+- Historique persistant des 60 dernières mesures, conservé localement pendant 7 jours et effaçable depuis l’interface.
+- Analyse ponctuelle des applications ayant du trafic actif, avec mesure de leurs destinations TCP publiques.
+- L’inventaire natif Windows fournit les PID sans élévation administrateur ; le trafic UDP non mesurable est clairement signalé.
 
 - [x] **Afficher RAM et VRAM avec un mini-graphe historique.**
 - [x] **Afficher la température GPU en temps réel.** *(Température CPU retirée : capteur non fiable sur le Ryzen 7 9800X3D.)*
@@ -242,21 +244,21 @@ pas le temps nécessaire.
 - [x] **Détecter les connexions TCP des jeux actifs et ajouter automatiquement leurs serveurs mesurables.**
 - [x] **Alerter lorsque le jitter dépasse un seuil avant une partie classée.**
 - [x] **Distinguer une panne locale (Wi-Fi/LAN) d'un problème extérieur.**
-- [ ] **Simuler une charge CPU/GPU avec graphe de température en direct.**
+- [x] **Simuler une charge CPU/GPU avec suivi de température en direct.** *(Tests CPU, GPU ou combiné séparés ; quatre niveaux de 50 à 100 %, véritable charge Direct3D 11 hors écran en 1440p/4K, historique et analyse, arrêt manuel et coupure automatique du GPU à 90 °C.)*
 
 
 
 ## 5. RESTE À FAIRE - JEUX ET PERFORMANCES
 
 - [ ] **Estimer les FPS en arrière-plan sans overlay.**
-- [x] **Détecter le jeu lancé, chronométrer la session et alerter après X heures.**
+- [x] **Détecter le jeu lancé, chronométrer la session et alerter après X heures.** *(Alerte de pause disponible mais désactivée par défaut.)*
 - Le suivi des sessions reste actif en arrière-plan toutes les 15 secondes, quelle que soit la page affichée.
 - [~] **Générer un rapport de session : durée, températures, FPS et chutes de FPS.** *(Durée, pics CPU/RAM/GPU, moyenne GPU et pic de température GPU disponibles. PresentMon/FrameView ne fournit aucune trame pour le jeu testé ; FPS à finaliser avec une source compatible.)*
 - [x] **Conserver l'historique des sessions et afficher des graphes par jeu/semaine.** *(Historique local sans limite et graphique comparatif filtrable sur 7 jours, 30 jours, l'année ou toute la période.)*
 - Export CSV complet des sessions et de leurs mesures CPU/RAM/GPU.
 - Une session terminée peut être définie comme référence par jeu ; les sessions suivantes affichent leurs écarts CPU, RAM, GPU et température GPU.
 - Le profil NVIDIA actif au démarrage est conservé avec chaque session afin d'identifier clairement les comparaisons avant/après.
-- [ ] **Passer automatiquement le processus d'un jeu en priorité CPU haute.**
+- [x] **Passer automatiquement le processus d'un jeu en priorité CPU haute.** *(Option désactivée par défaut, confirmation avec aperçu des jeux concernés, priorité Temps réel interdite et restauration automatique de la priorité d’origine.)*
 - [ ] **Isoler des cœurs CPU pour le jeu et déplacer les autres processus.**
 - [ ] **Calculer l'eDPI et comparer la sensibilité aux joueurs professionnels.**
 - [ ] **Convertir la sensibilité entre Valorant, CS2, Apex, etc., avec leur FOV.**

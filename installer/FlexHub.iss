@@ -1,7 +1,7 @@
 #define AppName "FlexHub"
 #define AppExeName "FlexHub.exe"
 #ifndef AppVersion
-  #define AppVersion "1.0.0"
+  #define AppVersion "1.4.0"
 #endif
 #ifndef SourceDir
   #define SourceDir "..\publish\installer\win-x64"

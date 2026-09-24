@@ -52,7 +52,11 @@ public sealed class SettingsService
                 settings.StorageHealthModuleEnabled = true;
                 settings.StartupAuditModuleEnabled = true;
             }
-            settings.SettingsSchemaVersion = 15;
+            if (settings.SettingsSchemaVersion < 16)
+                settings.AutomaticGameHighPriorityEnabled = false;
+            if (settings.SettingsSchemaVersion < 17)
+                settings.GameSessionAlertEnabled = false;
+            settings.SettingsSchemaVersion = 17;
             return settings;
         }
         catch
@@ -69,7 +73,7 @@ public sealed class SettingsService
     public void Save(HubSettings settings)
     {
         Directory.CreateDirectory(_folder);
-        settings.SettingsSchemaVersion = 15;
+        settings.SettingsSchemaVersion = 17;
         var temporaryPath = SettingsPath + ".tmp";
         File.WriteAllText(temporaryPath, JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));
         File.Move(temporaryPath, SettingsPath, overwrite: true);

@@ -9,6 +9,45 @@ namespace PersonalAppsHub.Services;
 
 public sealed class NetworkMonitoringService
 {
+    public IReadOnlyList<NetworkApplication> GetActiveApplications()
+    {
+        var connections = ReadOwnedTcpConnections().ToArray();
+        var udpProcessIds = ReadOwnedUdpProcessIds().ToHashSet();
+        return connections.Select(connection => connection.ProcessId)
+            .Concat(udpProcessIds)
+            .Distinct()
+            .Select(CreateNetworkApplication)
+            .Where(application => application is not null)
+            .Select(application => application!)
+            .OrderBy(application => application.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+            .ToArray();
+    }
+
+    public async Task<IReadOnlyList<NetworkTargetMetrics>> MeasureApplicationAsync(
+        uint processId, int sampleCount = 4, int timeoutMs = 650)
+    {
+        var application = CreateNetworkApplication(processId)
+            ?? throw new InvalidOperationException("L’application sélectionnée n’est plus active.");
+        var addresses = ReadOwnedTcpConnections()
+            .Where(connection => connection.ProcessId == processId && connection.State == 5 &&
+                                 IsPublicAddress(connection.RemoteAddress))
+            .Select(connection => connection.RemoteAddress)
+            .Distinct()
+            .Take(8)
+            .ToArray();
+        if (addresses.Length == 0)
+        {
+            var hasUdp = ReadOwnedUdpProcessIds().Contains(processId);
+            return hasUdp
+                ? [NetworkTargetMetrics.UdpApplicationDetected(application.DisplayName)]
+                : [];
+        }
+
+        return await Task.WhenAll(addresses.Select((address, index) =>
+            MeasureTargetAsync(($"{application.DisplayName} · serveur {index + 1}", address.ToString()),
+                sampleCount, timeoutMs))).ConfigureAwait(false);
+    }
+
     public async Task<IReadOnlyList<NetworkTargetMetrics>> MeasureAsync(
         IEnumerable<string> configuredTargets, int sampleCount = 4, int timeoutMs = 650)
     {
@@ -197,6 +236,22 @@ public sealed class NetworkMonitoringService
         "msedge" or "chrome" or "firefox" or "notepad" or "nvidia overlay" or "opacitywnd" or
         "razerappengine" or "steam" or "steamwebhelper" or "systemsettings" or "textinputhost";
 
+    private static NetworkApplication? CreateNetworkApplication(uint processId)
+    {
+        try
+        {
+            using var process = Process.GetProcessById((int)processId);
+            if (processId == Environment.ProcessId || process.ProcessName.Equals("System", StringComparison.OrdinalIgnoreCase))
+                return null;
+            var title = process.MainWindowTitle.Trim();
+            return new NetworkApplication(processId, process.ProcessName,
+                title.Length == 0 ? process.ProcessName : title);
+        }
+        catch (ArgumentException) { return null; }
+        catch (InvalidOperationException) { return null; }
+        catch (System.ComponentModel.Win32Exception) { return null; }
+    }
+
     private static bool IsPublicAddress(IPAddress address)
     {
         if (IPAddress.IsLoopback(address) || address.Equals(IPAddress.Any)) return false;
@@ -299,4 +354,13 @@ public sealed record NetworkTargetMetrics(
     public static NetworkTargetMetrics UdpGameDetected(string gameName) => new(
         $"Jeu · {gameName}", "UDP", 0, 0, 0, 0, 0,
         "Trafic UDP détecté", "Jeu reconnu · serveur distant non exposé par Windows");
+
+    public static NetworkTargetMetrics UdpApplicationDetected(string applicationName) => new(
+        applicationName, "UDP", 0, 0, 0, 0, 0,
+        "Trafic UDP détecté", "Application active · serveur distant non exposé par Windows");
+}
+
+public sealed record NetworkApplication(uint ProcessId, string ProcessName, string DisplayName)
+{
+    public string SelectionText => $"{DisplayName} ({ProcessName}, PID {ProcessId})";
 }

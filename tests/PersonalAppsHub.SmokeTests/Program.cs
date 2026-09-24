@@ -35,10 +35,46 @@ Check(defaults.MonitoringAlertsEnabled && defaults.MonitoringCpuAlertPercent == 
     "seuils de monitoring prudents par défaut");
 Check(defaults.MonitoringCpuTemperatureAlertC == 90, "seuil de température CPU prudent par défaut");
 Check(defaults.GameSessionAlertHours == 2, "alerte de session de jeu après 2 heures par défaut");
-Check(defaults.GameSessionAlertEnabled, "alerte de session de jeu activée par défaut");
+Check(!defaults.GameSessionAlertEnabled, "alerte de session de jeu désactivée par défaut");
+Check(!defaults.AutomaticGameHighPriorityEnabled, "mode performance jeu désactivé par défaut");
 Check(defaults.NetworkJitterAlertEnabled && defaults.NetworkJitterAlertMs == 30,
     "alerte jitter activée à 30 ms par défaut");
+var networkHistoryPath = Path.Combine(Path.GetTempPath(), $"flexhub-network-history-{Guid.NewGuid():N}.json");
+try
+{
+    var networkHistory = new NetworkHistoryService(networkHistoryPath);
+    for (var index = 0; index < 65; index++)
+        networkHistory.Add(new NetworkHistorySample(DateTime.Now, "Test", index, index / 2d, 0));
+    var savedNetworkSamples = new NetworkHistoryService(networkHistoryPath).GetRecent();
+    Check(savedNetworkSamples.Count == 60 && savedNetworkSamples[0].PingMs == 5 && savedNetworkSamples[^1].PingMs == 64,
+        "historique réseau persistant limité aux 60 dernières mesures");
+}
+finally
+{
+    if (File.Exists(networkHistoryPath)) File.Delete(networkHistoryPath);
+}
+var stressHistoryPath = Path.Combine(Path.GetTempPath(), $"flexhub-stress-history-{Guid.NewGuid():N}.json");
+try
+{
+    var stressHistory = new StressTestHistoryService(stressHistoryPath);
+    for (var index = 0; index < 35; index++)
+        stressHistory.Add(new StressTestResult { StartedAt = DateTime.Now.AddMinutes(index), Level = "Moyen", DurationSeconds = 30, Analysis = "Stable." });
+    var savedStressTests = new StressTestHistoryService(stressHistoryPath).GetRecent(50);
+    Check(savedStressTests.Count == 30 && savedStressTests[0].Analysis == "Stable.",
+        "historique des tests de charge limité aux 30 derniers résultats");
+}
+finally
+{
+    if (File.Exists(stressHistoryPath)) File.Delete(stressHistoryPath);
+}
 Check(Math.Abs(SystemMonitoringService.Percentage(25, 100) - 25) < 0.01, "calcul de pourcentage monitoring");
+using (var direct3DLoad = new Direct3DGpuLoadService())
+{
+    direct3DLoad.Start(35);
+    await Task.Delay(300);
+    direct3DLoad.Stop();
+    Check(direct3DLoad.LastError is null, $"initialisation de la charge GPU Direct3D 11 ({direct3DLoad.LastError})");
+}
 Check(MainWindow.TryReadThreshold("85", 50, 100, out var threshold) && threshold == 85 &&
       !MainWindow.TryReadThreshold("120", 50, 100, out _), "validation des seuils monitoring");
 var temporaryRoot = Path.Combine(Path.GetTempPath(), "flexhub-test-root");

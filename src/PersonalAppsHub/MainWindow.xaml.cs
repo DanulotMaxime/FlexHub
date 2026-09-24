@@ -33,8 +33,10 @@ public partial class MainWindow : Window
     private readonly XmpMonitorService _xmpMonitorService = new();
     private readonly SystemMonitoringService _systemMonitoringService = new();
     private readonly NetworkMonitoringService _networkMonitoringService = new();
+    private readonly NetworkHistoryService _networkHistoryService = new();
     private readonly GameSessionService _gameSessionService = new();
     private readonly GameSessionHistoryService _gameSessionHistoryService = new();
+    private readonly GamePerformanceService _gamePerformanceService = new();
     private readonly TemporaryFileCleanupService _temporaryFileCleanupService = new();
     private readonly DuplicateFileService _duplicateFileService = new();
     private readonly StorageHealthService _storageHealthService = new();
@@ -101,6 +103,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         _settings = _settingsService.Load();
+        LoadNetworkHistory();
         ApplyAppearance();
         var logoPath = Path.Combine(AppContext.BaseDirectory, "Assets", "app-logo.png");
         _tray = new Forms.NotifyIcon { Text = "FlexHub", Visible = true };
@@ -141,7 +144,7 @@ public partial class MainWindow : Window
         AutomationToggle.Click += (_, _) => ToggleNavigationSection(AutomationPanel, AutomationChevron, ref _automationExpanded);
         MonitoringNav.Click += async (_, _) => { ShowPage("monitoring"); await RefreshMonitoringAsync(); };
         GameSessionsNav.Click += async (_, _) => { ShowPage("gameSessions"); await RefreshGameSessionsAsync(true); };
-        NetworkMonitoringNav.Click += async (_, _) => { ShowPage("networkMonitoring"); await RefreshNetworkMonitoringAsync(); };
+        NetworkMonitoringNav.Click += async (_, _) => { ShowPage("networkMonitoring"); RefreshNetworkApplications(); await RefreshNetworkMonitoringAsync(); };
         CleanupNav.Click += (_, _) => ShowPage("cleanup");
         DuplicateFilesNav.Click += (_, _) => ShowPage("duplicateFiles");
         StorageHealthNav.Click += async (_, _) => { ShowPage("storageHealth"); await RefreshStorageHealthAsync(); };
@@ -218,9 +221,14 @@ public partial class MainWindow : Window
         TestXmp.Click += async (_, _) => await CheckXmpAsync(true);
         RefreshMonitoring.Click += async (_, _) => await RefreshMonitoringAsync();
         ConfigureMonitoringAlerts.Click += (_, _) => OpenMonitoringAlertSettings();
+        OpenStressTest.Click += (_, _) => new StressTestWindow { Owner = this }.ShowDialog();
         RefreshNetworkMonitoring.Click += async (_, _) => await RefreshNetworkMonitoringAsync();
+        RefreshNetworkApplicationsButton.Click += (_, _) => RefreshNetworkApplications();
+        AnalyzeNetworkApplication.Click += async (_, _) => await AnalyzeNetworkApplicationAsync();
+        ClearNetworkHistory.Click += (_, _) => ClearNetworkHistoryNow();
         SaveNetworkTargets.Click += (_, _) => SaveNetworkMonitoringTargets();
         SaveGameSessionAlert.Click += (_, _) => SaveGameSessionAlertSettings();
+        SaveGamePerformanceMode.Click += (_, _) => SaveGamePerformanceModeSettings();
         GameSessionPeriodBox.SelectionChanged += (_, _) => RefreshGameSessionSummary();
         ClearGameSessionHistory.Click += (_, _) => ClearGameSessionHistory_OnClick();
         ExportGameSessionHistory.Click += (_, _) => ExportGameSessionHistory_OnClick();
@@ -425,6 +433,7 @@ public partial class MainWindow : Window
         NetworkTargetsBox.Text = _settings.NetworkMonitoringTargets;
         GameSessionAlertHoursBox.Text = _settings.GameSessionAlertHours.ToString();
         GameSessionAlertEnabled.IsChecked = _settings.GameSessionAlertEnabled;
+        AutomaticGameHighPriorityEnabled.IsChecked = _settings.AutomaticGameHighPriorityEnabled;
         NetworkJitterAlertEnabled.IsChecked = _settings.NetworkJitterAlertEnabled;
         NetworkJitterAlertMsBox.Text = _settings.NetworkJitterAlertMs.ToString();
         GameSessionsModuleEnabled.IsChecked = _settings.GameSessionsModuleEnabled;
@@ -2121,6 +2130,31 @@ public partial class MainWindow : Window
             : "Alerte de pause désactivée.";
     }
 
+    private void SaveGamePerformanceModeSettings()
+    {
+        var enable = AutomaticGameHighPriorityEnabled.IsChecked == true;
+        if (enable && !_settings.AutomaticGameHighPriorityEnabled)
+        {
+            var activeGames = _gameSessionService.DetectActiveSessions();
+            var preview = activeGames.Count == 0
+                ? "Aucun jeu n’est actif actuellement. Le mode s’appliquera au prochain jeu détecté."
+                : "Jeux concernés actuellement :\n• " + string.Join("\n• ", activeGames.Select(game => game.Name));
+            var confirmation = System.Windows.MessageBox.Show(this,
+                "FlexHub appliquera la priorité CPU Haute aux jeux détectés. La priorité Temps réel n’est jamais utilisée.\n\n" +
+                preview + "\n\nLa priorité d’origine sera restaurée à la désactivation ou à la fermeture de FlexHub.",
+                "Activer le mode performance", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (confirmation != MessageBoxResult.Yes)
+            {
+                AutomaticGameHighPriorityEnabled.IsChecked = false;
+                return;
+            }
+        }
+        _settings.AutomaticGameHighPriorityEnabled = enable;
+        _settingsService.Save(_settings);
+        var result = _gamePerformanceService.Update(_gameSessionService.DetectActiveSessions(), enable);
+        GamePerformanceStatus.Text = result.Message;
+    }
+
     private void SaveNetworkJitterAlertSettings()
     {
         if (!int.TryParse(NetworkJitterAlertMsBox.Text.Trim(), out var threshold) || threshold is < 5 or > 200)
@@ -2139,7 +2173,11 @@ public partial class MainWindow : Window
 
     private async Task RefreshGameSessionsAsync(bool force = false)
     {
-        if (!_settings.GameSessionsModuleEnabled) return;
+        if (!_settings.GameSessionsModuleEnabled)
+        {
+            _gamePerformanceService.Update([], false);
+            return;
+        }
         if (_gameSessionRefreshRunning || (!force && DateTime.UtcNow - _lastGameSessionRefreshUtc < TimeSpan.FromSeconds(15))) return;
         _gameSessionRefreshRunning = true;
         try
@@ -2148,6 +2186,8 @@ public partial class MainWindow : Window
             _lastGameSessionRefreshUtc = DateTime.UtcNow;
             ActiveGameSessionsList.ItemsSource = sessions;
             GameSessionHistoryList.ItemsSource = _gameSessionHistoryService.Update(sessions, _settings.ActiveNvidiaProfileName);
+            var performance = _gamePerformanceService.Update(sessions, _settings.AutomaticGameHighPriorityEnabled);
+            GamePerformanceStatus.Text = performance.Message;
             RefreshGameSessionSummary();
             ActiveGameSessionEmpty.Visibility = sessions.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             ActiveGameSessionSummary.Text = sessions.Count == 0
@@ -2355,6 +2395,54 @@ public partial class MainWindow : Window
         }
     }
 
+    private void RefreshNetworkApplications()
+    {
+        var previousProcessId = (NetworkApplicationBox.SelectedItem as NetworkApplication)?.ProcessId;
+        var applications = _networkMonitoringService.GetActiveApplications();
+        NetworkApplicationBox.ItemsSource = applications;
+        NetworkApplicationBox.SelectedItem = applications.FirstOrDefault(item => item.ProcessId == previousProcessId);
+        if (NetworkApplicationBox.SelectedItem is null && applications.Count > 0)
+            NetworkApplicationBox.SelectedIndex = 0;
+        AnalyzeNetworkApplication.IsEnabled = applications.Count > 0;
+        NetworkApplicationStatus.Text = applications.Count == 0
+            ? "Aucune application avec du trafic réseau actif."
+            : $"{applications.Count} application(s) détectée(s), sans élévation administrateur.";
+    }
+
+    private async Task AnalyzeNetworkApplicationAsync()
+    {
+        if (NetworkApplicationBox.SelectedItem is not NetworkApplication application) return;
+        AnalyzeNetworkApplication.IsEnabled = false;
+        NetworkApplicationStatus.Text = $"Analyse de {application.DisplayName}…";
+        try
+        {
+            var results = await _networkMonitoringService.MeasureApplicationAsync(application.ProcessId);
+            NetworkResultsList.ItemsSource = results;
+            NetworkApplicationStatus.Text = results.Count == 0
+                ? "Aucun serveur TCP public mesurable pour cette application. Réessayez pendant son utilisation."
+                : $"Analyse terminée à {DateTime.Now:HH:mm:ss} · {results.Count} serveur(s).";
+            var measurable = results.Where(result => result.StatusOverride is null).ToArray();
+            NetworkDiagnosticText.Text = results.Count == 0
+                ? "Diagnostic application : aucune destination publique mesurable pendant cet instantané."
+                : results.All(result => result.StatusOverride is not null)
+                    ? "Diagnostic application : trafic UDP détecté, mais Windows n’expose pas sa destination distante."
+                    : measurable.Any(result => result.SuccessfulSamples == 0 || result.PacketLossPercent > 0 ||
+                                               result.JitterMs > 30 || result.AveragePingMs > 120)
+                        ? "Diagnostic application : au moins une destination présente une latence, un jitter ou des pertes élevés."
+                        : "Diagnostic application : les destinations mesurables répondent normalement.";
+            RecordNetworkHistory(results);
+        }
+        catch (InvalidOperationException ex)
+        {
+            NetworkApplicationStatus.Text = ex.Message;
+            RefreshNetworkApplications();
+        }
+        finally
+        {
+            AnalyzeNetworkApplication.IsEnabled = NetworkApplicationBox.Items.Count > 0;
+        }
+    }
+
     private void UpdateNetworkDiagnosis(IReadOnlyList<NetworkTargetMetrics> results)
     {
         var gateway = results.FirstOrDefault(result => result.Name.StartsWith("Box /", StringComparison.OrdinalIgnoreCase));
@@ -2398,14 +2486,43 @@ public partial class MainWindow : Window
     private void RecordNetworkHistory(IReadOnlyList<NetworkTargetMetrics> results)
     {
         var source = results.FirstOrDefault(result => result.Name.StartsWith("Jeu ·", StringComparison.OrdinalIgnoreCase) && result.SuccessfulSamples > 0)
-            ?? results.FirstOrDefault(result => result.Name.Equals("Internet", StringComparison.OrdinalIgnoreCase) && result.SuccessfulSamples > 0);
+            ?? results.FirstOrDefault(result => result.Name.Equals("Internet", StringComparison.OrdinalIgnoreCase) && result.SuccessfulSamples > 0)
+            ?? results.FirstOrDefault(result => result.StatusOverride is null && result.SuccessfulSamples > 0);
         if (source is null) return;
         EnqueueNetworkValue(_networkPingHistory, Math.Min(200, source.AveragePingMs));
         EnqueueNetworkValue(_networkJitterHistory, Math.Min(200, source.JitterMs));
         EnqueueNetworkValue(_networkLossHistory, Math.Min(100, source.PacketLossPercent));
         _networkHistoryTimestamps.Enqueue(DateTime.Now);
         while (_networkHistoryTimestamps.Count > 60) _networkHistoryTimestamps.Dequeue();
+        _networkHistoryService.Add(new NetworkHistorySample(DateTime.Now, source.Name,
+            source.AveragePingMs, source.JitterMs, source.PacketLossPercent));
         DrawNetworkHistory();
+    }
+
+    private void LoadNetworkHistory()
+    {
+        foreach (var sample in _networkHistoryService.GetRecent())
+        {
+            _networkPingHistory.Enqueue(Math.Min(200, sample.PingMs));
+            _networkJitterHistory.Enqueue(Math.Min(200, sample.JitterMs));
+            _networkLossHistory.Enqueue(Math.Min(100, sample.PacketLossPercent));
+            _networkHistoryTimestamps.Enqueue(sample.RecordedAt);
+        }
+    }
+
+    private void ClearNetworkHistoryNow()
+    {
+        var confirmation = System.Windows.MessageBox.Show(this,
+            "Effacer les 60 dernières mesures réseau ?", "Effacer l’historique",
+            MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        if (confirmation != MessageBoxResult.Yes) return;
+        _networkHistoryService.Clear();
+        _networkPingHistory.Clear();
+        _networkJitterHistory.Clear();
+        _networkLossHistory.Clear();
+        _networkHistoryTimestamps.Clear();
+        DrawNetworkHistory();
+        NetworkMonitoringStatus.Text = "Historique réseau effacé.";
     }
 
     private static void EnqueueNetworkValue(Queue<double> queue, double value)
@@ -3174,7 +3291,7 @@ public partial class MainWindow : Window
         Focus();
     }
     private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e) { if (!_exit) { e.Cancel = true; Hide(); } }
-    private void ExitHub() { _exit = true; _systemMonitoringService.Dispose(); _gameChatKeyboardService.Dispose(); _keyboardLayoutMonitorService.Dispose(); _hotkeyService.Dispose(); _translatorHotkeyService.Dispose(); _responseGeneratorHotkeyService.Dispose(); _actionWheelHotkeyService.Dispose(); _reminderTimer.Stop(); _xmpTimer.Stop(); _monitoringTimer.Stop(); _tray.Visible = false; _tray.Dispose(); Close(); System.Windows.Application.Current.Shutdown(); }
+    private void ExitHub() { _exit = true; _gamePerformanceService.Dispose(); _systemMonitoringService.Dispose(); _gameChatKeyboardService.Dispose(); _keyboardLayoutMonitorService.Dispose(); _hotkeyService.Dispose(); _translatorHotkeyService.Dispose(); _responseGeneratorHotkeyService.Dispose(); _actionWheelHotkeyService.Dispose(); _reminderTimer.Stop(); _xmpTimer.Stop(); _monitoringTimer.Stop(); _tray.Visible = false; _tray.Dispose(); Close(); System.Windows.Application.Current.Shutdown(); }
 
     private sealed record LanguageChoice(string Name, string Code)
     {

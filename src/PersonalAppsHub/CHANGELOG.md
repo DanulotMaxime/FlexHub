@@ -1,5 +1,23 @@
 # Notes de version
 
+## 1.4.0
+
+- Ajout d’un tableau de monitoring CPU, RAM, GPU, VRAM et température GPU avec historique graphique et alertes configurables.
+- Nouveau diagnostic réseau avancé : ping, jitter, pertes, distinction réseau local/Internet/serveur distant, détection des serveurs de jeu et analyse ponctuelle par application.
+- Conservation locale des 60 dernières mesures réseau pendant sept jours.
+- Nouveau test de charge CPU et GPU avec modes séparés ou combinés, quatre niveaux de 50 à 100 %, véritable charge Direct3D 11, arrêt thermique, historique et analyse automatique.
+- Détection automatique des sessions de jeu, durée, alertes facultatives, historique illimité, statistiques par période et export CSV.
+- Rapports de session enrichis avec pics CPU/RAM/GPU, température, profil NVIDIA et comparaison avec une session de référence.
+- Nouveau mode performance facultatif appliquant la priorité CPU Haute aux jeux détectés et restaurant automatiquement leur priorité d’origine.
+- Ajout des modules de reformulation, simplification, résumé de conversation et définition d’un mot dans la roue d’actions.
+- Ajout du nettoyage sécurisé des fichiers temporaires et caches d’applications avec aperçu, confirmation et nettoyage quotidien facultatif.
+- Ajout de la recherche de fichiers en double par empreinte SHA-256 avec conservation obligatoire d’un exemplaire et déplacement vers la Corbeille.
+- Ajout de la santé des disques, des informations NVMe S.M.A.R.T. et de l’audit réversible des programmes au démarrage.
+- Réorganisation du menu par catégories, compteurs de modules et regroupement des fonctions désactivées.
+- Nouveau style de cases à cocher cohérent avec les thèmes de FlexHub.
+- Les alertes de pause des sessions de jeu sont désormais désactivées par défaut.
+- Nombreuses améliorations de lisibilité, de sécurité, de journalisation et de stabilité.
+
 ## 1.3.1
 
 - Ajout d’une étape de configuration de la clé API Google Gemini au premier lancement, juste après le choix de la mémoire.

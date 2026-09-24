@@ -2,7 +2,7 @@ namespace PersonalAppsHub.Models;
 
 public sealed class HubSettings
 {
-    public int SettingsSchemaVersion { get; set; } = 15;
+    public int SettingsSchemaVersion { get; set; } = 17;
     public bool StartWithWindows { get; set; } = true;
     public string FontSizePreference { get; set; } = "Moyen";
     public string ThemePreference { get; set; } = "Sombre";
@@ -63,7 +63,8 @@ public sealed class HubSettings
     public int MonitoringCpuTemperatureAlertC { get; set; } = 90;
     public string NetworkMonitoringTargets { get; set; } = "passerelle;Internet=1.1.1.1;Discord=discord.com;Steam=store.steampowered.com;jeu";
     public int GameSessionAlertHours { get; set; } = 2;
-    public bool GameSessionAlertEnabled { get; set; } = true;
+    public bool GameSessionAlertEnabled { get; set; }
+    public bool AutomaticGameHighPriorityEnabled { get; set; }
     public bool NetworkJitterAlertEnabled { get; set; } = true;
     public int NetworkJitterAlertMs { get; set; } = 30;
     public DateTime? LastNvidiaOptimizationUtc { get; set; }
