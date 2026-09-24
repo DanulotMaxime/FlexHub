@@ -35,6 +35,7 @@ public partial class MainWindow : Window
     private readonly NetworkMonitoringService _networkMonitoringService = new();
     private readonly NetworkHistoryService _networkHistoryService = new();
     private readonly GameSessionService _gameSessionService = new();
+    private readonly GameProcessMonitoringService _gameProcessMonitoringService = new();
     private readonly GameSessionHistoryService _gameSessionHistoryService = new();
     private readonly GamePerformanceService _gamePerformanceService = new();
     private readonly TemporaryFileCleanupService _temporaryFileCleanupService = new();
@@ -2182,17 +2183,29 @@ public partial class MainWindow : Window
         _gameSessionRefreshRunning = true;
         try
         {
-            var sessions = await Task.Run(_gameSessionService.DetectActiveSessions);
+            var detectedSessions = await Task.Run(_gameSessionService.DetectActiveSessions);
+            var processMetrics = await Task.Run(() => _gameProcessMonitoringService.Capture(detectedSessions));
+            var sessions = detectedSessions.Select(session => processMetrics.TryGetValue(session.ProcessId, out var metrics)
+                ? session with
+                {
+                    ProcessCpuPercent = metrics.CpuPercent,
+                    ProcessRamMb = metrics.RamMb,
+                    ProcessGpuPercent = metrics.GpuPercent,
+                    ProcessVramMb = metrics.VramMb
+                }
+                : session).ToArray();
             _lastGameSessionRefreshUtc = DateTime.UtcNow;
             ActiveGameSessionsList.ItemsSource = sessions;
-            GameSessionHistoryList.ItemsSource = _gameSessionHistoryService.Update(sessions, _settings.ActiveNvidiaProfileName);
+            _gameSessionHistoryService.Update(sessions, _settings.ActiveNvidiaProfileName);
+            _gameSessionHistoryService.RecordProcessMetrics(processMetrics.Values);
+            GameSessionHistoryList.ItemsSource = _gameSessionHistoryService.GetRecentReports();
             var performance = _gamePerformanceService.Update(sessions, _settings.AutomaticGameHighPriorityEnabled);
             GamePerformanceStatus.Text = performance.Message;
             RefreshGameSessionSummary();
-            ActiveGameSessionEmpty.Visibility = sessions.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-            ActiveGameSessionSummary.Text = sessions.Count == 0
+            ActiveGameSessionEmpty.Visibility = sessions.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+            ActiveGameSessionSummary.Text = sessions.Length == 0
                 ? "Aucune session de jeu détectée."
-                : sessions.Count == 1 ? "1 jeu actif" : $"{sessions.Count} jeux actifs";
+                : sessions.Length == 1 ? "1 jeu actif" : $"{sessions.Length} jeux actifs";
             var activeIds = sessions.Select(session => session.ProcessId).ToHashSet();
             _alertedGameSessionProcessIds.RemoveWhere(processId => !activeIds.Contains(processId));
             if (!_settings.GameSessionAlertEnabled) return;
@@ -2337,7 +2350,7 @@ public partial class MainWindow : Window
         static string Csv(string value) => "\"" + value.Replace("\"", "\"\"") + "\"";
         var lines = new List<string>
         {
-            "Jeu;Reference;Profil_NVIDIA;Debut;Fin;Duree_minutes;CPU_max_pct;RAM_max_pct;GPU_moy_pct;GPU_max_pct;GPU_max_C"
+            "Jeu;Reference;Profil_NVIDIA;Debut;Fin;Duree_minutes;PC_CPU_max_pct;PC_RAM_max_pct;PC_GPU_moy_pct;PC_GPU_max_pct;GPU_max_C;Jeu_CPU_max_pct;Jeu_RAM_max_Mo;Jeu_GPU_moy_pct;Jeu_GPU_max_pct;Jeu_VRAM_max_Mo"
         };
         foreach (var report in reports)
         {
@@ -2350,7 +2363,12 @@ public partial class MainWindow : Window
                 report.PeakRamUsagePercent?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? "",
                 gpuAverage?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? "",
                 report.PeakGpuUsagePercent?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? "",
-                report.PeakGpuTemperatureC?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? ""));
+                report.PeakGpuTemperatureC?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? "",
+                report.PeakProcessCpuPercent?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? "",
+                report.PeakProcessRamMb?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? "",
+                report.ProcessGpuUsageSampleCount > 0 ? (report.ProcessGpuUsageTotal / report.ProcessGpuUsageSampleCount).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) : "",
+                report.PeakProcessGpuPercent?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? "",
+                report.PeakProcessVramMb?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? ""));
         }
         try
         {

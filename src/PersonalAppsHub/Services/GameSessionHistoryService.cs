@@ -17,6 +17,12 @@ public sealed class GameSessionReport
     public double? PeakRamUsagePercent { get; set; }
     public double GpuUsageTotal { get; set; }
     public int GpuUsageSampleCount { get; set; }
+    public double? PeakProcessCpuPercent { get; set; }
+    public double? PeakProcessRamMb { get; set; }
+    public double? PeakProcessGpuPercent { get; set; }
+    public double ProcessGpuUsageTotal { get; set; }
+    public int ProcessGpuUsageSampleCount { get; set; }
+    public double? PeakProcessVramMb { get; set; }
     public bool IsReference { get; set; }
     public string NvidiaProfileName { get; set; } = "Non identifié";
     [JsonIgnore] public bool CanSetReference => !IsActive;
@@ -39,6 +45,12 @@ public sealed class GameSessionReport
     public string RamPeakText => PeakRamUsagePercent.HasValue ? $"{PeakRamUsagePercent:0}%" : "—";
     public string GpuAverageText => GpuUsageSampleCount > 0 ? $"{GpuUsageTotal / GpuUsageSampleCount:0}%" : "—";
     public string GpuUsagePeakText => PeakGpuUsagePercent.HasValue ? $"{PeakGpuUsagePercent:0}%" : "—";
+    public string ProcessCpuPeakText => PeakProcessCpuPercent.HasValue ? $"{PeakProcessCpuPercent:0.0}%" : "—";
+    public string ProcessRamPeakText => PeakProcessRamMb.HasValue ? $"{PeakProcessRamMb:0} Mo" : "—";
+    public string ProcessGpuAverageText => ProcessGpuUsageSampleCount > 0 ? $"{ProcessGpuUsageTotal / ProcessGpuUsageSampleCount:0.0}%" : "—";
+    public string ProcessGpuPeakText => PeakProcessGpuPercent.HasValue ? $"{PeakProcessGpuPercent:0.0}%" : "—";
+    public string ProcessVramPeakText => PeakProcessVramMb.HasValue ? $"{PeakProcessVramMb:0} Mo" : "—";
+    public string ProcessPerformanceText => $"JEU · CPU max {ProcessCpuPeakText} · RAM max {ProcessRamPeakText} · GPU moy./max {ProcessGpuAverageText} / {ProcessGpuPeakText} · VRAM max {ProcessVramPeakText}";
     public string GpuPeakText => PeakGpuUsagePercent.HasValue || PeakGpuTemperatureC.HasValue
         ? $"{(PeakGpuUsagePercent.HasValue ? $"{PeakGpuUsagePercent:0}%" : "—")} / {(PeakGpuTemperatureC.HasValue ? $"{PeakGpuTemperatureC:0} °C" : "—")}" : "—";
     public string PerformanceText
@@ -174,6 +186,31 @@ public sealed class GameSessionHistoryService
         if (changed) Save();
     }
 
+    public void RecordProcessMetrics(IEnumerable<GameProcessMetrics> metrics)
+    {
+        var byProcess = metrics.ToDictionary(metric => metric.ProcessId);
+        var changed = false;
+        foreach (var report in _reports.Where(report => report.IsActive && byProcess.ContainsKey(report.ProcessId)))
+        {
+            var sample = byProcess[report.ProcessId];
+            if (sample.CpuPercent.HasValue && (!report.PeakProcessCpuPercent.HasValue || sample.CpuPercent > report.PeakProcessCpuPercent))
+                report.PeakProcessCpuPercent = sample.CpuPercent;
+            if (sample.RamMb.HasValue && (!report.PeakProcessRamMb.HasValue || sample.RamMb > report.PeakProcessRamMb))
+                report.PeakProcessRamMb = sample.RamMb;
+            if (sample.GpuPercent.HasValue)
+            {
+                report.ProcessGpuUsageTotal += sample.GpuPercent.Value;
+                report.ProcessGpuUsageSampleCount++;
+                if (!report.PeakProcessGpuPercent.HasValue || sample.GpuPercent > report.PeakProcessGpuPercent)
+                    report.PeakProcessGpuPercent = sample.GpuPercent;
+            }
+            if (sample.VramMb.HasValue && (!report.PeakProcessVramMb.HasValue || sample.VramMb > report.PeakProcessVramMb))
+                report.PeakProcessVramMb = sample.VramMb;
+            changed |= sample.CpuPercent.HasValue || sample.RamMb.HasValue || sample.GpuPercent.HasValue || sample.VramMb.HasValue;
+        }
+        if (changed) Save();
+    }
+
     private static bool IsUtilityProcess(string name) =>
         name.Contains("launcher", StringComparison.OrdinalIgnoreCase) ||
         name.Contains("crashreport", StringComparison.OrdinalIgnoreCase) ||
@@ -185,16 +222,17 @@ public sealed class GameSessionHistoryService
     {
         foreach (var report in _reports)
         {
+            var processDetails = report.ProcessPerformanceText;
             if (report.IsReference)
             {
-                report.ComparisonText = "★ Session de référence";
+                report.ComparisonText = processDetails + Environment.NewLine + "★ Session de référence";
                 continue;
             }
             var reference = _reports.FirstOrDefault(item => item.IsReference &&
                 item.GameName.Equals(report.GameName, StringComparison.OrdinalIgnoreCase));
             if (reference is null || report.StartedAt <= reference.StartedAt)
             {
-                report.ComparisonText = "";
+                report.ComparisonText = processDetails;
                 continue;
             }
             var differences = new List<string>();
@@ -208,7 +246,8 @@ public sealed class GameSessionHistoryService
             var referenceGpuAverage = reference.GpuUsageSampleCount > 0 ? reference.GpuUsageTotal / reference.GpuUsageSampleCount : (double?)null;
             AddDifference(differences, "GPU moy.", currentGpuAverage, referenceGpuAverage, "%");
             AddDifference(differences, "Temp. GPU", report.PeakGpuTemperatureC, reference.PeakGpuTemperatureC, " °C");
-            report.ComparisonText = differences.Count == 0 ? "Comparaison indisponible" : "Vs réf. : " + string.Join(" · ", differences);
+            var comparison = differences.Count == 0 ? "Comparaison indisponible" : "Vs réf. : " + string.Join(" · ", differences);
+            report.ComparisonText = processDetails + Environment.NewLine + comparison;
         }
     }
 

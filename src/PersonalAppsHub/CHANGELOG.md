@@ -1,5 +1,13 @@
 # Notes de version
 
+## 1.4.2
+
+- Ajout du suivi des ressources utilisées directement par le processus de chaque jeu détecté.
+- Les sessions en cours affichent désormais des cases distinctes pour le CPU, la RAM, le GPU 3D et la VRAM du jeu.
+- Les rapports séparent clairement les performances du jeu de l’utilisation totale du PC, avec pics CPU/RAM/VRAM et moyenne/pic GPU.
+- L’export CSV contient maintenant des colonnes séparées pour les mesures globales du PC et celles du processus du jeu.
+- Les anciens historiques restent compatibles ; une mesure indisponible est affichée par un tiret.
+
 ## 1.4.1
 
 - Ajout d’une option d’installation, cochée par défaut, pour activer l’historique du Presse-papiers Windows accessible avec `Win + V`.

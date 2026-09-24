@@ -254,9 +254,9 @@ pas le temps nécessaire.
 - [ ] **Estimer les FPS en arrière-plan sans overlay.**
 - [x] **Détecter le jeu lancé, chronométrer la session et alerter après X heures.** *(Alerte de pause disponible mais désactivée par défaut.)*
 - Le suivi des sessions reste actif en arrière-plan toutes les 15 secondes, quelle que soit la page affichée.
-- [~] **Générer un rapport de session : durée, températures, FPS et chutes de FPS.** *(Durée, pics CPU/RAM/GPU, moyenne GPU et pic de température GPU disponibles. PresentMon/FrameView ne fournit aucune trame pour le jeu testé ; FPS à finaliser avec une source compatible.)*
+- [~] **Générer un rapport de session : durée, températures, FPS et chutes de FPS.** *(Durée et mesures globales du PC disponibles, avec détail séparé du processus du jeu : CPU, RAM, GPU 3D et VRAM. PresentMon/FrameView ne fournit aucune trame pour le jeu testé ; FPS à finaliser avec une source compatible.)*
 - [x] **Conserver l'historique des sessions et afficher des graphes par jeu/semaine.** *(Historique local sans limite et graphique comparatif filtrable sur 7 jours, 30 jours, l'année ou toute la période.)*
-- Export CSV complet des sessions et de leurs mesures CPU/RAM/GPU.
+- Export CSV complet avec colonnes distinctes pour les mesures globales du PC et celles du processus du jeu.
 - Une session terminée peut être définie comme référence par jeu ; les sessions suivantes affichent leurs écarts CPU, RAM, GPU et température GPU.
 - Le profil NVIDIA actif au démarrage est conservé avec chaque session afin d'identifier clairement les comparaisons avant/après.
 - [x] **Passer automatiquement le processus d'un jeu en priorité CPU haute.** *(Option désactivée par défaut, confirmation avec aperçu des jeux concernés, priorité Temps réel interdite et restauration automatique de la priorité d’origine.)*

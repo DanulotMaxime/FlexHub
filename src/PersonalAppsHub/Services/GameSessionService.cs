@@ -4,10 +4,22 @@ namespace PersonalAppsHub.Services;
 
 public sealed record ActiveGameSession(int ProcessId, string Name, DateTime StartedAt, TimeSpan Duration)
 {
+    public double? ProcessCpuPercent { get; init; }
+    public double? ProcessRamMb { get; init; }
+    public double? ProcessGpuPercent { get; init; }
+    public double? ProcessVramMb { get; init; }
     public string StartedText => $"Démarré à {StartedAt:HH:mm}";
     public string DurationText => Duration.TotalHours >= 1
         ? $"{(int)Duration.TotalHours} h {Duration.Minutes:00} min"
         : $"{Math.Max(0, (int)Duration.TotalMinutes)} min";
+    public string ProcessMetricsText => $"Jeu : CPU {Percent(ProcessCpuPercent)} · RAM {Memory(ProcessRamMb)} · GPU {Percent(ProcessGpuPercent)} · VRAM {Memory(ProcessVramMb)}";
+    public string ProcessCpuText => Percent(ProcessCpuPercent);
+    public string ProcessRamText => Memory(ProcessRamMb);
+    public string ProcessGpuText => Percent(ProcessGpuPercent);
+    public string ProcessVramText => Memory(ProcessVramMb);
+
+    private static string Percent(double? value) => value.HasValue ? $"{value:0.0}%" : "—";
+    private static string Memory(double? value) => value.HasValue ? $"{value:0} Mo" : "—";
 }
 
 public sealed class GameSessionService
