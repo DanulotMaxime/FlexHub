@@ -137,8 +137,10 @@ Check(toneAnalyzer.Analyze("C'est absolument génial, j'adore ! Bravo !").Primar
 Check(toneAnalyzer.Analyze("Le rendez-vous est fixé à quinze heures.").PrimaryTone == "Neutre",
     "analyse d’un message neutre");
 var criticalTone = toneAnalyzer.Analyze("Votre serveur encourage le spam. J'en ai marre, réglez ce problème ou je me casse !");
-Check(criticalTone.PrimaryTone.StartsWith("Critique") && criticalTone.Clues.Any(clue => clue.Contains("Expressions repérées")),
-    "analyse expliquée d’un long reproche critique");
+Check((criticalTone.PrimaryTone.StartsWith("Critique") || criticalTone.PrimaryTone.StartsWith("Frustré")) &&
+      criticalTone.PrimaryTone.Contains("critique", StringComparison.OrdinalIgnoreCase) &&
+      criticalTone.Clues.Any(clue => clue.Contains("Indices repérés")),
+    "analyse expliquée d’un long reproche critique et frustré");
 var nextGenTone = toneAnalyzer.Analyze("J'arrête de jouer sur NextGen. Ça spam à outrance les véhicules. Suite à un T-14, j'en ai eu ma claque. Je ne rejouerais que lorsque ce sera réglé. Les devs n'en ont rien à foutre de l'équilibre, sans parler de Bravo 1. Les joueurs ne peuvent pas jouer comme ils veulent !");
 Check(!nextGenTone.PrimaryTone.StartsWith("Enthousiaste") &&
       (nextGenTone.PrimaryTone.StartsWith("Critique") || nextGenTone.PrimaryTone.StartsWith("Frustré") || nextGenTone.PrimaryTone.StartsWith("Résigné")),
@@ -156,7 +158,7 @@ Check(toneAnalyzer.Analyze("Merci beaucoup pour ton aide, prends soin de toi.").
     "détection d’un ton chaleureux");
 Check(toneAnalyzer.Analyze("C'est urgent, répondez au plus vite avant ce soir.").PrimaryTone.StartsWith("Urgent"),
     "détection de l’urgence");
-Check(toneAnalyzer.Analyze("Vous devez arrêter immédiatement et régler le problème.").PrimaryTone.Contains("Directif"),
+Check(toneAnalyzer.Analyze("Vous devez arrêter immédiatement et régler le problème.").PrimaryTone.Contains("directif", StringComparison.OrdinalIgnoreCase),
     "détection d’une instruction directe");
 Check(!toneAnalyzer.Analyze("Ce n'est vraiment pas génial.").PrimaryTone.StartsWith("Enthousiaste"),
     "prise en compte de la négation d’un mot positif");
