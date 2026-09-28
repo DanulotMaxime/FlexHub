@@ -56,7 +56,35 @@ public sealed class SettingsService
                 settings.AutomaticGameHighPriorityEnabled = false;
             if (settings.SettingsSchemaVersion < 17)
                 settings.GameSessionAlertEnabled = false;
-            settings.SettingsSchemaVersion = 17;
+            if (settings.SettingsSchemaVersion < 18)
+                settings.MemoryCacheModuleEnabled = true;
+            if (settings.SettingsSchemaVersion < 19)
+            {
+                settings.RecycleBinModuleEnabled = true;
+                settings.AutomaticRecycleBinCleanupEnabled = false;
+                settings.RecycleBinMaximumSizeGb = 5;
+                settings.RecycleBinMaximumAgeDays = 30;
+            }
+            if (settings.SettingsSchemaVersion < 20)
+            {
+                settings.UnusedApplicationsModuleEnabled = true;
+                settings.UnusedApplicationsThresholdDays = 90;
+            }
+            if (settings.SettingsSchemaVersion < 22)
+                settings.DownloadsOrganizerModuleEnabled = true;
+            if (settings.SettingsSchemaVersion < 23)
+                settings.BulkRenameModuleEnabled = true;
+            if (settings.SettingsSchemaVersion < 24)
+                settings.DriverAuditModuleEnabled = true;
+            if (settings.SettingsSchemaVersion < 25)
+                settings.AutomaticDownloadsOrganizerEnabled = false;
+            if (settings.SettingsSchemaVersion < 26)
+                settings.MouseSensitivityModuleEnabled = true;
+            if (settings.SettingsSchemaVersion < 27)
+                settings.FileFinderModuleEnabled = true;
+            if (settings.SettingsSchemaVersion < 28)
+                settings.ToneAnalysisEnabled = true;
+            settings.SettingsSchemaVersion = 28;
             return settings;
         }
         catch
@@ -73,7 +101,7 @@ public sealed class SettingsService
     public void Save(HubSettings settings)
     {
         Directory.CreateDirectory(_folder);
-        settings.SettingsSchemaVersion = 17;
+        settings.SettingsSchemaVersion = 28;
         var temporaryPath = SettingsPath + ".tmp";
         File.WriteAllText(temporaryPath, JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));
         File.Move(temporaryPath, SettingsPath, overwrite: true);

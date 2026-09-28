@@ -3,6 +3,11 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:sys="clr-namespace:System;assembly=System.Runtime">
   <Application.Resources>
+    <!-- Empêche les contrôles Windows natifs de rétablir une sélection claire illisible. -->
+    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#FF24627A"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#FFFFFFFF"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#FF1C4B5E"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="#FFE8F7FC"/>
     <SolidColorBrush x:Key="BackgroundBrush" Color="#FF0E0F0F"/>
     <SolidColorBrush x:Key="PanelBrush" Color="#FF1A1918"/>
     <SolidColorBrush x:Key="PanelLightBrush" Color="#FF24211F"/>
@@ -173,6 +178,87 @@
       <Setter Property="Background" Value="{DynamicResource FieldBrush}"/><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
       <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="CaretBrush" Value="{DynamicResource AccentBrightBrush}"/>
       <Setter Property="FontFamily" Value="Segoe UI"/><Setter Property="FontSize" Value="{DynamicResource ControlFontSize}"/>
+    </Style>
+    <Style TargetType="ListViewItem">
+      <Setter Property="Background" Value="#FF132129"/>
+      <Setter Property="Foreground" Value="#FFE8F7FC"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Padding" Value="4,3"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ListViewItem">
+            <Border x:Name="TableRowBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}"
+                    TextElement.Foreground="{TemplateBinding Foreground}" SnapsToDevicePixels="True">
+              <GridViewRowPresenter Content="{TemplateBinding Content}"
+                                    Columns="{Binding View.Columns, RelativeSource={RelativeSource AncestorType={x:Type ListView}}}"
+                                    VerticalAlignment="Center" SnapsToDevicePixels="True"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="TableRowBorder" Property="Background" Value="#FF214554"/>
+                <Setter Property="Foreground" Value="#FFFFFFFF"/>
+              </Trigger>
+              <Trigger Property="IsSelected" Value="True">
+                <Setter TargetName="TableRowBorder" Property="Background" Value="#FF24627A"/>
+                <Setter TargetName="TableRowBorder" Property="BorderBrush" Value="#FF7CC8E8"/>
+                <Setter Property="Foreground" Value="#FFFFFFFF"/>
+              </Trigger>
+              <MultiTrigger>
+                <MultiTrigger.Conditions>
+                  <Condition Property="IsSelected" Value="True"/>
+                  <Condition Property="Selector.IsSelectionActive" Value="False"/>
+                </MultiTrigger.Conditions>
+                <Setter TargetName="TableRowBorder" Property="Background" Value="#FF1C4B5E"/>
+                <Setter TargetName="TableRowBorder" Property="BorderBrush" Value="#FF56899D"/>
+                <Setter Property="Foreground" Value="#FFE8F7FC"/>
+              </MultiTrigger>
+              <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.55"/></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style TargetType="GridViewColumnHeader">
+      <Setter Property="Background" Value="#FF203844"/>
+      <Setter Property="Foreground" Value="#FFCDEFFF"/>
+      <Setter Property="BorderBrush" Value="#FF5D8798"/>
+      <Setter Property="BorderThickness" Value="0,0,1,1"/>
+      <Setter Property="Padding" Value="9,7"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="GridViewColumnHeader">
+            <Border x:Name="HeaderBorder" Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                    Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+              <Grid>
+                <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                  VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                  TextElement.Foreground="{TemplateBinding Foreground}"/>
+                <Thumb x:Name="PART_HeaderGripper" Width="7" HorizontalAlignment="Right"
+                       Margin="0,-7,-9,-7" Background="Transparent" Cursor="SizeWE"/>
+              </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="HeaderBorder" Property="Background" Value="#FF285064"/>
+                <Setter Property="Foreground" Value="#FFFFFFFF"/>
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="HeaderBorder" Property="Background" Value="#FF24627A"/>
+                <Setter TargetName="HeaderBorder" Property="BorderBrush" Value="#FF7CC8E8"/>
+                <Setter Property="Foreground" Value="#FFFFFFFF"/>
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.55"/></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
     <Style x:Key="ButtonStyle" TargetType="Button">
       <Setter Property="Background" Value="{DynamicResource ButtonBrush}"/><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>

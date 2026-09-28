@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.ComponentModel;
 using System.Drawing;
 using System.Runtime.InteropServices;
 using System.IO;
@@ -29,6 +30,7 @@ public partial class MainWindow : Window
     private readonly TranslationService _translationService = new();
     private readonly ResponseGenerationService _responseGenerationService = new();
     private readonly WiktionaryService _wiktionaryService = new();
+    private readonly ToneAnalysisService _toneAnalysisService = new();
     private readonly NvidiaProfileService _nvidiaProfileService = new();
     private readonly XmpMonitorService _xmpMonitorService = new();
     private readonly SystemMonitoringService _systemMonitoringService = new();
@@ -39,9 +41,17 @@ public partial class MainWindow : Window
     private readonly GameSessionHistoryService _gameSessionHistoryService = new();
     private readonly GamePerformanceService _gamePerformanceService = new();
     private readonly TemporaryFileCleanupService _temporaryFileCleanupService = new();
+    private readonly MemoryCacheService _memoryCacheService = new();
+    private readonly RecycleBinService _recycleBinService = new();
+    private readonly InstalledApplicationAuditService _installedApplicationAuditService = new();
+    private readonly MouseSensitivityService _mouseSensitivityService = new();
+    private readonly DownloadsOrganizerService _downloadsOrganizerService = new();
+    private readonly BulkRenameService _bulkRenameService = new();
     private readonly DuplicateFileService _duplicateFileService = new();
     private readonly StorageHealthService _storageHealthService = new();
     private readonly StartupAuditService _startupAuditService = new();
+    private readonly FileFinderService _fileFinderService = new();
+    private readonly DriverAuditService _driverAuditService = new();
     private readonly UpdateService _updateService = new();
     private readonly ApiQuotaService _apiQuotaService = new();
     private readonly HotkeyService _hotkeyService = new(9471);
@@ -75,9 +85,14 @@ public partial class MainWindow : Window
     private bool _networkMonitoringRunning;
     private bool _gameSessionRefreshRunning;
     private bool _automaticTemporaryCleanupRunning;
+    private bool _automaticRecycleBinCleanupRunning;
+    private bool _automaticDownloadsOrganizerRunning;
     private bool _duplicateScanRunning;
     private CancellationTokenSource? _duplicateScanCancellation;
+    private CancellationTokenSource? _fileSearchCancellation;
     private IReadOnlyList<DuplicateFileCandidate> _duplicateResults = Array.Empty<DuplicateFileCandidate>();
+    private IReadOnlyList<DownloadMoveCandidate> _downloadsOrganizerResults = Array.Empty<DownloadMoveCandidate>();
+    private IReadOnlyList<RenameCandidate> _bulkRenameResults = Array.Empty<RenameCandidate>();
     private string? _duplicateScanRoot;
     private DateTime _lastAutomaticNetworkMeasureUtc = DateTime.MinValue;
     private DateTime _lastGameSessionRefreshUtc = DateTime.MinValue;
@@ -146,9 +161,17 @@ public partial class MainWindow : Window
         MonitoringNav.Click += async (_, _) => { ShowPage("monitoring"); await RefreshMonitoringAsync(); };
         GameSessionsNav.Click += async (_, _) => { ShowPage("gameSessions"); await RefreshGameSessionsAsync(true); };
         NetworkMonitoringNav.Click += async (_, _) => { ShowPage("networkMonitoring"); RefreshNetworkApplications(); await RefreshNetworkMonitoringAsync(); };
+        MouseSensitivityNav.Click += async (_, _) => { ShowPage("mouseSensitivity"); await RefreshInstalledSensitivityGamesAsync(); };
         CleanupNav.Click += (_, _) => ShowPage("cleanup");
+        FileFinderNav.Click += (_, _) => ShowPage("fileFinder");
+        MemoryCacheNav.Click += (_, _) => ShowPage("memoryCache");
+        RecycleBinNav.Click += async (_, _) => { ShowPage("recycleBin"); await ScanRecycleBinAsync(); };
+        DownloadsOrganizerNav.Click += (_, _) => ShowPage("downloadsOrganizer");
+        BulkRenameNav.Click += (_, _) => ShowPage("bulkRename");
+        UnusedApplicationsNav.Click += (_, _) => ShowPage("unusedApplications");
         DuplicateFilesNav.Click += (_, _) => ShowPage("duplicateFiles");
         StorageHealthNav.Click += async (_, _) => { ShowPage("storageHealth"); await RefreshStorageHealthAsync(); };
+        DriverAuditNav.Click += async (_, _) => { ShowPage("driverAudit"); await RefreshDriverAuditAsync(); };
         StartupAuditNav.Click += async (_, _) => { ShowPage("startupAudit"); await RefreshStartupAuditAsync(); };
         CorrectorNav.Click += (_, _) => ShowPage("corrector");
         ReformulateNav.Click += (_, _) => ShowPage("reformulate");
@@ -157,6 +180,7 @@ public partial class MainWindow : Window
         WordDefinitionNav.Click += (_, _) => ShowPage("wordDefinition");
         TranslatorNav.Click += (_, _) => ShowPage("translator");
         ResponseGeneratorNav.Click += (_, _) => ShowPage("responseGenerator");
+        ToneAnalysisNav.Click += (_, _) => ShowPage("toneAnalysis");
         ActionWheelNav.Click += (_, _) => ShowPage("actionWheel");
         NvidiaNav.Click += (_, _) => ShowPage("nvidia");
         XmpNav.Click += (_, _) => ShowPage("xmp");
@@ -197,6 +221,8 @@ public partial class MainWindow : Window
         ConversationSummarizerEnabled.Unchecked += (_, _) => ApplyEnabledStates();
         WordDefinitionEnabled.Checked += (_, _) => ApplyEnabledStates();
         WordDefinitionEnabled.Unchecked += (_, _) => ApplyEnabledStates();
+        ToneAnalysisEnabled.Checked += (_, _) => ApplyEnabledStates();
+        ToneAnalysisEnabled.Unchecked += (_, _) => ApplyEnabledStates();
         ActionWheelEnabled.Checked += (_, _) => ApplyEnabledStates();
         ActionWheelEnabled.Unchecked += (_, _) => ApplyEnabledStates();
         NvidiaEnabled.Checked += (_, _) => ApplyEnabledStates();
@@ -211,14 +237,30 @@ public partial class MainWindow : Window
         GameSessionsModuleEnabled.Unchecked += (_, _) => ApplyEnabledStates();
         NetworkMonitoringModuleEnabled.Checked += (_, _) => ApplyEnabledStates();
         NetworkMonitoringModuleEnabled.Unchecked += (_, _) => ApplyEnabledStates();
+        MouseSensitivityModuleEnabled.Checked += (_, _) => ApplyEnabledStates();
+        MouseSensitivityModuleEnabled.Unchecked += (_, _) => ApplyEnabledStates();
         TemporaryCleanupModuleEnabled.Checked += (_, _) => ApplyEnabledStates();
         TemporaryCleanupModuleEnabled.Unchecked += (_, _) => ApplyEnabledStates();
+        MemoryCacheModuleEnabled.Checked += (_, _) => ApplyEnabledStates();
+        MemoryCacheModuleEnabled.Unchecked += (_, _) => ApplyEnabledStates();
+        RecycleBinModuleEnabled.Checked += (_, _) => ApplyEnabledStates();
+        RecycleBinModuleEnabled.Unchecked += (_, _) => ApplyEnabledStates();
+        UnusedApplicationsModuleEnabled.Checked += (_, _) => ApplyEnabledStates();
+        UnusedApplicationsModuleEnabled.Unchecked += (_, _) => ApplyEnabledStates();
+        DownloadsOrganizerModuleEnabled.Checked += (_, _) => ApplyEnabledStates();
+        DownloadsOrganizerModuleEnabled.Unchecked += (_, _) => ApplyEnabledStates();
+        BulkRenameModuleEnabled.Checked += (_, _) => ApplyEnabledStates();
+        BulkRenameModuleEnabled.Unchecked += (_, _) => ApplyEnabledStates();
         DuplicateFilesModuleEnabled.Checked += (_, _) => ApplyEnabledStates();
         DuplicateFilesModuleEnabled.Unchecked += (_, _) => ApplyEnabledStates();
         StorageHealthModuleEnabled.Checked += (_, _) => ApplyEnabledStates();
         StorageHealthModuleEnabled.Unchecked += (_, _) => ApplyEnabledStates();
         StartupAuditModuleEnabled.Checked += (_, _) => ApplyEnabledStates();
         StartupAuditModuleEnabled.Unchecked += (_, _) => ApplyEnabledStates();
+        DriverAuditModuleEnabled.Checked += (_, _) => ApplyEnabledStates();
+        DriverAuditModuleEnabled.Unchecked += (_, _) => ApplyEnabledStates();
+        FileFinderModuleEnabled.Checked += (_, _) => ApplyEnabledStates();
+        FileFinderModuleEnabled.Unchecked += (_, _) => ApplyEnabledStates();
         TestXmp.Click += async (_, _) => await CheckXmpAsync(true);
         RefreshMonitoring.Click += async (_, _) => await RefreshMonitoringAsync();
         ConfigureMonitoringAlerts.Click += (_, _) => OpenMonitoringAlertSettings();
@@ -234,10 +276,26 @@ public partial class MainWindow : Window
         ClearGameSessionHistory.Click += (_, _) => ClearGameSessionHistory_OnClick();
         ExportGameSessionHistory.Click += (_, _) => ExportGameSessionHistory_OnClick();
         SaveNetworkJitterAlert.Click += (_, _) => SaveNetworkJitterAlertSettings();
+        CalculateMouseSensitivity.Click += (_, _) => CalculateMouseSensitivityNow();
+        AnalyzeTone.Click += (_, _) => AnalyzeToneNow();
+        SensitivitySourceGameBox.SelectionChanged += (_, _) => LoadSavedMouseSensitivity();
         ScanTemporaryFiles.Click += async (_, _) => await ScanTemporaryFilesAsync();
         SelectAllCleanupFiles.Click += (_, _) => CleanupFilesList.SelectAll();
         DeleteSelectedTemporaryFiles.Click += async (_, _) => await DeleteSelectedTemporaryFilesAsync();
         SaveAutomaticTemporaryCleanup.Click += async (_, _) => await SaveAutomaticTemporaryCleanupAsync();
+        PurgeMemoryCache.Click += async (_, _) => await PurgeMemoryCacheAsync();
+        ScanRecycleBin.Click += async (_, _) => await ScanRecycleBinAsync();
+        EmptyRecycleBin.Click += async (_, _) => await EmptyRecycleBinAsync();
+        SaveRecycleBinAutomation.Click += async (_, _) => await SaveRecycleBinAutomationAsync();
+        ScanUnusedApplications.Click += async (_, _) => await ScanUnusedApplicationsAsync();
+        ScanDownloads.Click += async (_, _) => await ScanDownloadsAsync();
+        SelectAllDownloads.Click += (_, _) => SetDownloadsSelection(true);
+        DeselectAllDownloads.Click += (_, _) => SetDownloadsSelection(false);
+        MoveSelectedDownloads.Click += async (_, _) => await MoveSelectedDownloadsAsync();
+        SaveAutomaticDownloadsOrganizer.Click += async (_, _) => await SaveAutomaticDownloadsOrganizerAsync();
+        ChooseBulkRenameFolder.Click += (_, _) => ChooseBulkRenameFolderNow();
+        PreviewBulkRename.Click += async (_, _) => await PreviewBulkRenameAsync();
+        ApplyBulkRename.Click += async (_, _) => await ApplyBulkRenameAsync();
         ChooseDuplicateFolder.Click += (_, _) => ChooseDuplicateFolderNow();
         ScanDuplicateFiles.Click += async (_, _) => await ScanDuplicateFilesAsync();
         CancelDuplicateScan.Click += (_, _) => _duplicateScanCancellation?.Cancel();
@@ -250,6 +308,19 @@ public partial class MainWindow : Window
             DeleteSelectedTemporaryFiles.IsEnabled = CleanupFilesList.SelectedItems.Count > 0;
         RefreshStorageHealth.Click += async (_, _) => await RefreshStorageHealthAsync();
         RefreshStartupAudit.Click += async (_, _) => await RefreshStartupAuditAsync();
+        RefreshDriverAudit.Click += async (_, _) => await RefreshDriverAuditAsync();
+        DriverAuditList.SelectionChanged += (_, _) => OpenDriverSupport.IsEnabled = DriverAuditList.SelectedItem is DriverAuditEntry;
+        OpenDriverSupport.Click += (_, _) => OpenSelectedDriverSupportPage();
+        StartFileSearch.Click += async (_, _) => await SearchFilesAsync();
+        CancelFileSearch.Click += (_, _) => _fileSearchCancellation?.Cancel();
+        FileFinderResults.SelectionChanged += (_, _) =>
+        {
+            var selected = FileFinderResults.SelectedItem is FileSearchResult;
+            OpenFoundFile.IsEnabled = selected;
+            OpenFoundFileLocation.IsEnabled = selected;
+        };
+        OpenFoundFile.Click += (_, _) => OpenFoundFileNow();
+        OpenFoundFileLocation.Click += (_, _) => OpenFoundFileLocationNow();
         StartupEntriesList.SelectionChanged += (_, _) => UpdateStartupAuditButtons();
         DisableStartupEntry.Click += async (_, _) => await ChangeStartupEntryStateAsync(false);
         EnableStartupEntry.Click += async (_, _) => await ChangeStartupEntryStateAsync(true);
@@ -320,6 +391,8 @@ public partial class MainWindow : Window
             }
             await RefreshGameSessionsAsync();
             await RunAutomaticTemporaryCleanupAsync();
+            await RunAutomaticRecycleBinCleanupAsync();
+            await RunAutomaticDownloadsOrganizerAsync();
         };
         SourceInitialized += (_, _) => { RegisterHotkey(); RegisterTranslatorHotkey(); RegisterResponseGeneratorHotkey(); RegisterActionWheelHotkey(); };
         ContentRendered += async (_, _) =>
@@ -330,6 +403,8 @@ public partial class MainWindow : Window
             ShowGeminiSetupIfNeeded();
             if (_settings.XmpMonitorEnabled) await CheckXmpAsync(false);
             await RunAutomaticTemporaryCleanupAsync();
+            await RunAutomaticRecycleBinCleanupAsync();
+            await RunAutomaticDownloadsOrganizerAsync();
             await CheckForUpdatesAtStartupAsync();
         };
         Closing += OnClosing;
@@ -411,6 +486,7 @@ public partial class MainWindow : Window
         ConversationSummaryPreserveNamesCheck.IsChecked = _settings.ConversationSummaryPreserveNames;
         ConversationSummaryIncludeActionsCheck.IsChecked = _settings.ConversationSummaryIncludeActions;
         WordDefinitionEnabled.IsChecked = _settings.WordDefinitionEnabled;
+        ToneAnalysisEnabled.IsChecked = _settings.ToneAnalysisEnabled;
         WordDefinitionDetailBox.SelectedIndex = _settings.WordDefinitionDetail switch
         {
             "Très simple" => 0, "Détaillé" => 2, "Expert" => 3, _ => 1
@@ -439,10 +515,23 @@ public partial class MainWindow : Window
         NetworkJitterAlertMsBox.Text = _settings.NetworkJitterAlertMs.ToString();
         GameSessionsModuleEnabled.IsChecked = _settings.GameSessionsModuleEnabled;
         NetworkMonitoringModuleEnabled.IsChecked = _settings.NetworkMonitoringModuleEnabled;
+        MouseSensitivityModuleEnabled.IsChecked = _settings.MouseSensitivityModuleEnabled;
         TemporaryCleanupModuleEnabled.IsChecked = _settings.TemporaryCleanupModuleEnabled;
+        MemoryCacheModuleEnabled.IsChecked = _settings.MemoryCacheModuleEnabled;
+        RecycleBinModuleEnabled.IsChecked = _settings.RecycleBinModuleEnabled;
+        AutomaticRecycleBinCleanupEnabled.IsChecked = _settings.AutomaticRecycleBinCleanupEnabled;
+        RecycleBinMaximumSizeGbBox.Text = _settings.RecycleBinMaximumSizeGb.ToString();
+        RecycleBinMaximumAgeDaysBox.Text = _settings.RecycleBinMaximumAgeDays.ToString();
+        UnusedApplicationsModuleEnabled.IsChecked = _settings.UnusedApplicationsModuleEnabled;
+        UnusedApplicationsThresholdDaysBox.Text = _settings.UnusedApplicationsThresholdDays.ToString();
+        DownloadsOrganizerModuleEnabled.IsChecked = _settings.DownloadsOrganizerModuleEnabled;
+        AutomaticDownloadsOrganizerEnabled.IsChecked = _settings.AutomaticDownloadsOrganizerEnabled;
+        BulkRenameModuleEnabled.IsChecked = _settings.BulkRenameModuleEnabled;
         DuplicateFilesModuleEnabled.IsChecked = _settings.DuplicateFilesModuleEnabled;
         StorageHealthModuleEnabled.IsChecked = _settings.StorageHealthModuleEnabled;
         StartupAuditModuleEnabled.IsChecked = _settings.StartupAuditModuleEnabled;
+        DriverAuditModuleEnabled.IsChecked = _settings.DriverAuditModuleEnabled;
+        FileFinderModuleEnabled.IsChecked = _settings.FileFinderModuleEnabled;
         AutomaticTemporaryCleanupEnabled.IsChecked = _settings.AutomaticTemporaryCleanupEnabled;
         UpdateXmpLastCheck();
         StartWithWindowsToggle.IsChecked = _settings.StartWithWindows;
@@ -468,6 +557,7 @@ public partial class MainWindow : Window
         SimplifyPage.Visibility = page == "simplify" ? Visibility.Visible : Visibility.Collapsed;
         ConversationSummaryPage.Visibility = page == "conversationSummary" ? Visibility.Visible : Visibility.Collapsed;
         WordDefinitionPage.Visibility = page == "wordDefinition" ? Visibility.Visible : Visibility.Collapsed;
+        ToneAnalysisPage.Visibility = page == "toneAnalysis" ? Visibility.Visible : Visibility.Collapsed;
         TranslatorPage.Visibility = page == "translator" ? Visibility.Visible : Visibility.Collapsed;
         ResponseGeneratorPage.Visibility = page == "responseGenerator" ? Visibility.Visible : Visibility.Collapsed;
         ActionWheelPage.Visibility = page == "actionWheel" ? Visibility.Visible : Visibility.Collapsed;
@@ -475,10 +565,18 @@ public partial class MainWindow : Window
         MonitoringPage.Visibility = page == "monitoring" ? Visibility.Visible : Visibility.Collapsed;
         GameSessionsPage.Visibility = page == "gameSessions" ? Visibility.Visible : Visibility.Collapsed;
         NetworkMonitoringPage.Visibility = page == "networkMonitoring" ? Visibility.Visible : Visibility.Collapsed;
+        MouseSensitivityPage.Visibility = page == "mouseSensitivity" ? Visibility.Visible : Visibility.Collapsed;
         CleanupPage.Visibility = page == "cleanup" ? Visibility.Visible : Visibility.Collapsed;
+        FileFinderPage.Visibility = page == "fileFinder" ? Visibility.Visible : Visibility.Collapsed;
+        MemoryCachePage.Visibility = page == "memoryCache" ? Visibility.Visible : Visibility.Collapsed;
+        RecycleBinPage.Visibility = page == "recycleBin" ? Visibility.Visible : Visibility.Collapsed;
+        UnusedApplicationsPage.Visibility = page == "unusedApplications" ? Visibility.Visible : Visibility.Collapsed;
+        DownloadsOrganizerPage.Visibility = page == "downloadsOrganizer" ? Visibility.Visible : Visibility.Collapsed;
+        BulkRenamePage.Visibility = page == "bulkRename" ? Visibility.Visible : Visibility.Collapsed;
         DuplicateFilesPage.Visibility = page == "duplicateFiles" ? Visibility.Visible : Visibility.Collapsed;
         StorageHealthPage.Visibility = page == "storageHealth" ? Visibility.Visible : Visibility.Collapsed;
         StartupAuditPage.Visibility = page == "startupAudit" ? Visibility.Visible : Visibility.Collapsed;
+        DriverAuditPage.Visibility = page == "driverAudit" ? Visibility.Visible : Visibility.Collapsed;
         XmpPage.Visibility = page == "xmp" ? Visibility.Visible : Visibility.Collapsed;
         KeyboardLayoutPage.Visibility = page == "keyboardLayout" ? Visibility.Visible : Visibility.Collapsed;
         GeneralSettingsPage.Visibility = page == "general" ? Visibility.Visible : Visibility.Collapsed;
@@ -751,7 +849,7 @@ public partial class MainWindow : Window
 
     private void UpdateNavigationState()
     {
-        if (ReminderNav == null || CorrectorNav == null || ReformulateNav == null || SimplifyNav == null || ConversationSummaryNav == null || WordDefinitionNav == null || TranslatorNav == null || ResponseGeneratorNav == null || ActionWheelNav == null || MonitoringNav == null || GameSessionsNav == null || NetworkMonitoringNav == null || CleanupNav == null || DuplicateFilesNav == null || StorageHealthNav == null || StartupAuditNav == null || NvidiaNav == null || XmpNav == null || KeyboardLayoutNav == null) return;
+        if (ReminderNav == null || CorrectorNav == null || ReformulateNav == null || SimplifyNav == null || ConversationSummaryNav == null || WordDefinitionNav == null || TranslatorNav == null || ResponseGeneratorNav == null || ActionWheelNav == null || MonitoringNav == null || GameSessionsNav == null || NetworkMonitoringNav == null || MouseSensitivityNav == null || FileFinderNav == null || CleanupNav == null || MemoryCacheNav == null || RecycleBinNav == null || DownloadsOrganizerNav == null || BulkRenameNav == null || UnusedApplicationsNav == null || DuplicateFilesNav == null || StorageHealthNav == null || DriverAuditNav == null || StartupAuditNav == null || NvidiaNav == null || XmpNav == null || KeyboardLayoutNav == null) return;
         PlaceNavigationButton(ReminderNav, ReminderEnabled.IsChecked == true);
         PlaceNavigationButton(CorrectorNav, CorrectorEnabled.IsChecked == true);
         PlaceNavigationButton(ReformulateNav, ReformulatorEnabled.IsChecked == true);
@@ -760,13 +858,22 @@ public partial class MainWindow : Window
         PlaceNavigationButton(WordDefinitionNav, WordDefinitionEnabled.IsChecked == true);
         PlaceNavigationButton(TranslatorNav, TranslatorEnabled.IsChecked == true);
         PlaceNavigationButton(ResponseGeneratorNav, ResponseGeneratorEnabled.IsChecked == true);
+        PlaceNavigationButton(ToneAnalysisNav, ToneAnalysisEnabled.IsChecked == true);
         PlaceNavigationButton(ActionWheelNav, ActionWheelEnabled.IsChecked == true);
         PlaceNavigationButton(MonitoringNav, _settings.MonitoringEnabled);
         PlaceNavigationButton(GameSessionsNav, _settings.GameSessionsModuleEnabled);
         PlaceNavigationButton(NetworkMonitoringNav, _settings.NetworkMonitoringModuleEnabled);
+        PlaceNavigationButton(MouseSensitivityNav, _settings.MouseSensitivityModuleEnabled);
         PlaceNavigationButton(CleanupNav, _settings.TemporaryCleanupModuleEnabled);
+        PlaceNavigationButton(FileFinderNav, _settings.FileFinderModuleEnabled);
+        PlaceNavigationButton(MemoryCacheNav, _settings.MemoryCacheModuleEnabled);
+        PlaceNavigationButton(RecycleBinNav, _settings.RecycleBinModuleEnabled);
+        PlaceNavigationButton(DownloadsOrganizerNav, _settings.DownloadsOrganizerModuleEnabled);
+        PlaceNavigationButton(BulkRenameNav, _settings.BulkRenameModuleEnabled);
+        PlaceNavigationButton(UnusedApplicationsNav, _settings.UnusedApplicationsModuleEnabled);
         PlaceNavigationButton(DuplicateFilesNav, _settings.DuplicateFilesModuleEnabled);
         PlaceNavigationButton(StorageHealthNav, _settings.StorageHealthModuleEnabled);
+        PlaceNavigationButton(DriverAuditNav, _settings.DriverAuditModuleEnabled);
         PlaceNavigationButton(StartupAuditNav, _settings.StartupAuditModuleEnabled);
         PlaceNavigationButton(NvidiaNav, NvidiaEnabled.IsChecked == true);
         PlaceNavigationButton(XmpNav, XmpEnabled.IsChecked == true);
@@ -777,11 +884,11 @@ public partial class MainWindow : Window
         MaintenanceSection.Visibility = Visibility.Visible;
         AutomationSection.Visibility = Visibility.Visible;
         UpdateCategoryCount(TextToolsModuleCount, CorrectorNav, ReformulateNav, SimplifyNav,
-            ConversationSummaryNav, WordDefinitionNav, TranslatorNav, ResponseGeneratorNav);
+            ConversationSummaryNav, WordDefinitionNav, TranslatorNav, ResponseGeneratorNav, ToneAnalysisNav);
         UpdateCategoryCount(MonitoringGamesModuleCount, MonitoringNav, GameSessionsNav,
-            NetworkMonitoringNav, NvidiaNav, XmpNav);
-        UpdateCategoryCount(MaintenanceModuleCount, CleanupNav, DuplicateFilesNav, StorageHealthNav, StartupAuditNav);
-        UpdateCategoryCount(AutomationModuleCount, ReminderNav, ActionWheelNav, KeyboardLayoutNav);
+            NetworkMonitoringNav, MouseSensitivityNav, NvidiaNav, XmpNav);
+        UpdateCategoryCount(MaintenanceModuleCount, CleanupNav, MemoryCacheNav, RecycleBinNav, UnusedApplicationsNav, StorageHealthNav, DriverAuditNav, StartupAuditNav);
+        UpdateCategoryCount(AutomationModuleCount, ReminderNav, ActionWheelNav, FileFinderNav, DownloadsOrganizerNav, BulkRenameNav, DuplicateFilesNav, KeyboardLayoutNav);
     }
 
     private void PlaceNavigationButton(System.Windows.Controls.Button button, bool enabled)
@@ -803,15 +910,15 @@ public partial class MainWindow : Window
     private bool IsTextTool(System.Windows.Controls.Button button) =>
         button == CorrectorNav || button == ReformulateNav || button == SimplifyNav ||
         button == ConversationSummaryNav || button == WordDefinitionNav ||
-        button == TranslatorNav || button == ResponseGeneratorNav;
+        button == TranslatorNav || button == ResponseGeneratorNav || button == ToneAnalysisNav;
 
     private System.Windows.Controls.Panel NavigationPanelFor(System.Windows.Controls.Button button)
     {
         if (IsTextTool(button)) return TextToolsPanel;
-        if (button == MonitoringNav || button == GameSessionsNav || button == NetworkMonitoringNav ||
+        if (button == MonitoringNav || button == GameSessionsNav || button == NetworkMonitoringNav || button == MouseSensitivityNav ||
             button == NvidiaNav || button == XmpNav) return MonitoringGamesPanel;
-        if (button == CleanupNav || button == DuplicateFilesNav || button == StorageHealthNav ||
-            button == StartupAuditNav) return MaintenancePanel;
+        if (button == CleanupNav || button == MemoryCacheNav || button == RecycleBinNav || button == UnusedApplicationsNav || button == StorageHealthNav ||
+            button == DriverAuditNav || button == StartupAuditNav) return MaintenancePanel;
         return AutomationPanel;
     }
 
@@ -841,7 +948,7 @@ public partial class MainWindow : Window
     }
 
     private int NavigationRank(System.Windows.Controls.Button button) =>
-        button == ReminderNav ? 0 : button == CorrectorNav ? 1 : button == ReformulateNav ? 2 : button == SimplifyNav ? 3 : button == ConversationSummaryNav ? 4 : button == WordDefinitionNav ? 5 : button == TranslatorNav ? 6 : button == ResponseGeneratorNav ? 7 : button == ActionWheelNav ? 8 : button == MonitoringNav ? 9 : button == GameSessionsNav ? 10 : button == NetworkMonitoringNav ? 11 : button == CleanupNav ? 12 : button == DuplicateFilesNav ? 13 : button == StorageHealthNav ? 14 : button == StartupAuditNav ? 15 : button == NvidiaNav ? 16 : button == XmpNav ? 17 : 18;
+        button == ReminderNav ? 0 : button == CorrectorNav ? 1 : button == ReformulateNav ? 2 : button == SimplifyNav ? 3 : button == ConversationSummaryNav ? 4 : button == WordDefinitionNav ? 5 : button == TranslatorNav ? 6 : button == ResponseGeneratorNav ? 7 : button == ActionWheelNav ? 8 : button == MonitoringNav ? 9 : button == GameSessionsNav ? 10 : button == NetworkMonitoringNav ? 11 : button == MouseSensitivityNav ? 12 : button == CleanupNav ? 13 : button == MemoryCacheNav ? 14 : button == RecycleBinNav ? 15 : button == DownloadsOrganizerNav ? 16 : button == BulkRenameNav ? 17 : button == UnusedApplicationsNav ? 18 : button == DuplicateFilesNav ? 19 : button == StorageHealthNav ? 20 : button == DriverAuditNav ? 21 : button == StartupAuditNav ? 22 : button == NvidiaNav ? 23 : button == XmpNav ? 24 : 25;
 
     private void ApplyEnabledStates()
     {
@@ -853,15 +960,24 @@ public partial class MainWindow : Window
         _settings.SimplifierEnabled = SimplifierEnabled.IsChecked == true;
         _settings.ConversationSummarizerEnabled = ConversationSummarizerEnabled.IsChecked == true;
         _settings.WordDefinitionEnabled = WordDefinitionEnabled.IsChecked == true;
+        _settings.ToneAnalysisEnabled = ToneAnalysisEnabled.IsChecked == true;
         _settings.ActionWheelEnabled = ActionWheelEnabled.IsChecked == true;
         _settings.NvidiaOptimizerEnabled = NvidiaEnabled.IsChecked == true;
         _settings.XmpMonitorEnabled = XmpEnabled.IsChecked == true;
         _settings.AutoFrenchKeyboardInDialogs = KeyboardLayoutEnabled.IsChecked == true;
         _settings.GameSessionsModuleEnabled = GameSessionsModuleEnabled.IsChecked == true;
         _settings.NetworkMonitoringModuleEnabled = NetworkMonitoringModuleEnabled.IsChecked == true;
+        _settings.MouseSensitivityModuleEnabled = MouseSensitivityModuleEnabled.IsChecked == true;
         _settings.TemporaryCleanupModuleEnabled = TemporaryCleanupModuleEnabled.IsChecked == true;
+        _settings.FileFinderModuleEnabled = FileFinderModuleEnabled.IsChecked == true;
+        _settings.MemoryCacheModuleEnabled = MemoryCacheModuleEnabled.IsChecked == true;
+        _settings.RecycleBinModuleEnabled = RecycleBinModuleEnabled.IsChecked == true;
+        _settings.UnusedApplicationsModuleEnabled = UnusedApplicationsModuleEnabled.IsChecked == true;
+        _settings.DownloadsOrganizerModuleEnabled = DownloadsOrganizerModuleEnabled.IsChecked == true;
+        _settings.BulkRenameModuleEnabled = BulkRenameModuleEnabled.IsChecked == true;
         _settings.DuplicateFilesModuleEnabled = DuplicateFilesModuleEnabled.IsChecked == true;
         _settings.StorageHealthModuleEnabled = StorageHealthModuleEnabled.IsChecked == true;
+        _settings.DriverAuditModuleEnabled = DriverAuditModuleEnabled.IsChecked == true;
         _settings.StartupAuditModuleEnabled = StartupAuditModuleEnabled.IsChecked == true;
         _settingsService.Save(_settings);
         LogModuleStates();
@@ -3110,6 +3226,487 @@ public partial class MainWindow : Window
         finally { ScanTemporaryFiles.IsEnabled = true; }
     }
 
+    private async Task PurgeMemoryCacheAsync()
+    {
+        var before = _memoryCacheService.ReadSnapshot();
+        var confirmation = System.Windows.MessageBox.Show(this,
+            $"Purger la mémoire en attente de Windows ?\n\nMémoire disponible actuellement : {before.AvailableText}.\n\nCette action ne ferme aucune application. Windows pourra remettre ces données en cache si elles redeviennent utiles. Une autorisation administrateur sera demandée.",
+            "Purger le cache RAM", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
+        if (confirmation != MessageBoxResult.Yes) return;
+
+        PurgeMemoryCache.IsEnabled = false;
+        MemoryCacheStatus.Text = "Autorisation administrateur et purge en cours…";
+        try
+        {
+            await _memoryCacheService.PurgeStandbyListElevatedAsync();
+            await Task.Delay(500);
+            var after = _memoryCacheService.ReadSnapshot();
+            var difference = after.AvailableBytes > before.AvailableBytes ? after.AvailableBytes - before.AvailableBytes : 0;
+            MemoryCacheStatus.Text = difference > 0
+                ? $"Terminé · {TemporaryFileCleanupService.FormatSize((long)Math.Min(difference, long.MaxValue))} rendus disponibles · RAM disponible : {after.AvailableText}."
+                : $"Terminé · RAM disponible : {after.AvailableText}. Windows n’avait pas de cache récupérable notable.";
+            AppLog.Write($"PURGE CACHE RAM | DisponibleAvant={before.AvailableBytes}; DisponibleAprès={after.AvailableBytes}");
+        }
+        catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            MemoryCacheStatus.Text = "Opération annulée : l’autorisation administrateur n’a pas été accordée.";
+        }
+        catch (Exception ex)
+        {
+            MemoryCacheStatus.Text = $"Purge impossible : {ex.Message}";
+            AppLog.Write($"PURGE CACHE RAM IMPOSSIBLE | {ex.Message}");
+        }
+        finally { PurgeMemoryCache.IsEnabled = true; }
+    }
+
+    private async Task ScanRecycleBinAsync()
+    {
+        ScanRecycleBin.IsEnabled = false;
+        EmptyRecycleBin.IsEnabled = false;
+        RecycleBinStatus.Text = "Lecture de la Corbeille…";
+        try
+        {
+            var snapshot = await _recycleBinService.ScanAsync();
+            RecycleBinItemsList.ItemsSource = snapshot.Items;
+            RecycleBinSummary.Text = snapshot.ItemCount == 0
+                ? "La Corbeille est vide."
+                : $"{snapshot.ItemCount} élément(s) · {TemporaryFileCleanupService.FormatSize(snapshot.TotalSizeBytes)}" +
+                  (snapshot.OldestDeletion.HasValue ? $" · plus ancien : {snapshot.OldestDeletion:dd/MM/yyyy}" : "");
+            RecycleBinStatus.Text = snapshot.Items.Count < snapshot.ItemCount
+                ? "Certains éléments système ne peuvent pas être détaillés, mais ils sont inclus dans la taille totale."
+                : "Analyse terminée en lecture seule.";
+            EmptyRecycleBin.IsEnabled = snapshot.ItemCount > 0;
+        }
+        catch (Exception ex)
+        {
+            RecycleBinSummary.Text = "Analyse impossible.";
+            RecycleBinStatus.Text = ex.Message;
+            AppLog.Write($"ANALYSE CORBEILLE IMPOSSIBLE | {ex.Message}");
+        }
+        finally { ScanRecycleBin.IsEnabled = true; }
+    }
+
+    private async Task ScanUnusedApplicationsAsync()
+    {
+        if (!int.TryParse(UnusedApplicationsThresholdDaysBox.Text, out var thresholdDays) || thresholdDays is < 30 or > 3650)
+        {
+            UnusedApplicationsStatus.Text = "Indiquez un seuil compris entre 30 et 3650 jours.";
+            return;
+        }
+        ScanUnusedApplications.IsEnabled = false;
+        UnusedApplicationsList.ItemsSource = null;
+        UnusedApplicationsStatus.Text = "Lecture des applications installées et de l’historique Windows…";
+        try
+        {
+            var result = await _installedApplicationAuditService.ScanAsync();
+            var cutoff = DateTime.Now.AddDays(-thresholdDays);
+            var candidates = result.Applications.Where(application => application.LastUsed.HasValue && application.LastUsed <= cutoff)
+                .OrderBy(application => application.LastUsed).ToArray();
+            var unknown = result.Applications.Count(application => !application.LastUsed.HasValue);
+            var candidateGames = candidates.Count(application => application.Category == "Jeu");
+            var detectedGames = result.Applications.Count(application => application.Category == "Jeu");
+            UnusedApplicationsList.ItemsSource = candidates;
+            UnusedApplicationsStatus.Text = candidates.Length == 0
+                ? $"Aucun logiciel ou jeu avec une utilisation connue antérieure à {thresholdDays} jours · {detectedGames} jeu(x) détecté(s) · {unknown} usage(s) inconnu(s) exclus."
+                : $"{candidates.Length} élément(s) potentiellement inutilisé(s), dont {candidateGames} jeu(x), depuis plus de {thresholdDays} jours · {unknown} usage(s) inconnu(s) exclus." +
+                  (result.InaccessibleSources > 0 ? $" · {result.InaccessibleSources} entrée(s) inaccessible(s)." : "");
+            _settings.UnusedApplicationsThresholdDays = thresholdDays;
+            _settingsService.Save(_settings);
+            AppLog.Write($"AUDIT LOGICIELS INUTILISÉS | Installés={result.Applications.Count}; Candidats={candidates.Length}; Inconnus={unknown}; Seuil={thresholdDays}");
+        }
+        catch (Exception ex)
+        {
+            UnusedApplicationsStatus.Text = $"Analyse impossible : {ex.Message}";
+            AppLog.Write($"AUDIT LOGICIELS IMPOSSIBLE | {ex.Message}");
+        }
+        finally { ScanUnusedApplications.IsEnabled = true; }
+    }
+
+    private string DownloadsFolder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+
+    private void AnalyzeToneNow()
+    {
+        try
+        {
+            var result = _toneAnalysisService.Analyze(ToneAnalysisInput.Text);
+            ToneAnalysisResult.Text = result.PrimaryTone;
+            ToneAnalysisClues.Text = string.Join("\n• ", new[] { result.Summary }.Concat(result.Clues));
+            ToneAnalysisStatus.Text = "Analyse locale terminée · résultat indicatif.";
+        }
+        catch (Exception ex)
+        {
+            ToneAnalysisResult.Text = "Analyse impossible";
+            ToneAnalysisClues.Text = ex.Message;
+        }
+    }
+
+    private async Task SearchFilesAsync()
+    {
+        _fileSearchCancellation?.Dispose();
+        _fileSearchCancellation = new CancellationTokenSource();
+        StartFileSearch.IsEnabled = false;
+        CancelFileSearch.IsEnabled = true;
+        OpenFoundFile.IsEnabled = false;
+        OpenFoundFileLocation.IsEnabled = false;
+        FileFinderResults.ItemsSource = null;
+        FileFinderStatus.Text = "Recherche dans les dossiers personnels…";
+        try
+        {
+            var result = await _fileFinderService.SearchAsync(FileFinderQueryBox.Text, _fileSearchCancellation.Token);
+            FileFinderResults.ItemsSource = result.Files;
+            FileFinderStatus.Text = result.Files.Count == 0 ? "Aucun fichier correspondant."
+                : $"{result.Files.Count} résultat(s)" + (result.LimitReached ? " · limite de 500 atteinte." : ".") +
+                  (result.InaccessibleFolders > 0 ? $" · {result.InaccessibleFolders} dossier(s) ignoré(s)." : "");
+        }
+        catch (OperationCanceledException) { FileFinderStatus.Text = "Recherche annulée."; }
+        catch (Exception ex) { FileFinderStatus.Text = ex.Message; }
+        finally { StartFileSearch.IsEnabled = true; CancelFileSearch.IsEnabled = false; }
+    }
+
+    private void OpenFoundFileLocationNow()
+    {
+        if (FileFinderResults.SelectedItem is not FileSearchResult file) return;
+        try { Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{file.FullPath}\"") { UseShellExecute = true }); }
+        catch (Exception ex) { FileFinderStatus.Text = $"Ouverture impossible : {ex.Message}"; }
+    }
+
+    private void OpenFoundFileNow()
+    {
+        if (FileFinderResults.SelectedItem is not FileSearchResult file) return;
+        try
+        {
+            if (!File.Exists(file.FullPath))
+            {
+                FileFinderStatus.Text = "Ce fichier n’existe plus à cet emplacement.";
+                return;
+            }
+            Process.Start(new ProcessStartInfo(file.FullPath) { UseShellExecute = true });
+            FileFinderStatus.Text = $"Ouverture de {file.Name}…";
+        }
+        catch (Exception ex) { FileFinderStatus.Text = $"Ouverture impossible : {ex.Message}"; }
+    }
+
+    private async Task RefreshInstalledSensitivityGamesAsync()
+    {
+        CalculateMouseSensitivity.IsEnabled = false;
+        MouseSensitivityStatus.Text = "Détection des jeux installés…";
+        try
+        {
+            var audit = await _installedApplicationAuditService.ScanAsync();
+            var profiles = _mouseSensitivityService.FindInstalled(audit.Applications);
+            SensitivitySourceGameBox.ItemsSource = null;
+            SensitivityTargetGameBox.ItemsSource = null;
+            SensitivitySourceGameBox.Items.Clear();
+            SensitivityTargetGameBox.Items.Clear();
+            SensitivitySourceGameBox.ItemsSource = profiles;
+            SensitivityTargetGameBox.ItemsSource = profiles;
+            SensitivitySourceGameBox.SelectedIndex = profiles.Count > 0 ? 0 : -1;
+            SensitivityTargetGameBox.SelectedIndex = profiles.Count > 1 ? 1 : profiles.Count > 0 ? 0 : -1;
+            CalculateMouseSensitivity.IsEnabled = profiles.Count > 0;
+            MouseSensitivityStatus.Text = profiles.Count == 0
+                ? "Aucun jeu installé avec un profil de conversion fiable n’a été détecté."
+                : $"{profiles.Count} jeu(x) compatible(s) détecté(s) sur ce PC.";
+        }
+        catch (Exception ex)
+        {
+            MouseSensitivityStatus.Text = $"Détection impossible : {ex.Message}";
+        }
+    }
+
+    private void CalculateMouseSensitivityNow()
+    {
+        static bool TryNumber(string text, out double value) =>
+            double.TryParse(text, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.CurrentCulture, out value) ||
+            double.TryParse(text.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out value);
+        if (!TryNumber(MouseDpiBox.Text, out var dpi) || dpi is < 100 or > 32_000 ||
+            !TryNumber(MouseSensitivityBox.Text, out var sensitivity) || sensitivity <= 0 || sensitivity > 100)
+        {
+            MouseEdpiResult.Text = MouseCm360Result.Text = MouseTargetSensitivityResult.Text = "—";
+            MouseSensitivityStatus.Text = "Utilisez un DPI entre 100 et 32 000 et une sensibilité positive.";
+            return;
+        }
+
+        if (SensitivitySourceGameBox.SelectedItem is not MouseSensitivityProfile source ||
+            SensitivityTargetGameBox.SelectedItem is not MouseSensitivityProfile target)
+        {
+            MouseSensitivityStatus.Text = "Sélectionnez un jeu installé dans les deux listes.";
+            return;
+        }
+        if (!source.Yaw.HasValue || !target.Yaw.HasValue)
+        {
+            MouseEdpiResult.Text = (dpi * sensitivity).ToString("0.##", System.Globalization.CultureInfo.CurrentCulture);
+            MouseCm360Result.Text = MouseTargetSensitivityResult.Text = "—";
+            MouseSensitivityStatus.Text = "La valeur enregistrée est affichée, mais Arma Reforger n’a pas encore de coefficient cm/360 suffisamment vérifié.";
+            return;
+        }
+
+        var edpi = dpi * sensitivity;
+        var cm360 = 2.54 * 360 / (dpi * sensitivity * source.Yaw.Value);
+        var targetSensitivity = sensitivity * source.Yaw.Value / target.Yaw.Value;
+        MouseEdpiResult.Text = edpi.ToString("0.##", System.Globalization.CultureInfo.CurrentCulture);
+        MouseCm360Result.Text = $"{cm360:0.00} cm";
+        MouseTargetSensitivityResult.Text = targetSensitivity.ToString("0.####", System.Globalization.CultureInfo.CurrentCulture);
+        MouseSensitivityStatus.Text = $"{source.Name} → {target.Name} · même cm/360 · FOV cible : {target.FovReference}";
+    }
+
+    private void LoadSavedMouseSensitivity()
+    {
+        if (SensitivitySourceGameBox.SelectedItem is not MouseSensitivityProfile profile) return;
+        try
+        {
+            var saved = _mouseSensitivityService.ReadSavedSensitivity(profile);
+            if (saved is null) return;
+            if (saved.Value.HasValue)
+                MouseSensitivityBox.Text = saved.Value.Value.ToString("0.######", System.Globalization.CultureInfo.CurrentCulture);
+            MouseSensitivityStatus.Text = saved.Details;
+        }
+        catch (Exception ex)
+        {
+            MouseSensitivityStatus.Text = $"Réglage du jeu détecté, mais lecture impossible : {ex.Message}";
+        }
+    }
+
+    private async Task ScanDownloadsAsync()
+    {
+        ScanDownloads.IsEnabled = false;
+        MoveSelectedDownloads.IsEnabled = false;
+        SelectAllDownloads.IsEnabled = false;
+        DeselectAllDownloads.IsEnabled = false;
+        DownloadsOrganizerList.ItemsSource = null;
+        DownloadsOrganizerStatus.Text = "Analyse en lecture seule…";
+        try
+        {
+            var result = await _downloadsOrganizerService.ScanAsync(DownloadsFolder);
+            _downloadsOrganizerResults = result.Files;
+            DownloadsOrganizerList.ItemsSource = result.Files;
+            var total = result.Files.Sum(file => file.SizeBytes);
+            DownloadsOrganizerSummary.Text = result.Files.Count == 0
+                ? "Aucun fichier ancien de plus de 10 minutes à organiser."
+                : $"{result.Files.Count} fichier(s) · {TemporaryFileCleanupService.FormatSize(total)} · {result.Files.Select(file => file.Category).Distinct().Count()} catégorie(s)";
+            DownloadsOrganizerStatus.Text = result.SkippedFiles > 0
+                ? $"{result.SkippedFiles} fichier(s) inaccessible(s) ignoré(s). Vérifiez la sélection avant de continuer."
+                : "Aucun déplacement effectué. Vérifiez les dossiers proposés.";
+            SelectAllDownloads.IsEnabled = result.Files.Count > 0;
+            DeselectAllDownloads.IsEnabled = result.Files.Count > 0;
+            MoveSelectedDownloads.IsEnabled = result.Files.Count > 0;
+        }
+        catch (Exception ex)
+        {
+            DownloadsOrganizerSummary.Text = "Analyse impossible.";
+            DownloadsOrganizerStatus.Text = ex.Message;
+            AppLog.Write($"ORGANISATION TÉLÉCHARGEMENTS IMPOSSIBLE | {ex.Message}");
+        }
+        finally { ScanDownloads.IsEnabled = true; }
+    }
+
+    private void SetDownloadsSelection(bool selected)
+    {
+        foreach (var file in _downloadsOrganizerResults) file.IsSelected = selected;
+        DownloadsOrganizerStatus.Text = selected ? "Tous les fichiers proposés sont sélectionnés." : "Tous les fichiers sont désélectionnés.";
+    }
+
+    private async Task MoveSelectedDownloadsAsync()
+    {
+        var selected = _downloadsOrganizerResults.Where(file => file.IsSelected).ToArray();
+        if (selected.Length == 0)
+        {
+            DownloadsOrganizerStatus.Text = "Sélectionnez au moins un fichier à déplacer.";
+            return;
+        }
+        var categories = selected.GroupBy(file => file.Category).OrderBy(group => group.Key)
+            .Select(group => $"• {group.Key} : {group.Count()} fichier(s)");
+        var confirmation = System.Windows.MessageBox.Show(this,
+            $"Déplacer {selected.Length} fichier(s) dans les sous-dossiers proposés de Téléchargements ?\n\n{string.Join("\n", categories)}\n\nLes fichiers portant déjà le même nom seront renommés sans écrasement.",
+            "Organiser Téléchargements", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
+        if (confirmation != MessageBoxResult.Yes) return;
+
+        ScanDownloads.IsEnabled = false;
+        MoveSelectedDownloads.IsEnabled = false;
+        DownloadsOrganizerStatus.Text = "Déplacement en cours…";
+        var result = await Task.Run(() => _downloadsOrganizerService.Move(selected, DownloadsFolder));
+        AppLog.Write($"ORGANISATION TÉLÉCHARGEMENTS | Déplacés={result.MovedFiles}; Échecs={result.FailedFiles}");
+        await ScanDownloadsAsync();
+        DownloadsOrganizerStatus.Text = $"{result.MovedFiles} fichier(s) déplacé(s)" +
+            (result.FailedFiles > 0 ? $" · {result.FailedFiles} échec(s)." : ".");
+    }
+
+    private async Task SaveAutomaticDownloadsOrganizerAsync()
+    {
+        var enable = AutomaticDownloadsOrganizerEnabled.IsChecked == true;
+        if (enable && !_settings.AutomaticDownloadsOrganizerEnabled)
+        {
+            var confirmation = System.Windows.MessageBox.Show(this,
+                "Activer le classement automatique quotidien ?\n\nFlexHub déplacera sans nouvelle confirmation les fichiers présents depuis plus de 24 heures vers Images, Vidéos, Musique, Documents, Archives, Installateurs, Images disque ou Code.\n\nLes téléchargements en cours et la catégorie Autres resteront toujours intacts.",
+                "Activer le classement automatique", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+            if (confirmation != MessageBoxResult.Yes)
+            {
+                AutomaticDownloadsOrganizerEnabled.IsChecked = false;
+                return;
+            }
+        }
+
+        _settings.AutomaticDownloadsOrganizerEnabled = enable;
+        if (enable) _settings.LastAutomaticDownloadsOrganizerUtc = null;
+        _settingsService.Save(_settings);
+        DownloadsOrganizerStatus.Text = enable
+            ? "Classement automatique activé. Premier contrôle en cours…"
+            : "Classement automatique désactivé.";
+        if (enable) await RunAutomaticDownloadsOrganizerAsync(true);
+    }
+
+    private async Task RunAutomaticDownloadsOrganizerAsync(bool force = false)
+    {
+        if (!_settings.DownloadsOrganizerModuleEnabled || !_settings.AutomaticDownloadsOrganizerEnabled || _automaticDownloadsOrganizerRunning) return;
+        if (!force && _settings.LastAutomaticDownloadsOrganizerUtc.HasValue &&
+            DateTime.UtcNow - _settings.LastAutomaticDownloadsOrganizerUtc.Value < TimeSpan.FromDays(1)) return;
+
+        _automaticDownloadsOrganizerRunning = true;
+        try
+        {
+            var scan = await _downloadsOrganizerService.ScanAsync(DownloadsFolder, TimeSpan.FromHours(24));
+            var recognized = scan.Files.Where(file => file.Category != "Autres").ToArray();
+            var result = await Task.Run(() => _downloadsOrganizerService.Move(recognized, DownloadsFolder));
+            _settings.LastAutomaticDownloadsOrganizerUtc = DateTime.UtcNow;
+            _settingsService.Save(_settings);
+            AppLog.Write($"ORGANISATION TÉLÉCHARGEMENTS AUTOMATIQUE | Trouvés={recognized.Length}; Déplacés={result.MovedFiles}; Échecs={result.FailedFiles}");
+            DownloadsOrganizerStatus.Text = result.MovedFiles == 0
+                ? "Classement automatique : aucun fichier reconnu de plus de 24 heures."
+                : $"Classement automatique : {result.MovedFiles} fichier(s) déplacé(s)" +
+                  (result.FailedFiles > 0 ? $" · {result.FailedFiles} échec(s)." : ".");
+            if (DownloadsOrganizerPage.Visibility == Visibility.Visible) await ScanDownloadsAsync();
+        }
+        catch (Exception ex)
+        {
+            DownloadsOrganizerStatus.Text = $"Classement automatique impossible : {ex.Message}";
+            AppLog.Write($"ORGANISATION TÉLÉCHARGEMENTS AUTOMATIQUE IMPOSSIBLE | {ex.Message}");
+        }
+        finally { _automaticDownloadsOrganizerRunning = false; }
+    }
+
+    private void ChooseBulkRenameFolderNow()
+    {
+        using var dialog = new Forms.FolderBrowserDialog { Description = "Choisissez le dossier contenant les fichiers à renommer.", UseDescriptionForTitle = true };
+        if (dialog.ShowDialog() != Forms.DialogResult.OK) return;
+        BulkRenameFolderBox.Text = dialog.SelectedPath;
+        PreviewBulkRename.IsEnabled = Directory.Exists(dialog.SelectedPath);
+        BulkRenameStatus.Text = "Dossier sélectionné. Configurez le modèle puis prévisualisez.";
+    }
+
+    private async Task PreviewBulkRenameAsync()
+    {
+        PreviewBulkRename.IsEnabled = false;
+        ApplyBulkRename.IsEnabled = false;
+        try
+        {
+            _bulkRenameResults = await _bulkRenameService.PreviewAsync(BulkRenameFolderBox.Text,
+                BulkRenamePrefixBox.Text, BulkRenameDateCheck.IsChecked == true, BulkRenameNumberCheck.IsChecked == true,
+                BulkRenameSmartCheck.IsChecked == true);
+            BulkRenameList.ItemsSource = _bulkRenameResults;
+            ApplyBulkRename.IsEnabled = _bulkRenameResults.Count > 0;
+            BulkRenameStatus.Text = _bulkRenameResults.Count == 0 ? "Aucun fichier à renommer avec ce modèle." : $"{_bulkRenameResults.Count} changement(s) proposé(s). Vérifiez chaque nouveau nom.";
+        }
+        catch (Exception ex) { BulkRenameStatus.Text = $"Aperçu impossible : {ex.Message}"; }
+        finally { PreviewBulkRename.IsEnabled = Directory.Exists(BulkRenameFolderBox.Text); }
+    }
+
+    private async Task ApplyBulkRenameAsync()
+    {
+        var selected = _bulkRenameResults.Where(file => file.IsSelected).ToArray();
+        if (selected.Length == 0) { BulkRenameStatus.Text = "Sélectionnez au moins un fichier."; return; }
+        if (System.Windows.MessageBox.Show(this, $"Renommer {selected.Length} fichier(s) ?\n\nLes nouveaux noms affichés dans l’aperçu seront appliqués.",
+                "Confirmer le renommage", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        ApplyBulkRename.IsEnabled = false;
+        var result = await Task.Run(() => _bulkRenameService.Rename(selected, BulkRenameFolderBox.Text));
+        AppLog.Write($"RENOMMAGE MASSE | Renommés={result.RenamedFiles}; Échecs={result.FailedFiles}");
+        await PreviewBulkRenameAsync();
+        BulkRenameStatus.Text = $"{result.RenamedFiles} fichier(s) renommé(s)" + (result.FailedFiles > 0 ? $" · {result.FailedFiles} échec(s)." : ".");
+    }
+
+    private async Task EmptyRecycleBinAsync()
+    {
+        var snapshot = await _recycleBinService.ScanAsync();
+        if (snapshot.ItemCount == 0) { await ScanRecycleBinAsync(); return; }
+        var confirmation = System.Windows.MessageBox.Show(this,
+            $"Supprimer définitivement les {snapshot.ItemCount} élément(s) de la Corbeille ({TemporaryFileCleanupService.FormatSize(snapshot.TotalSizeBytes)}) ?\n\nCette opération est irréversible.",
+            "Vider la Corbeille", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+        if (confirmation != MessageBoxResult.Yes) return;
+        ScanRecycleBin.IsEnabled = false;
+        EmptyRecycleBin.IsEnabled = false;
+        RecycleBinStatus.Text = "Suppression définitive en cours…";
+        try
+        {
+            await Task.Run(_recycleBinService.Empty);
+            AppLog.Write($"CORBEILLE VIDÉE | Éléments={snapshot.ItemCount}; Récupéré={snapshot.TotalSizeBytes}");
+            await ScanRecycleBinAsync();
+            RecycleBinStatus.Text = $"Corbeille vidée · {TemporaryFileCleanupService.FormatSize(snapshot.TotalSizeBytes)} récupérés.";
+        }
+        catch (Exception ex)
+        {
+            RecycleBinStatus.Text = $"Vidage impossible : {ex.Message}";
+            AppLog.Write($"VIDAGE CORBEILLE IMPOSSIBLE | {ex.Message}");
+        }
+        finally { ScanRecycleBin.IsEnabled = true; }
+    }
+
+    private async Task SaveRecycleBinAutomationAsync()
+    {
+        if (!int.TryParse(RecycleBinMaximumSizeGbBox.Text, out var sizeGb) || sizeGb is < 1 or > 100 ||
+            !int.TryParse(RecycleBinMaximumAgeDaysBox.Text, out var ageDays) || ageDays is < 1 or > 3650)
+        {
+            RecycleBinStatus.Text = "Indiquez une taille de 1 à 100 Go et un âge de 1 à 3650 jours.";
+            return;
+        }
+        var enable = AutomaticRecycleBinCleanupEnabled.IsChecked == true;
+        if (enable && !_settings.AutomaticRecycleBinCleanupEnabled)
+        {
+            var confirmation = System.Windows.MessageBox.Show(this,
+                $"Activer le vidage automatique quotidien ?\n\nToute la Corbeille sera supprimée définitivement, sans nouvelle confirmation, dès qu’elle dépassera {sizeGb} Go ou que son élément le plus ancien dépassera {ageDays} jours.",
+                "Activer le vidage automatique", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+            if (confirmation != MessageBoxResult.Yes)
+            {
+                AutomaticRecycleBinCleanupEnabled.IsChecked = false;
+                return;
+            }
+        }
+        _settings.AutomaticRecycleBinCleanupEnabled = enable;
+        _settings.RecycleBinMaximumSizeGb = sizeGb;
+        _settings.RecycleBinMaximumAgeDays = ageDays;
+        _settings.LastAutomaticRecycleBinCheckUtc = null;
+        _settingsService.Save(_settings);
+        RecycleBinStatus.Text = enable ? "Automatisation enregistrée. Premier contrôle en cours…" : "Vidage automatique désactivé.";
+        if (enable) await RunAutomaticRecycleBinCleanupAsync(true);
+    }
+
+    private async Task RunAutomaticRecycleBinCleanupAsync(bool force = false)
+    {
+        if (!_settings.RecycleBinModuleEnabled || !_settings.AutomaticRecycleBinCleanupEnabled || _automaticRecycleBinCleanupRunning) return;
+        if (!force && _settings.LastAutomaticRecycleBinCheckUtc.HasValue &&
+            DateTime.UtcNow - _settings.LastAutomaticRecycleBinCheckUtc.Value < TimeSpan.FromDays(1)) return;
+        _automaticRecycleBinCleanupRunning = true;
+        try
+        {
+            var snapshot = await _recycleBinService.ScanAsync();
+            var tooLarge = snapshot.TotalSizeBytes >= _settings.RecycleBinMaximumSizeGb * 1024L * 1024 * 1024;
+            var tooOld = snapshot.OldestDeletion.HasValue &&
+                snapshot.OldestDeletion.Value <= DateTime.Now.AddDays(-_settings.RecycleBinMaximumAgeDays);
+            if (snapshot.ItemCount > 0 && (tooLarge || tooOld))
+            {
+                await Task.Run(_recycleBinService.Empty);
+                AppLog.Write($"CORBEILLE AUTOMATIQUE | Éléments={snapshot.ItemCount}; Récupéré={snapshot.TotalSizeBytes}; Motif={(tooLarge ? "taille" : "ancienneté")}");
+                RecycleBinStatus.Text = $"Vidage automatique effectué · {TemporaryFileCleanupService.FormatSize(snapshot.TotalSizeBytes)} récupérés.";
+                if (RecycleBinPage.Visibility == Visibility.Visible) await ScanRecycleBinAsync();
+            }
+            _settings.LastAutomaticRecycleBinCheckUtc = DateTime.UtcNow;
+            _settingsService.Save(_settings);
+        }
+        catch (Exception ex)
+        {
+            RecycleBinStatus.Text = $"Contrôle automatique impossible : {ex.Message}";
+            AppLog.Write($"CORBEILLE AUTOMATIQUE IMPOSSIBLE | {ex.Message}");
+        }
+        finally { _automaticRecycleBinCleanupRunning = false; }
+    }
+
     private async Task SaveAutomaticTemporaryCleanupAsync()
     {
         var enable = AutomaticTemporaryCleanupEnabled.IsChecked == true;
@@ -3201,6 +3798,41 @@ public partial class MainWindow : Window
             AppLog.Write($"Lecture du stockage impossible : {ex.Message}");
         }
         finally { RefreshStorageHealth.IsEnabled = true; }
+    }
+
+    private async Task RefreshDriverAuditAsync()
+    {
+        RefreshDriverAudit.IsEnabled = false;
+        OpenDriverSupport.IsEnabled = false;
+        DriverAuditList.ItemsSource = null;
+        DriverAuditStatus.Text = "Lecture des pilotes installés par Windows…";
+        try
+        {
+            var entries = await _driverAuditService.ScanAsync();
+            DriverAuditList.ItemsSource = entries;
+            var gpu = entries.Count(entry => entry.Category == "GPU");
+            var audio = entries.Count(entry => entry.Category == "Audio");
+            var chipset = entries.Count(entry => entry.Category == "Chipset");
+            DriverAuditStatus.Text = entries.Count == 0
+                ? "Aucun pilote GPU, audio ou chipset n’a été identifié."
+                : $"{entries.Count} pilote(s) affiché(s) · GPU : {gpu} · Audio : {audio} · Chipset : {chipset}.";
+            AppLog.Write($"AUDIT PILOTES | Total={entries.Count}; GPU={gpu}; Audio={audio}; Chipset={chipset}");
+        }
+        catch (Exception ex)
+        {
+            DriverAuditStatus.Text = $"Analyse impossible : {ex.Message}";
+            AppLog.Write($"Audit des pilotes impossible : {ex.Message}");
+        }
+        finally { RefreshDriverAudit.IsEnabled = true; }
+    }
+
+    private void OpenSelectedDriverSupportPage()
+    {
+        if (DriverAuditList.SelectedItem is not DriverAuditEntry entry) return;
+        OpenExternalPage(entry.SupportUrl, $"support pilote {entry.Manufacturer}");
+        DriverAuditStatus.Text = entry.SupportUrl.StartsWith("ms-settings:", StringComparison.OrdinalIgnoreCase)
+            ? "Windows Update a été ouvert pour ce fabricant non reconnu."
+            : $"Page officielle ouverte pour {entry.Manufacturer}. Vérifiez le modèle exact avant d’installer.";
     }
 
     private async Task RefreshStartupAuditAsync()

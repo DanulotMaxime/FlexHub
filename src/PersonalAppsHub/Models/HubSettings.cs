@@ -2,7 +2,7 @@ namespace PersonalAppsHub.Models;
 
 public sealed class HubSettings
 {
-    public int SettingsSchemaVersion { get; set; } = 17;
+    public int SettingsSchemaVersion { get; set; } = 28;
     public bool StartWithWindows { get; set; } = true;
     public string FontSizePreference { get; set; } = "Moyen";
     public string ThemePreference { get; set; } = "Sombre";
@@ -50,6 +50,7 @@ public sealed class HubSettings
     public bool ConversationSummaryPreserveNames { get; set; } = true;
     public bool ConversationSummaryIncludeActions { get; set; } = true;
     public bool WordDefinitionEnabled { get; set; } = true;
+    public bool ToneAnalysisEnabled { get; set; } = true;
     public string WordDefinitionDetail { get; set; } = "Simple";
     public bool WordDefinitionIncludeExamples { get; set; } = true;
     public bool ActionWheelEnabled { get; set; } = true;
@@ -73,10 +74,25 @@ public sealed class HubSettings
     public DateTime? LastAutomaticTemporaryCleanupUtc { get; set; }
     public bool GameSessionsModuleEnabled { get; set; } = true;
     public bool NetworkMonitoringModuleEnabled { get; set; } = true;
+    public bool MouseSensitivityModuleEnabled { get; set; } = true;
     public bool TemporaryCleanupModuleEnabled { get; set; } = true;
+    public bool MemoryCacheModuleEnabled { get; set; } = true;
+    public bool RecycleBinModuleEnabled { get; set; } = true;
+    public bool AutomaticRecycleBinCleanupEnabled { get; set; }
+    public int RecycleBinMaximumSizeGb { get; set; } = 5;
+    public int RecycleBinMaximumAgeDays { get; set; } = 30;
+    public DateTime? LastAutomaticRecycleBinCheckUtc { get; set; }
+    public bool UnusedApplicationsModuleEnabled { get; set; } = true;
+    public int UnusedApplicationsThresholdDays { get; set; } = 90;
+    public bool DownloadsOrganizerModuleEnabled { get; set; } = true;
+    public bool AutomaticDownloadsOrganizerEnabled { get; set; }
+    public DateTime? LastAutomaticDownloadsOrganizerUtc { get; set; }
+    public bool BulkRenameModuleEnabled { get; set; } = true;
     public bool DuplicateFilesModuleEnabled { get; set; } = true;
     public bool StorageHealthModuleEnabled { get; set; } = true;
     public bool StartupAuditModuleEnabled { get; set; } = true;
+    public bool DriverAuditModuleEnabled { get; set; } = true;
+    public bool FileFinderModuleEnabled { get; set; } = true;
     public bool XmpMonitorEnabled { get; set; }
     public int XmpCheckIntervalMinutes { get; set; } = 360;
     public bool MemorySetupCompleted { get; set; }

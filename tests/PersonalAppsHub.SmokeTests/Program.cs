@@ -127,6 +127,44 @@ Check(summaryInstruction.Contains("5 lignes") && summaryInstruction.Contains("t�
 var definitionInstruction = ResponseGenerationService.BuildTransformationInstruction(TextTransformationMode.DefineWord, "Définition courte avec un exemple.");
 Check(definitionInstruction.Contains("Définition courte") && definitionInstruction.Contains("contexte"), "consigne de définition d’un mot");
 
+var toneAnalyzer = new ToneAnalysisService();
+Check(toneAnalyzer.Analyze("J'en ai marre, ça ne fonctionne toujours pas !").PrimaryTone.StartsWith("Frustré"),
+    "analyse d’un message frustré");
+Check(toneAnalyzer.Analyze("Bonjour Madame, veuillez trouver le document. Bien cordialement.").PrimaryTone.StartsWith("Professionnel"),
+    "analyse d’un message professionnel");
+Check(toneAnalyzer.Analyze("C'est absolument génial, j'adore ! Bravo !").PrimaryTone.StartsWith("Enthousiaste"),
+    "analyse d’un message enthousiaste");
+Check(toneAnalyzer.Analyze("Le rendez-vous est fixé à quinze heures.").PrimaryTone == "Neutre",
+    "analyse d’un message neutre");
+var criticalTone = toneAnalyzer.Analyze("Votre serveur encourage le spam. J'en ai marre, réglez ce problème ou je me casse !");
+Check(criticalTone.PrimaryTone.StartsWith("Critique") && criticalTone.Clues.Any(clue => clue.Contains("Expressions repérées")),
+    "analyse expliquée d’un long reproche critique");
+var nextGenTone = toneAnalyzer.Analyze("J'arrête de jouer sur NextGen. Ça spam à outrance les véhicules. Suite à un T-14, j'en ai eu ma claque. Je ne rejouerais que lorsque ce sera réglé. Les devs n'en ont rien à foutre de l'équilibre, sans parler de Bravo 1. Les joueurs ne peuvent pas jouer comme ils veulent !");
+Check(!nextGenTone.PrimaryTone.StartsWith("Enthousiaste") &&
+      (nextGenTone.PrimaryTone.StartsWith("Critique") || nextGenTone.PrimaryTone.StartsWith("Frustré") || nextGenTone.PrimaryTone.StartsWith("Résigné")),
+    "Bravo 1 n’est pas interprété comme une félicitation");
+var indirectCriticism = toneAnalyzer.Analyze("Quand on suggère des choses à des modérateurs qui jouent 2 fois au jeu dans le mois, sans prendre en compte ceux qui jouent, en se mettant des bouchons d'oreille et n'acceptant jamais d'avoir tort, voilà ce que ça donne : de nombreux joueurs quittent le serveur. Bonne continuation.");
+Check(indirectCriticism.PrimaryTone.StartsWith("Critique"),
+    "détection d’une critique indirecte envers la modération");
+Check(toneAnalyzer.Analyze("Pas méchant mais pourquoi publier ça ici ? Les gens se plaignent quelle que soit la décision.").PrimaryTone.StartsWith("Défensif"),
+    "détection d’un désaccord défensif et atténué");
+Check(toneAnalyzer.Analyze("Je suis vraiment inquiet, est-ce normal ? J'ai peur de perdre mes données.").PrimaryTone.StartsWith("Inquiet"),
+    "détection de l’inquiétude");
+Check(toneAnalyzer.Analyze("Je suis très déçu et triste que tout se termine ainsi.").PrimaryTone.StartsWith("Triste"),
+    "détection de la tristesse");
+Check(toneAnalyzer.Analyze("Merci beaucoup pour ton aide, prends soin de toi.").PrimaryTone.StartsWith("Chaleureux"),
+    "détection d’un ton chaleureux");
+Check(toneAnalyzer.Analyze("C'est urgent, répondez au plus vite avant ce soir.").PrimaryTone.StartsWith("Urgent"),
+    "détection de l’urgence");
+Check(toneAnalyzer.Analyze("Vous devez arrêter immédiatement et régler le problème.").PrimaryTone.Contains("Directif"),
+    "détection d’une instruction directe");
+Check(!toneAnalyzer.Analyze("Ce n'est vraiment pas génial.").PrimaryTone.StartsWith("Enthousiaste"),
+    "prise en compte de la négation d’un mot positif");
+Check(!toneAnalyzer.Analyze("Bravo 1 arrive avec son véhicule.").PrimaryTone.StartsWith("Enthousiaste"),
+    "absence de faux positif sur le nom Bravo 1");
+Check(toneAnalyzer.Analyze("Le rapport contient douze pages et a été envoyé mardi.").PrimaryTone == "Neutre",
+    "conservation d’un ton factuel neutre");
+
 Check(NvidiaProfileService.GetProfileKeyForGpuName("NVIDIA GeForce RTX 2080 Ti") == "RTX-2080-Ti", "détection RTX 2080 Ti");
 Check(NvidiaProfileService.GetProfileKeyForGpuName("NVIDIA GeForce RTX 3050 Laptop GPU") == "RTX-3050-Laptop", "détection RTX 3050 mobile");
 Check(NvidiaProfileService.GetProfileKeyForGpuName("GeForce RTX 4070 Ti SUPER") == "RTX-4070-Ti-SUPER", "détection RTX 4070 Ti SUPER");

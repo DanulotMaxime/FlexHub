@@ -1,5 +1,27 @@
 # Notes de version
 
+## 1.5.0
+
+- Ajout d’une purge manuelle du cache RAM en attente de Windows, avec confirmation, autorisation administrateur et mesure de la mémoire disponible avant/après.
+- La purge du cache RAM reste exclusivement manuelle ; le mode automatique a été retiré afin d’éviter les ralentissements et rechargements de données pendant les jeux.
+- Ajout d’un module Corbeille avec inventaire, taille, ancienneté, vidage manuel confirmé et seuils automatiques facultatifs en Go ou en jours.
+- Ajout d’un audit en lecture seule des logiciels et jeux Steam/Epic potentiellement inutilisés, avec seuil configurable et exclusion prudente des usages inconnus.
+- Ajout d’un organisateur du dossier Téléchargements avec aperçu, sélection, classement par type et déplacement confirmé sans écrasement.
+- Ajout d’un classement quotidien facultatif des téléchargements reconnus âgés de plus de 24 heures ; les fichiers partiels et la catégorie Autres restent intacts.
+- Ajout du renommage de fichiers en masse avec aperçu, préfixe, cases date et numéro, sélection et confirmation.
+- Ajout facultatif de noms intelligents générés localement depuis le contenu et les métadonnées des fichiers, toujours avec aperçu et confirmation.
+- Ajout d’un audit en lecture seule des pilotes GPU, audio et chipset avec version, date, fichier INF et accès au support officiel du fabricant.
+- Ajout d’un calculateur de sensibilité pour Valorant, CS2 et Apex Legends avec eDPI, cm/360, conversion équivalente et indication du FOV de référence.
+- Le calculateur filtre désormais une bibliothèque étendue de profils et ne propose que les jeux détectés dans les installations Windows, Steam ou Epic.
+- Lecture automatique des réglages de sensibilité WARDOGS, toujours sans modifier les fichiers du jeu.
+- Ajout de la recherche locale de fichiers par fragment de nom, avec type, taille, date, ouverture du fichier et accès direct à son emplacement.
+- Regroupement de la recherche de fichiers, du classement des téléchargements, du renommage et des doublons dans une catégorie Utilitaires dédiée.
+- Ajout d’une analyse locale et explicable du ton : critique, agressif, frustré, résigné, défensif, inquiet, triste, enthousiaste, chaleureux, urgent, professionnel, incertain, directif ou neutre.
+- L’analyse du ton combine familles de mots, expressions, négations, contexte, ponctuation et intensité, avec jusqu’à deux nuances et les indices ayant motivé le résultat.
+- Amélioration de l’ergonomie du renommage en masse : choix du dossier plus compact, prévisualisation agrandie et champ de préfixe clarifié.
+- Harmonisation de tous les tableaux : lignes, sélections, survols et en-têtes restent sombres et lisibles, y compris lorsque le contrôle perd le focus.
+- Correction de plusieurs problèmes de robustesse, notamment l’encodage de l’inventaire des pilotes et la détection Unicode dans l’analyse du ton.
+
 ## 1.4.2
 
 - Ajout du suivi des ressources utilisées directement par le processus de chaque jeu détecté.

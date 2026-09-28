@@ -1,6 +1,6 @@
 ﻿# 🚀 FlexHub — Suivi du développement
 
-*Dernière mise à jour : 24 septembre 2026*
+*Dernière mise à jour : 28 septembre 2026*
 
 
 ## Légende
@@ -215,16 +215,16 @@ pas le temps nécessaire.
 
 ## 3. RESTE À FAIRE - SYSTÈME, NETTOYAGE ET MAINTENANCE
 
-- [ ] **Vider le cache RAM et purger les fichiers temporaires en un clic.** *(Nettoyage temporaire sécurisé disponible ; cache RAM à étudier.)*
-- [ ] **Vider automatiquement la corbeille au-delà de X Go ou X jours.**
+- [x] **Vider le cache RAM et purger les fichiers temporaires.** *(Purge RAM exclusivement manuelle avec confirmation, élévation administrateur et mesure avant/après. Le mode automatique a été retiré car il pouvait provoquer des ralentissements.)*
+- [x] **Vider automatiquement la corbeille au-delà de X Go ou X jours.** *(Inventaire en lecture seule, aperçu, vidage manuel confirmé et contrôle quotidien facultatif désactivé par défaut. Le vidage automatique supprime toute la Corbeille après consentement explicite.)*
 - [x] **Afficher l'espace disque et la santé S.M.A.R.T. des SSD.**
 - [x] **Auditer les programmes lancés au démarrage et proposer leur désactivation.**
-- [ ] **Détecter les logiciels inutilisés depuis une durée configurable.**
+- [x] **Détecter les logiciels et jeux inutilisés depuis une durée configurable.** *(Audit en lecture seule des logiciels installés, des bibliothèques Steam/Epic et de l’historique UserAssist de Windows ; seules les dernières exécutions connues sont signalées, les usages inconnus restent explicitement exclus.)*
 - [x] **Scanner les fichiers en double par hash avec validation avant suppression.** *(Analyse SHA-256, sélection manuelle ou automatique, conservation obligatoire d'un exemplaire et déplacement récupérable vers la Corbeille.)*
-- [ ] **Vérifier les pilotes GPU, audio et chipset sur les sites fabricants.**
+- [~] **Vérifier les pilotes GPU, audio et chipset sur les sites fabricants.** *(Inventaire local en lecture seule avec type, fabricant, version, date et fichier INF, plus accès au support officiel NVIDIA, AMD, Intel ou Realtek. La comparaison automatique avec la toute dernière version constructeur reste à ajouter.)*
 - [x] **Nettoyer précisément les caches de navigateurs, Steam, Visual Studio, etc.**
-- [ ] **Organiser automatiquement le dossier Téléchargements selon des règles.**
-- [ ] **Renommer des fichiers en masse selon leur contexte (EXIF, lieu, date, etc.).**
+- [x] **Organiser automatiquement le dossier Téléchargements selon des règles.** *(Analyse et aperçu manuels, catégories par extension et déplacement confirmé. Mode quotidien facultatif, désactivé par défaut : seuls les fichiers reconnus âgés de plus de 24 heures sont déplacés, sans écrasement ; les téléchargements partiels et la catégorie Autres restent intacts.)*
+- [~] **Renommer des fichiers en masse selon leur contexte (EXIF, lieu, date, etc.).** *(Aperçu, sélection, préfixe, date et numérotation, plus génération locale d’un nom intelligent depuis le contenu texte/code, les titres DOCX/PDF, les tags MP3 et les métadonnées EXIF. Les fichiers non reconnus conservent leur nom ; le lieu GPS reste à ajouter.)*
 
 
 
@@ -261,14 +261,15 @@ pas le temps nécessaire.
 - Le profil NVIDIA actif au démarrage est conservé avec chaque session afin d'identifier clairement les comparaisons avant/après.
 - [x] **Passer automatiquement le processus d'un jeu en priorité CPU haute.** *(Option désactivée par défaut, confirmation avec aperçu des jeux concernés, priorité Temps réel interdite et restauration automatique de la priorité d’origine.)*
 - [ ] **Isoler des cœurs CPU pour le jeu et déplacer les autres processus.**
-- [ ] **Calculer l'eDPI et comparer la sensibilité aux joueurs professionnels.**
-- [ ] **Convertir la sensibilité entre Valorant, CS2, Apex, etc., avec leur FOV.**
+- [~] **Calculer l'eDPI et comparer la sensibilité aux joueurs professionnels.** *(Calcul local de l’eDPI et du cm/360 disponible. La comparaison à une base de joueurs professionnels reste à ajouter.)*
+- [x] **Convertir la sensibilité entre Valorant, CS2, Apex, etc., avec leur FOV.** *(Bibliothèque de profils fiables pour Valorant, Counter-Strike 2/GO/Source, Apex Legends, Overwatch 2, Rainbow Six Siege, Team Fortress 2, Left 4 Dead 2, Half-Life 2, Quake Live/Champions, Garry’s Mod, Portal 2, Black Mesa et Day of Defeat Source. Seuls les jeux réellement détectés sur le PC sont proposés.)*
+- Lecture automatique en consultation seule de la sensibilité, de l’ADS, du FOV et de l’accélération de WARDOGS.
 
 
 
 ## 6. RESTE À FAIRE - IA, TEXTE ET PRODUCTIVITÉ
 
-- [ ] **Détecter le ton d'un message (agressif, formel, ambigu, etc.).**
+- [x] **Détecter le ton d'un message (critique, défensif, agressif, etc.).** *(Moteur local explicable combinant familles de mots, expressions, négations, contexte adressé, ponctuation et intensité. Tons critique, agressif, frustré, résigné, défensif, inquiet, triste, enthousiaste, chaleureux, urgent, professionnel, incertain, directif ou neutre, avec jusqu’à deux nuances et les indices ayant motivé le résultat.)*
 - [ ] **Analyser la légitimité d'un lien ou exécutable suspect.**
 - [ ] **Ajouter des actions au menu contextuel Windows pour le texte sélectionné.**
 - [ ] **Comparer deux produits/options et proposer un verdict sourcé.**
@@ -287,7 +288,7 @@ pas le temps nécessaire.
   et permettre une recherche dans l'historique.
 - [ ] **Créer une recherche unifiée dans les fichiers, le presse-papiers,**
   les snippets et les favoris.
-- [ ] **Ajouter la recherche « Où est ce fichier ? » par fragment de nom.**
+- [x] **Ajouter la recherche « Où est ce fichier ? » par fragment de nom.** *(Recherche locale annulable dans les dossiers personnels, limitée à 500 résultats, avec type, taille, date, ouverture du fichier dans son application associée et ouverture directe de son emplacement.)*
 
 
 

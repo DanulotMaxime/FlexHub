@@ -17,6 +17,8 @@ FlexHub permet notamment de :
 - recevoir un rappel Top-Serveurs ;
 - appliquer des profils d'optimisation NVIDIA ;
 - surveiller la configuration XMP de la mémoire ;
+- nettoyer les fichiers temporaires et purger manuellement le cache RAM en attente ;
+- consulter la Corbeille et configurer son vidage selon sa taille ou son ancienneté ;
 - recevoir les nouvelles versions depuis GitHub.
 
 ## Installation

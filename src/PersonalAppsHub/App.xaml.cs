@@ -17,6 +17,21 @@ public partial class App : System.Windows.Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        if (MemoryCacheService.IsElevatedPurgeRequest(e.Args))
+        {
+            try
+            {
+                MemoryCacheService.PurgeStandbyList();
+                Environment.ExitCode = 0;
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write($"PURGE CACHE RAM IMPOSSIBLE | {ex.Message}");
+                Environment.ExitCode = 1;
+            }
+            Shutdown(Environment.ExitCode);
+            return;
+        }
         DispatcherUnhandledException += (_, args) =>
         {
             AppLog.WriteException("ERREUR WPF NON GÉRÉE", args.Exception);
