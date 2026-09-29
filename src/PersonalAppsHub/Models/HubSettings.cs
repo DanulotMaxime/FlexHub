@@ -2,7 +2,7 @@ namespace PersonalAppsHub.Models;
 
 public sealed class HubSettings
 {
-    public int SettingsSchemaVersion { get; set; } = 28;
+    public int SettingsSchemaVersion { get; set; } = 32;
     public bool StartWithWindows { get; set; } = true;
     public string FontSizePreference { get; set; } = "Moyen";
     public string ThemePreference { get; set; } = "Sombre";
@@ -93,6 +93,11 @@ public sealed class HubSettings
     public bool StartupAuditModuleEnabled { get; set; } = true;
     public bool DriverAuditModuleEnabled { get; set; } = true;
     public bool FileFinderModuleEnabled { get; set; } = true;
+    public bool SuspiciousContentModuleEnabled { get; set; } = true;
+    public bool LinkHoverSafetyEnabled { get; set; }
+    public bool DailyActivityReportEnabled { get; set; }
+    public int DailyActivityReportHour { get; set; } = 18;
+    public DateTime? LastDailyActivityReportDate { get; set; }
     public bool XmpMonitorEnabled { get; set; }
     public int XmpCheckIntervalMinutes { get; set; } = 360;
     public bool MemorySetupCompleted { get; set; }

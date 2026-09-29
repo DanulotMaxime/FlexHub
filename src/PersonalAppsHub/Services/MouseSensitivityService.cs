@@ -9,8 +9,19 @@ public sealed record MouseSensitivityProfile(string Name, double? Yaw, string Fo
     public override string ToString() => Name;
 }
 
+public sealed record ProfessionalSensitivityReference(
+    double MedianEdpi, int PlayerCount, string SourceName, string SourceUrl, string UpdatedText);
+
 public sealed class MouseSensitivityService
 {
+    private static readonly IReadOnlyDictionary<string, ProfessionalSensitivityReference> ProfessionalReferences =
+        new Dictionary<string, ProfessionalSensitivityReference>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Valorant"] = new(240, 698, "ProSettings", "https://prosettings.net/guides/valorant-options/", "septembre 2026"),
+            ["Counter-Strike 2"] = new(830, 940, "ProSettings", "https://prosettings.net/guides/cs2-options/", "septembre 2026"),
+            ["Counter-Strike: Global Offensive"] = new(830, 940, "ProSettings (référence CS2)", "https://prosettings.net/guides/cs2-options/", "septembre 2026")
+        };
+
     private static readonly MouseSensitivityProfile[] Profiles =
     {
         new("Valorant", 0.07, "103° horizontal (16:9, fixe)", "valorant"),
@@ -33,6 +44,9 @@ public sealed class MouseSensitivityService
     };
 
     public sealed record SavedSensitivity(double? Value, string Details);
+
+    public ProfessionalSensitivityReference? GetProfessionalReference(MouseSensitivityProfile profile) =>
+        ProfessionalReferences.GetValueOrDefault(profile.Name);
 
     public SavedSensitivity? ReadSavedSensitivity(MouseSensitivityProfile profile)
     {

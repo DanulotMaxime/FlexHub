@@ -204,7 +204,7 @@ pas le temps nécessaire.
 ### 🟡 Comparaison avant/après un réglage NVIDIA — 70 %
 - L'application sait appliquer, sauvegarder et restaurer un profil NVIDIA.
 - Les sessions enregistrent le profil NVIDIA actif et comparent leurs mesures à une session de référence du même jeu.
-- Reste à intégrer les FPS lorsqu'une source compatible sera disponible.
+- Les FPS moyens, les 1 % low et le temps d’image moyen sont collectés automatiquement avec PresentMon pendant les sessions compatibles.
 
 
 ### 🟡 Rapport et analyse des erreurs — 15 %
@@ -251,17 +251,17 @@ pas le temps nécessaire.
 
 ## 5. RESTE À FAIRE - JEUX ET PERFORMANCES
 
-- [ ] **Estimer les FPS en arrière-plan sans overlay.**
+- [x] **Estimer les FPS en arrière-plan sans overlay.** *(Collecte ciblée avec PresentMon, sans injection dans le jeu.)*
 - [x] **Détecter le jeu lancé, chronométrer la session et alerter après X heures.** *(Alerte de pause disponible mais désactivée par défaut.)*
 - Le suivi des sessions reste actif en arrière-plan toutes les 15 secondes, quelle que soit la page affichée.
-- [~] **Générer un rapport de session : durée, températures, FPS et chutes de FPS.** *(Durée et mesures globales du PC disponibles, avec détail séparé du processus du jeu : CPU, RAM, GPU 3D et VRAM. PresentMon/FrameView ne fournit aucune trame pour le jeu testé ; FPS à finaliser avec une source compatible.)*
+- [x] **Générer un rapport de session : durée, températures, FPS et chutes de FPS.** *(Durée, mesures globales du PC, détail CPU/RAM/GPU/VRAM du jeu, FPS moyens, 1 % low et temps d’image moyen.)*
 - [x] **Conserver l'historique des sessions et afficher des graphes par jeu/semaine.** *(Historique local sans limite et graphique comparatif filtrable sur 7 jours, 30 jours, l'année ou toute la période.)*
 - Export CSV complet avec colonnes distinctes pour les mesures globales du PC et celles du processus du jeu.
 - Une session terminée peut être définie comme référence par jeu ; les sessions suivantes affichent leurs écarts CPU, RAM, GPU et température GPU.
 - Le profil NVIDIA actif au démarrage est conservé avec chaque session afin d'identifier clairement les comparaisons avant/après.
 - [x] **Passer automatiquement le processus d'un jeu en priorité CPU haute.** *(Option désactivée par défaut, confirmation avec aperçu des jeux concernés, priorité Temps réel interdite et restauration automatique de la priorité d’origine.)*
-- [ ] **Isoler des cœurs CPU pour le jeu et déplacer les autres processus.**
-- [~] **Calculer l'eDPI et comparer la sensibilité aux joueurs professionnels.** *(Calcul local de l’eDPI et du cm/360 disponible. La comparaison à une base de joueurs professionnels reste à ajouter.)*
+- [~] **Isoler des cœurs CPU pour le jeu et déplacer les autres processus.** *(Module abandonné et retiré : les essais ont provoqué des freezes et des interruptions temporaires des périphériques.)*
+- [x] **Calculer l'eDPI et comparer la sensibilité aux joueurs professionnels.** *(Calcul local de l’eDPI et du cm/360, avec comparaison prudente aux médianes professionnelles vérifiées pour Valorant et Counter-Strike 2.)*
 - [x] **Convertir la sensibilité entre Valorant, CS2, Apex, etc., avec leur FOV.** *(Bibliothèque de profils fiables pour Valorant, Counter-Strike 2/GO/Source, Apex Legends, Overwatch 2, Rainbow Six Siege, Team Fortress 2, Left 4 Dead 2, Half-Life 2, Quake Live/Champions, Garry’s Mod, Portal 2, Black Mesa et Day of Defeat Source. Seuls les jeux réellement détectés sur le PC sont proposés.)*
 - Lecture automatique en consultation seule de la sensibilité, de l’ADS, du FOV et de l’accélération de WARDOGS.
 
@@ -270,12 +270,11 @@ pas le temps nécessaire.
 ## 6. RESTE À FAIRE - IA, TEXTE ET PRODUCTIVITÉ
 
 - [x] **Détecter le ton d'un message (critique, défensif, agressif, etc.).** *(Moteur local explicable combinant familles de mots, expressions, négations, contexte adressé, ponctuation et intensité. Tons critique, agressif, frustré, résigné, défensif, inquiet, triste, enthousiaste, chaleureux, urgent, professionnel, incertain, directif ou neutre, avec jusqu’à deux nuances et les indices ayant motivé le résultat.)*
-- [ ] **Analyser la légitimité d'un lien ou exécutable suspect.**
-- [ ] **Ajouter des actions au menu contextuel Windows pour le texte sélectionné.**
-- [ ] **Comparer deux produits/options et proposer un verdict sourcé.**
-- [ ] **Ajouter des commandes vocales.**
-- [ ] **Générer à 18 h un rapport des applications utilisées et fichiers modifiés.**
-- [ ] **Produire des statistiques hebdomadaires d'utilisation et de productivité.**
+- [x] **Analyser la légitimité d'un lien ou exécutable suspect.** *(Analyse locale sans ouverture : structure réelle du lien, protocole, domaine, indices d’hameçonnage, double extension, provenance Internet, signature numérique, taille et empreinte SHA-256. Indicateur facultatif ✓/?/✕ au survol des liens exposés par l’accessibilité Windows. Verdict prudent et non présenté comme une garantie.)*
+- [~] **Ajouter des actions au menu contextuel Windows pour le texte sélectionné.** *(Abandonné : Windows ne fournit pas de menu contextuel universel pour le texte sélectionné dans toutes les applications ; la roue d’actions et les raccourcis FlexHub couvrent déjà ce besoin de manière plus fiable.)*
+- [~] **Ajouter des commandes vocales.** *(Module abandonné avant développement.)*
+- [x] **Générer à 18 h un rapport des applications utilisées et fichiers modifiés.** *(Module local désactivé par défaut, heure configurable, échantillonnage léger de l’application active toutes les 20 secondes et surveillance événementielle Windows des dossiers personnels, sans scan complet ni lecture du contenu.)*
+- [x] **Produire des statistiques hebdomadaires d'utilisation et de productivité.** *(Vue locale sur 7 jours, activité quotidienne, applications principales, fichiers modifiés et comparaison avec les 7 jours précédents. Les résultats décrivent l’usage sans attribuer une note de productivité.)*
 - [ ] **Mettre en place une veille automatique sur des sources configurables.**
 
 

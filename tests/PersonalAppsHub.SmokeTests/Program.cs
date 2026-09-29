@@ -167,6 +167,22 @@ Check(!toneAnalyzer.Analyze("Bravo 1 arrive avec son véhicule.").PrimaryTone.St
 Check(toneAnalyzer.Analyze("Le rapport contient douze pages et a été envoyé mardi.").PrimaryTone == "Neutre",
     "conservation d’un ton factuel neutre");
 
+var suspiciousAnalyzer = new SuspiciousContentAnalysisService();
+Check(suspiciousAnalyzer.AnalyzeUrl("https://example.com/page").RiskScore == 0,
+    "lien HTTPS ordinaire sans fausse alerte");
+Check(suspiciousAnalyzer.AnalyzeUrl("http://192.0.2.1/verify-account").RiskScore >= 50,
+    "cumul des indices d’un lien suspect");
+Check(suspiciousAnalyzer.AnalyzeUrl("http://X9TXMS4piGQk.imited.net/cl/6984_rd/4/0/3235/686/69d696e0788456ca7af1e284").Verdict == "Risque élevé",
+    "détection d’un sous-domaine aléatoire et d’un lien de redirection");
+Check(suspiciousAnalyzer.AnalyzeUrl("https://accounts.google.com/").RiskScore == 0,
+    "absence de fausse alerte sur un domaine officiel avec un terme sensible");
+Check(suspiciousAnalyzer.AnalyzeUrl("https://paypal.securite-exemple.test/login").RiskScore >= 35,
+    "détection d’une marque imitée dans un domaine tiers");
+Check(suspiciousAnalyzer.AnalyzeUrl("[https://microsoft.com](https://example.test/login)").RiskScore >= 50,
+    "détection d’un texte de lien différent de sa destination");
+Check(suspiciousAnalyzer.AnalyzeUrl("https://example.com/download/setup.exe").RiskScore >= 30,
+    "détection d’un téléchargement exécutable");
+
 Check(NvidiaProfileService.GetProfileKeyForGpuName("NVIDIA GeForce RTX 2080 Ti") == "RTX-2080-Ti", "détection RTX 2080 Ti");
 Check(NvidiaProfileService.GetProfileKeyForGpuName("NVIDIA GeForce RTX 3050 Laptop GPU") == "RTX-3050-Laptop", "détection RTX 3050 mobile");
 Check(NvidiaProfileService.GetProfileKeyForGpuName("GeForce RTX 4070 Ti SUPER") == "RTX-4070-Ti-SUPER", "détection RTX 4070 Ti SUPER");

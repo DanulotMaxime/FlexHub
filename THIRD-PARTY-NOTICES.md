@@ -27,3 +27,12 @@ Projet officiel : https://github.com/amerkoleci/Vortice.Windows
 
 Copyright (c) Amer Koleci et contributeurs. Ce composant est distribué sous licence MIT.
 Le texte complet est inclus dans `LICENSES/VORTICE-WINDOWS.txt`.
+
+## PresentMon
+
+FlexHub distribue PresentMon 1.10.0 d’Intel afin de mesurer les temps d’image des jeux via ETW, sans injection dans leur processus.
+
+Projet officiel : https://github.com/GameTechDev/PresentMon
+
+Copyright (C) 2017-2023 Intel Corporation. Ce composant est distribué sous licence MIT.
+Le texte complet est inclus dans `LICENSES/PRESENTMON.txt`.

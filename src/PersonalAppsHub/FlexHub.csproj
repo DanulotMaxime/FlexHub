@@ -28,10 +28,12 @@
     <Content Include="..\..\THIRD-PARTY-NOTICES.md" Link="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\LICENSES\NVIDIA-PROFILE-INSPECTOR.txt" Link="LICENSES\NVIDIA-PROFILE-INSPECTOR.txt" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\LICENSES\VORTICE-WINDOWS.txt" Link="LICENSES\VORTICE-WINDOWS.txt" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\LICENSES\PRESENTMON.txt" Link="LICENSES\PRESENTMON.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="..\..\tools\nvidia-profile-inspector\nvidiaProfileInspector.exe" Link="Tools\nvidiaProfileInspector.exe" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\tools\nvidia-profile-inspector\Reference.xml" Link="Tools\Reference.xml" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\tools\presentmon\PresentMon.exe" Link="Tools\PresentMon.exe" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\nvidia-profiles\NVIDIA-Global-Profile-Baseline.nip" Link="Profiles\NVIDIA-Global-Profile-Baseline.nip" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>

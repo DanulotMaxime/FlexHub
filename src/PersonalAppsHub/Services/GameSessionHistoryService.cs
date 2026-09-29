@@ -23,6 +23,10 @@ public sealed class GameSessionReport
     public double ProcessGpuUsageTotal { get; set; }
     public int ProcessGpuUsageSampleCount { get; set; }
     public double? PeakProcessVramMb { get; set; }
+    public double? AverageFps { get; set; }
+    public double? OnePercentLowFps { get; set; }
+    public double? AverageFrameTimeMs { get; set; }
+    public long CapturedFrameCount { get; set; }
     public bool IsReference { get; set; }
     public string NvidiaProfileName { get; set; } = "Non identifié";
     [JsonIgnore] public bool CanSetReference => !IsActive;
@@ -50,6 +54,9 @@ public sealed class GameSessionReport
     public string ProcessGpuAverageText => ProcessGpuUsageSampleCount > 0 ? $"{ProcessGpuUsageTotal / ProcessGpuUsageSampleCount:0.0}%" : "—";
     public string ProcessGpuPeakText => PeakProcessGpuPercent.HasValue ? $"{PeakProcessGpuPercent:0.0}%" : "—";
     public string ProcessVramPeakText => PeakProcessVramMb.HasValue ? $"{PeakProcessVramMb:0} Mo" : "—";
+    public string AverageFpsText => AverageFps.HasValue ? $"{AverageFps:0.0} FPS" : "—";
+    public string OnePercentLowFpsText => OnePercentLowFps.HasValue ? $"{OnePercentLowFps:0.0} FPS" : "—";
+    public string AverageFrameTimeText => AverageFrameTimeMs.HasValue ? $"{AverageFrameTimeMs:0.00} ms" : "—";
     public string ProcessPerformanceText => $"JEU · CPU max {ProcessCpuPeakText} · RAM max {ProcessRamPeakText} · GPU moy./max {ProcessGpuAverageText} / {ProcessGpuPeakText} · VRAM max {ProcessVramPeakText}";
     public string GpuPeakText => PeakGpuUsagePercent.HasValue || PeakGpuTemperatureC.HasValue
         ? $"{(PeakGpuUsagePercent.HasValue ? $"{PeakGpuUsagePercent:0}%" : "—")} / {(PeakGpuTemperatureC.HasValue ? $"{PeakGpuTemperatureC:0} °C" : "—")}" : "—";
@@ -211,6 +218,22 @@ public sealed class GameSessionHistoryService
         if (changed) Save();
     }
 
+    public void RecordFrameRateMetrics(IEnumerable<GameFrameRateMetrics> metrics)
+    {
+        var byProcess = metrics.ToDictionary(metric => metric.ProcessId);
+        var changed = false;
+        foreach (var report in _reports.Where(report => report.IsActive && byProcess.ContainsKey(report.ProcessId)))
+        {
+            var sample = byProcess[report.ProcessId];
+            report.AverageFps = sample.AverageFps;
+            report.OnePercentLowFps = sample.OnePercentLowFps;
+            report.AverageFrameTimeMs = sample.AverageFrameTimeMs;
+            report.CapturedFrameCount = sample.FrameCount;
+            changed = true;
+        }
+        if (changed) Save();
+    }
+
     private static bool IsUtilityProcess(string name) =>
         name.Contains("launcher", StringComparison.OrdinalIgnoreCase) ||
         name.Contains("crashreport", StringComparison.OrdinalIgnoreCase) ||
@@ -246,6 +269,8 @@ public sealed class GameSessionHistoryService
             var referenceGpuAverage = reference.GpuUsageSampleCount > 0 ? reference.GpuUsageTotal / reference.GpuUsageSampleCount : (double?)null;
             AddDifference(differences, "GPU moy.", currentGpuAverage, referenceGpuAverage, "%");
             AddDifference(differences, "Temp. GPU", report.PeakGpuTemperatureC, reference.PeakGpuTemperatureC, " °C");
+            AddDifference(differences, "FPS moy.", report.AverageFps, reference.AverageFps, " FPS");
+            AddDifference(differences, "1 % low", report.OnePercentLowFps, reference.OnePercentLowFps, " FPS");
             var comparison = differences.Count == 0 ? "Comparaison indisponible" : "Vs réf. : " + string.Join(" · ", differences);
             report.ComparisonText = processDetails + Environment.NewLine + comparison;
         }

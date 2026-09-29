@@ -8,6 +8,8 @@ public sealed record ActiveGameSession(int ProcessId, string Name, DateTime Star
     public double? ProcessRamMb { get; init; }
     public double? ProcessGpuPercent { get; init; }
     public double? ProcessVramMb { get; init; }
+    public double? AverageFps { get; init; }
+    public double? OnePercentLowFps { get; init; }
     public string StartedText => $"Démarré à {StartedAt:HH:mm}";
     public string DurationText => Duration.TotalHours >= 1
         ? $"{(int)Duration.TotalHours} h {Duration.Minutes:00} min"
@@ -17,6 +19,8 @@ public sealed record ActiveGameSession(int ProcessId, string Name, DateTime Star
     public string ProcessRamText => Memory(ProcessRamMb);
     public string ProcessGpuText => Percent(ProcessGpuPercent);
     public string ProcessVramText => Memory(ProcessVramMb);
+    public string AverageFpsText => AverageFps.HasValue ? $"{AverageFps:0} FPS" : "Mesure en attente";
+    public string OnePercentLowFpsText => OnePercentLowFps.HasValue ? $"{OnePercentLowFps:0} FPS" : "—";
 
     private static string Percent(double? value) => value.HasValue ? $"{value:0.0}%" : "—";
     private static string Memory(double? value) => value.HasValue ? $"{value:0} Mo" : "—";

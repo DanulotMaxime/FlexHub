@@ -31,6 +31,9 @@ public partial class MainWindow : Window
     private readonly ResponseGenerationService _responseGenerationService = new();
     private readonly WiktionaryService _wiktionaryService = new();
     private readonly ToneAnalysisService _toneAnalysisService = new();
+    private readonly SuspiciousContentAnalysisService _suspiciousContentAnalysisService = new();
+    private readonly DailyActivityReportService _dailyActivityReportService = new();
+    private readonly LinkHoverSafetyService _linkHoverSafetyService;
     private readonly NvidiaProfileService _nvidiaProfileService = new();
     private readonly XmpMonitorService _xmpMonitorService = new();
     private readonly SystemMonitoringService _systemMonitoringService = new();
@@ -38,6 +41,7 @@ public partial class MainWindow : Window
     private readonly NetworkHistoryService _networkHistoryService = new();
     private readonly GameSessionService _gameSessionService = new();
     private readonly GameProcessMonitoringService _gameProcessMonitoringService = new();
+    private readonly GameFrameRateService _gameFrameRateService = new();
     private readonly GameSessionHistoryService _gameSessionHistoryService = new();
     private readonly GamePerformanceService _gamePerformanceService = new();
     private readonly TemporaryFileCleanupService _temporaryFileCleanupService = new();
@@ -88,11 +92,13 @@ public partial class MainWindow : Window
     private bool _automaticRecycleBinCleanupRunning;
     private bool _automaticDownloadsOrganizerRunning;
     private bool _duplicateScanRunning;
+    private bool _dailyActivityReportRunning;
     private CancellationTokenSource? _duplicateScanCancellation;
     private CancellationTokenSource? _fileSearchCancellation;
     private IReadOnlyList<DuplicateFileCandidate> _duplicateResults = Array.Empty<DuplicateFileCandidate>();
     private IReadOnlyList<DownloadMoveCandidate> _downloadsOrganizerResults = Array.Empty<DownloadMoveCandidate>();
     private IReadOnlyList<RenameCandidate> _bulkRenameResults = Array.Empty<RenameCandidate>();
+    private string _suspiciousTechnicalDetails = string.Empty;
     private string? _duplicateScanRoot;
     private DateTime _lastAutomaticNetworkMeasureUtc = DateTime.MinValue;
     private DateTime _lastGameSessionRefreshUtc = DateTime.MinValue;
@@ -117,6 +123,7 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
+        _linkHoverSafetyService = new LinkHoverSafetyService(_suspiciousContentAnalysisService);
         InitializeComponent();
         _settings = _settingsService.Load();
         LoadNetworkHistory();
@@ -154,6 +161,8 @@ public partial class MainWindow : Window
         LoadSettings();
         _loadingSettings = false;
         ReminderNav.Click += (_, _) => ShowPage("reminder");
+        SuspiciousContentNav.Click += (_, _) => ShowPage("suspiciousContent");
+        DailyActivityReportNav.Click += (_, _) => ShowPage("dailyActivityReport");
         TextToolsToggle.Click += (_, _) => ToggleTextToolsSection();
         MonitoringGamesToggle.Click += (_, _) => ToggleNavigationSection(MonitoringGamesPanel, MonitoringGamesChevron, ref _monitoringGamesExpanded);
         MaintenanceToggle.Click += (_, _) => ToggleNavigationSection(MaintenancePanel, MaintenanceChevron, ref _maintenanceExpanded);
@@ -223,6 +232,19 @@ public partial class MainWindow : Window
         WordDefinitionEnabled.Unchecked += (_, _) => ApplyEnabledStates();
         ToneAnalysisEnabled.Checked += (_, _) => ApplyEnabledStates();
         ToneAnalysisEnabled.Unchecked += (_, _) => ApplyEnabledStates();
+        SuspiciousContentModuleEnabled.Checked += (_, _) => ApplyEnabledStates();
+        SuspiciousContentModuleEnabled.Unchecked += (_, _) => ApplyEnabledStates();
+        DailyActivityReportEnabled.Checked += (_, _) => SaveDailyActivityReportSettings();
+        DailyActivityReportEnabled.Unchecked += (_, _) => SaveDailyActivityReportSettings();
+        GenerateDailyActivityReport.Click += async (_, _) => await GenerateDailyActivityReportAsync(false);
+        ShowWeeklyActivityStatistics.Click += (_, _) =>
+        {
+            DailyActivityReportText.Text = _dailyActivityReportService.BuildWeeklyStatistics();
+            DailyActivityReportStatus.Text = "Statistiques calculées depuis les rapports conservés localement.";
+        };
+        DailyActivityReportHourBox.LostKeyboardFocus += (_, _) => SaveDailyActivityReportSettings();
+        LinkHoverSafetyEnabled.Checked += (_, _) => ApplyEnabledStates();
+        LinkHoverSafetyEnabled.Unchecked += (_, _) => ApplyEnabledStates();
         ActionWheelEnabled.Checked += (_, _) => ApplyEnabledStates();
         ActionWheelEnabled.Unchecked += (_, _) => ApplyEnabledStates();
         NvidiaEnabled.Checked += (_, _) => ApplyEnabledStates();
@@ -278,6 +300,10 @@ public partial class MainWindow : Window
         SaveNetworkJitterAlert.Click += (_, _) => SaveNetworkJitterAlertSettings();
         CalculateMouseSensitivity.Click += (_, _) => CalculateMouseSensitivityNow();
         AnalyzeTone.Click += (_, _) => AnalyzeToneNow();
+        AnalyzeSuspiciousUrl.Click += (_, _) => AnalyzeSuspiciousUrlNow();
+        ChooseSuspiciousFile.Click += (_, _) => ChooseSuspiciousFileNow();
+        AnalyzeSuspiciousFile.Click += async (_, _) => await AnalyzeSuspiciousFileAsync();
+        OpenSuspiciousTechnicalDetails.Click += (_, _) => OpenSuspiciousTechnicalDetailsNow();
         SensitivitySourceGameBox.SelectionChanged += (_, _) => LoadSavedMouseSensitivity();
         ScanTemporaryFiles.Click += async (_, _) => await ScanTemporaryFilesAsync();
         SelectAllCleanupFiles.Click += (_, _) => CleanupFilesList.SelectAll();
@@ -393,6 +419,7 @@ public partial class MainWindow : Window
             await RunAutomaticTemporaryCleanupAsync();
             await RunAutomaticRecycleBinCleanupAsync();
             await RunAutomaticDownloadsOrganizerAsync();
+            await UpdateDailyActivityReportAsync();
         };
         SourceInitialized += (_, _) => { RegisterHotkey(); RegisterTranslatorHotkey(); RegisterResponseGeneratorHotkey(); RegisterActionWheelHotkey(); };
         ContentRendered += async (_, _) =>
@@ -413,6 +440,8 @@ public partial class MainWindow : Window
         _monitoringTimer.Start();
         ConfigureKeyboardLayoutMonitor();
         UpdateNavigationState();
+        if (_settings.LinkHoverSafetyEnabled) _linkHoverSafetyService.Start();
+        if (_settings.DailyActivityReportEnabled) _dailyActivityReportService.StartMonitoring();
     }
 
     private void LoadSettings()
@@ -487,6 +516,11 @@ public partial class MainWindow : Window
         ConversationSummaryIncludeActionsCheck.IsChecked = _settings.ConversationSummaryIncludeActions;
         WordDefinitionEnabled.IsChecked = _settings.WordDefinitionEnabled;
         ToneAnalysisEnabled.IsChecked = _settings.ToneAnalysisEnabled;
+        SuspiciousContentModuleEnabled.IsChecked = _settings.SuspiciousContentModuleEnabled;
+        DailyActivityReportEnabled.IsChecked = _settings.DailyActivityReportEnabled;
+        DailyActivityReportHourBox.Text = _settings.DailyActivityReportHour.ToString();
+        DailyActivityReportText.Text = _dailyActivityReportService.LoadTodayReport() ?? "Aucun rapport généré aujourd’hui.";
+        LinkHoverSafetyEnabled.IsChecked = _settings.LinkHoverSafetyEnabled;
         WordDefinitionDetailBox.SelectedIndex = _settings.WordDefinitionDetail switch
         {
             "Très simple" => 0, "Détaillé" => 2, "Expert" => 3, _ => 1
@@ -567,6 +601,8 @@ public partial class MainWindow : Window
         NetworkMonitoringPage.Visibility = page == "networkMonitoring" ? Visibility.Visible : Visibility.Collapsed;
         MouseSensitivityPage.Visibility = page == "mouseSensitivity" ? Visibility.Visible : Visibility.Collapsed;
         CleanupPage.Visibility = page == "cleanup" ? Visibility.Visible : Visibility.Collapsed;
+        SuspiciousContentPage.Visibility = page == "suspiciousContent" ? Visibility.Visible : Visibility.Collapsed;
+        DailyActivityReportPage.Visibility = page == "dailyActivityReport" ? Visibility.Visible : Visibility.Collapsed;
         FileFinderPage.Visibility = page == "fileFinder" ? Visibility.Visible : Visibility.Collapsed;
         MemoryCachePage.Visibility = page == "memoryCache" ? Visibility.Visible : Visibility.Collapsed;
         RecycleBinPage.Visibility = page == "recycleBin" ? Visibility.Visible : Visibility.Collapsed;
@@ -849,8 +885,10 @@ public partial class MainWindow : Window
 
     private void UpdateNavigationState()
     {
-        if (ReminderNav == null || CorrectorNav == null || ReformulateNav == null || SimplifyNav == null || ConversationSummaryNav == null || WordDefinitionNav == null || TranslatorNav == null || ResponseGeneratorNav == null || ActionWheelNav == null || MonitoringNav == null || GameSessionsNav == null || NetworkMonitoringNav == null || MouseSensitivityNav == null || FileFinderNav == null || CleanupNav == null || MemoryCacheNav == null || RecycleBinNav == null || DownloadsOrganizerNav == null || BulkRenameNav == null || UnusedApplicationsNav == null || DuplicateFilesNav == null || StorageHealthNav == null || DriverAuditNav == null || StartupAuditNav == null || NvidiaNav == null || XmpNav == null || KeyboardLayoutNav == null) return;
+        if (ReminderNav == null || SuspiciousContentNav == null || DailyActivityReportNav == null || CorrectorNav == null || ReformulateNav == null || SimplifyNav == null || ConversationSummaryNav == null || WordDefinitionNav == null || TranslatorNav == null || ResponseGeneratorNav == null || ActionWheelNav == null || MonitoringNav == null || GameSessionsNav == null || NetworkMonitoringNav == null || MouseSensitivityNav == null || FileFinderNav == null || CleanupNav == null || MemoryCacheNav == null || RecycleBinNav == null || DownloadsOrganizerNav == null || BulkRenameNav == null || UnusedApplicationsNav == null || DuplicateFilesNav == null || StorageHealthNav == null || DriverAuditNav == null || StartupAuditNav == null || NvidiaNav == null || XmpNav == null || KeyboardLayoutNav == null) return;
         PlaceNavigationButton(ReminderNav, ReminderEnabled.IsChecked == true);
+        PlaceNavigationButton(SuspiciousContentNav, SuspiciousContentModuleEnabled.IsChecked == true);
+        PlaceNavigationButton(DailyActivityReportNav, DailyActivityReportEnabled.IsChecked == true);
         PlaceNavigationButton(CorrectorNav, CorrectorEnabled.IsChecked == true);
         PlaceNavigationButton(ReformulateNav, ReformulatorEnabled.IsChecked == true);
         PlaceNavigationButton(SimplifyNav, SimplifierEnabled.IsChecked == true);
@@ -888,7 +926,7 @@ public partial class MainWindow : Window
         UpdateCategoryCount(MonitoringGamesModuleCount, MonitoringNav, GameSessionsNav,
             NetworkMonitoringNav, MouseSensitivityNav, NvidiaNav, XmpNav);
         UpdateCategoryCount(MaintenanceModuleCount, CleanupNav, MemoryCacheNav, RecycleBinNav, UnusedApplicationsNav, StorageHealthNav, DriverAuditNav, StartupAuditNav);
-        UpdateCategoryCount(AutomationModuleCount, ReminderNav, ActionWheelNav, FileFinderNav, DownloadsOrganizerNav, BulkRenameNav, DuplicateFilesNav, KeyboardLayoutNav);
+        UpdateCategoryCount(AutomationModuleCount, ReminderNav, SuspiciousContentNav, DailyActivityReportNav, ActionWheelNav, FileFinderNav, DownloadsOrganizerNav, BulkRenameNav, DuplicateFilesNav, KeyboardLayoutNav);
     }
 
     private void PlaceNavigationButton(System.Windows.Controls.Button button, bool enabled)
@@ -948,7 +986,7 @@ public partial class MainWindow : Window
     }
 
     private int NavigationRank(System.Windows.Controls.Button button) =>
-        button == ReminderNav ? 0 : button == CorrectorNav ? 1 : button == ReformulateNav ? 2 : button == SimplifyNav ? 3 : button == ConversationSummaryNav ? 4 : button == WordDefinitionNav ? 5 : button == TranslatorNav ? 6 : button == ResponseGeneratorNav ? 7 : button == ActionWheelNav ? 8 : button == MonitoringNav ? 9 : button == GameSessionsNav ? 10 : button == NetworkMonitoringNav ? 11 : button == MouseSensitivityNav ? 12 : button == CleanupNav ? 13 : button == MemoryCacheNav ? 14 : button == RecycleBinNav ? 15 : button == DownloadsOrganizerNav ? 16 : button == BulkRenameNav ? 17 : button == UnusedApplicationsNav ? 18 : button == DuplicateFilesNav ? 19 : button == StorageHealthNav ? 20 : button == DriverAuditNav ? 21 : button == StartupAuditNav ? 22 : button == NvidiaNav ? 23 : button == XmpNav ? 24 : 25;
+        button == ReminderNav ? 0 : button == CorrectorNav ? 1 : button == ReformulateNav ? 2 : button == SimplifyNav ? 3 : button == ConversationSummaryNav ? 4 : button == WordDefinitionNav ? 5 : button == TranslatorNav ? 6 : button == ResponseGeneratorNav ? 7 : button == SuspiciousContentNav ? 8 : button == DailyActivityReportNav ? 9 : button == ActionWheelNav ? 10 : button == MonitoringNav ? 11 : button == GameSessionsNav ? 12 : button == NetworkMonitoringNav ? 13 : button == MouseSensitivityNav ? 14 : button == CleanupNav ? 15 : button == MemoryCacheNav ? 16 : button == RecycleBinNav ? 17 : button == DownloadsOrganizerNav ? 18 : button == BulkRenameNav ? 19 : button == UnusedApplicationsNav ? 20 : button == DuplicateFilesNav ? 21 : button == StorageHealthNav ? 22 : button == DriverAuditNav ? 23 : button == StartupAuditNav ? 24 : button == NvidiaNav ? 25 : button == XmpNav ? 26 : 27;
 
     private void ApplyEnabledStates()
     {
@@ -961,6 +999,8 @@ public partial class MainWindow : Window
         _settings.ConversationSummarizerEnabled = ConversationSummarizerEnabled.IsChecked == true;
         _settings.WordDefinitionEnabled = WordDefinitionEnabled.IsChecked == true;
         _settings.ToneAnalysisEnabled = ToneAnalysisEnabled.IsChecked == true;
+        _settings.SuspiciousContentModuleEnabled = SuspiciousContentModuleEnabled.IsChecked == true;
+        _settings.LinkHoverSafetyEnabled = LinkHoverSafetyEnabled.IsChecked == true;
         _settings.ActionWheelEnabled = ActionWheelEnabled.IsChecked == true;
         _settings.NvidiaOptimizerEnabled = NvidiaEnabled.IsChecked == true;
         _settings.XmpMonitorEnabled = XmpEnabled.IsChecked == true;
@@ -980,6 +1020,8 @@ public partial class MainWindow : Window
         _settings.DriverAuditModuleEnabled = DriverAuditModuleEnabled.IsChecked == true;
         _settings.StartupAuditModuleEnabled = StartupAuditModuleEnabled.IsChecked == true;
         _settingsService.Save(_settings);
+        if (_settings.LinkHoverSafetyEnabled) _linkHoverSafetyService.Start();
+        else _linkHoverSafetyService.Stop();
         LogModuleStates();
         ConfigureReminderTimer();
         ConfigureXmpTimer();
@@ -2301,19 +2343,27 @@ public partial class MainWindow : Window
         {
             var detectedSessions = await Task.Run(_gameSessionService.DetectActiveSessions);
             var processMetrics = await Task.Run(() => _gameProcessMonitoringService.Capture(detectedSessions));
-            var sessions = detectedSessions.Select(session => processMetrics.TryGetValue(session.ProcessId, out var metrics)
-                ? session with
+            var frameRateMetrics = await Task.Run(() => _gameFrameRateService.Capture(detectedSessions));
+            var sessions = detectedSessions.Select(session =>
+            {
+                var enriched = processMetrics.TryGetValue(session.ProcessId, out var metrics)
+                    ? session with
                 {
                     ProcessCpuPercent = metrics.CpuPercent,
                     ProcessRamMb = metrics.RamMb,
                     ProcessGpuPercent = metrics.GpuPercent,
                     ProcessVramMb = metrics.VramMb
                 }
-                : session).ToArray();
+                    : session;
+                return frameRateMetrics.TryGetValue(session.ProcessId, out var fps)
+                    ? enriched with { AverageFps = fps.AverageFps, OnePercentLowFps = fps.OnePercentLowFps }
+                    : enriched;
+            }).ToArray();
             _lastGameSessionRefreshUtc = DateTime.UtcNow;
             ActiveGameSessionsList.ItemsSource = sessions;
             _gameSessionHistoryService.Update(sessions, _settings.ActiveNvidiaProfileName);
             _gameSessionHistoryService.RecordProcessMetrics(processMetrics.Values);
+            _gameSessionHistoryService.RecordFrameRateMetrics(frameRateMetrics.Values);
             GameSessionHistoryList.ItemsSource = _gameSessionHistoryService.GetRecentReports();
             var performance = _gamePerformanceService.Update(sessions, _settings.AutomaticGameHighPriorityEnabled);
             GamePerformanceStatus.Text = performance.Message;
@@ -2466,7 +2516,7 @@ public partial class MainWindow : Window
         static string Csv(string value) => "\"" + value.Replace("\"", "\"\"") + "\"";
         var lines = new List<string>
         {
-            "Jeu;Reference;Profil_NVIDIA;Debut;Fin;Duree_minutes;PC_CPU_max_pct;PC_RAM_max_pct;PC_GPU_moy_pct;PC_GPU_max_pct;GPU_max_C;Jeu_CPU_max_pct;Jeu_RAM_max_Mo;Jeu_GPU_moy_pct;Jeu_GPU_max_pct;Jeu_VRAM_max_Mo"
+            "Jeu;Reference;Profil_NVIDIA;Debut;Fin;Duree_minutes;FPS_moyen;FPS_1pct_low;Temps_image_moyen_ms;Images_mesurees;PC_CPU_max_pct;PC_RAM_max_pct;PC_GPU_moy_pct;PC_GPU_max_pct;GPU_max_C;Jeu_CPU_max_pct;Jeu_RAM_max_Mo;Jeu_GPU_moy_pct;Jeu_GPU_max_pct;Jeu_VRAM_max_Mo"
         };
         foreach (var report in reports)
         {
@@ -2475,6 +2525,10 @@ public partial class MainWindow : Window
             var gpuAverage = report.GpuUsageSampleCount > 0 ? report.GpuUsageTotal / report.GpuUsageSampleCount : (double?)null;
             lines.Add(string.Join(';', Csv(report.GameName), report.IsReference ? "oui" : "non", Csv(report.NvidiaProfileName), report.StartedAt.ToString("yyyy-MM-dd HH:mm:ss"),
                 end.ToString("yyyy-MM-dd HH:mm:ss"), duration.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture),
+                report.AverageFps?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? "",
+                report.OnePercentLowFps?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? "",
+                report.AverageFrameTimeMs?.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) ?? "",
+                report.CapturedFrameCount.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 report.PeakCpuUsagePercent?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? "",
                 report.PeakRamUsagePercent?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? "",
                 gpuAverage?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? "",
@@ -3340,6 +3394,144 @@ public partial class MainWindow : Window
         }
     }
 
+    private void SaveDailyActivityReportSettings()
+    {
+        if (_loadingSettings) return;
+        if (!int.TryParse(DailyActivityReportHourBox.Text.Trim(), out var hour) || hour is < 0 or > 23)
+        {
+            DailyActivityReportStatus.Text = "L’heure doit être comprise entre 0 et 23.";
+            return;
+        }
+        _settings.DailyActivityReportEnabled = DailyActivityReportEnabled.IsChecked == true;
+        _settings.DailyActivityReportHour = hour;
+        _settingsService.Save(_settings);
+        if (_settings.DailyActivityReportEnabled) _dailyActivityReportService.StartMonitoring();
+        else _dailyActivityReportService.StopMonitoring();
+        DailyActivityReportStatus.Text = _settings.DailyActivityReportEnabled
+            ? $"Surveillance légère active. Prochain rapport à {hour:00}:00."
+            : "Module désactivé : aucune activité n’est collectée.";
+        UpdateNavigationState();
+    }
+
+    private async Task UpdateDailyActivityReportAsync()
+    {
+        if (!_settings.DailyActivityReportEnabled) return;
+        _dailyActivityReportService.SampleForegroundApplication();
+        var now = DateTime.Now;
+        if (now.Hour < _settings.DailyActivityReportHour || _settings.LastDailyActivityReportDate?.Date == now.Date) return;
+        await GenerateDailyActivityReportAsync(true);
+    }
+
+    private async Task GenerateDailyActivityReportAsync(bool automatic)
+    {
+        if (_dailyActivityReportRunning) return;
+        _dailyActivityReportRunning = true;
+        GenerateDailyActivityReport.IsEnabled = false;
+        DailyActivityReportStatus.Text = "Analyse locale des dossiers personnels en cours…";
+        try
+        {
+            DailyActivityReportText.Text = await _dailyActivityReportService.GenerateAsync();
+            _settings.LastDailyActivityReportDate = DateTime.Today;
+            _settingsService.Save(_settings);
+            DailyActivityReportStatus.Text = automatic
+                ? "Rapport automatique généré et conservé localement."
+                : "Rapport généré et conservé localement.";
+        }
+        catch (Exception ex)
+        {
+            DailyActivityReportStatus.Text = $"Rapport impossible : {ex.Message}";
+            AppLog.Write($"RAPPORT QUOTIDIEN | Échec {ex.GetType().Name}: {ex.Message}");
+        }
+        finally { GenerateDailyActivityReport.IsEnabled = true; _dailyActivityReportRunning = false; }
+    }
+
+    private void AnalyzeSuspiciousUrlNow()
+    {
+        try { ShowSuspiciousAnalysis(_suspiciousContentAnalysisService.AnalyzeUrl(SuspiciousUrlInput.Text)); }
+        catch (Exception ex) { ShowSuspiciousError(ex.Message); }
+    }
+
+    private void ChooseSuspiciousFileNow()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Choisir un fichier à analyser sans l’ouvrir",
+            Filter = "Tous les fichiers|*.*",
+            CheckFileExists = true
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        SuspiciousFilePath.Text = dialog.FileName;
+        AnalyzeSuspiciousFile.IsEnabled = true;
+    }
+
+    private async Task AnalyzeSuspiciousFileAsync()
+    {
+        AnalyzeSuspiciousFile.IsEnabled = false;
+        SuspiciousVerdict.Text = "Analyse en cours…";
+        try
+        {
+            var path = SuspiciousFilePath.Text;
+            var result = await Task.Run(() => _suspiciousContentAnalysisService.AnalyzeFile(path));
+            ShowSuspiciousAnalysis(result);
+        }
+        catch (Exception ex) { ShowSuspiciousError(ex.Message); }
+        finally { AnalyzeSuspiciousFile.IsEnabled = File.Exists(SuspiciousFilePath.Text); }
+    }
+
+    private void ShowSuspiciousAnalysis(SuspiciousContentAnalysis result)
+    {
+        SuspiciousVerdict.Text = $"{result.Verdict} · {result.RiskScore}/100";
+        SuspiciousSummary.Text = result.Summary;
+        SuspiciousFindings.Text = "• " + string.Join("\n• ", result.Findings);
+        _suspiciousTechnicalDetails = result.TechnicalDetails;
+        OpenSuspiciousTechnicalDetails.IsEnabled = true;
+    }
+
+    private void ShowSuspiciousError(string message)
+    {
+        SuspiciousVerdict.Text = "Analyse impossible";
+        SuspiciousSummary.Text = message;
+        SuspiciousFindings.Text = string.Empty;
+        _suspiciousTechnicalDetails = string.Empty;
+        OpenSuspiciousTechnicalDetails.IsEnabled = false;
+    }
+
+    private void OpenSuspiciousTechnicalDetailsNow()
+    {
+        if (string.IsNullOrWhiteSpace(_suspiciousTechnicalDetails)) return;
+        var details = new System.Windows.Controls.TextBox
+        {
+            Text = _suspiciousTechnicalDetails,
+            IsReadOnly = true,
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap,
+            VerticalScrollBarVisibility = System.Windows.Controls.ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = System.Windows.Controls.ScrollBarVisibility.Disabled,
+            FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+            FontSize = 13,
+            Padding = new Thickness(14),
+            Width = double.NaN,
+            Height = double.NaN,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
+            VerticalAlignment = System.Windows.VerticalAlignment.Stretch,
+            HorizontalContentAlignment = System.Windows.HorizontalAlignment.Stretch,
+            VerticalContentAlignment = System.Windows.VerticalAlignment.Top
+        };
+        var popup = new Window
+        {
+            Owner = this,
+            Title = "Détails techniques de l’analyse",
+            Width = 680,
+            Height = 430,
+            MinWidth = 480,
+            MinHeight = 300,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Content = details
+        };
+        popup.SetResourceReference(BackgroundProperty, "BackgroundBrush");
+        popup.ShowDialog();
+    }
+
     private async Task SearchFilesAsync()
     {
         _fileSearchCancellation?.Dispose();
@@ -3422,6 +3614,7 @@ public partial class MainWindow : Window
             !TryNumber(MouseSensitivityBox.Text, out var sensitivity) || sensitivity <= 0 || sensitivity > 100)
         {
             MouseEdpiResult.Text = MouseCm360Result.Text = MouseTargetSensitivityResult.Text = "—";
+            ResetProfessionalSensitivityComparison();
             MouseSensitivityStatus.Text = "Utilisez un DPI entre 100 et 32 000 et une sensibilité positive.";
             return;
         }
@@ -3447,6 +3640,37 @@ public partial class MainWindow : Window
         MouseCm360Result.Text = $"{cm360:0.00} cm";
         MouseTargetSensitivityResult.Text = targetSensitivity.ToString("0.####", System.Globalization.CultureInfo.CurrentCulture);
         MouseSensitivityStatus.Text = $"{source.Name} → {target.Name} · même cm/360 · FOV cible : {target.FovReference}";
+        ShowProfessionalSensitivityComparison(source, edpi);
+    }
+
+    private void ResetProfessionalSensitivityComparison()
+    {
+        MouseProfessionalMedian.Text = "—";
+        MouseProfessionalComparison.Text = "Calculez pour comparer votre réglage à une médiane professionnelle vérifiée.";
+        MouseProfessionalSource.Text = "Disponible pour Valorant et Counter-Strike 2.";
+    }
+
+    private void ShowProfessionalSensitivityComparison(MouseSensitivityProfile profile, double edpi)
+    {
+        var reference = _mouseSensitivityService.GetProfessionalReference(profile);
+        if (reference is null)
+        {
+            MouseProfessionalMedian.Text = "Non disponible";
+            MouseProfessionalComparison.Text = $"Aucune médiane professionnelle suffisamment vérifiée n’est intégrée pour {profile.Name}.";
+            MouseProfessionalSource.Text = "FlexHub évite d’inventer une comparaison à partir d’un échantillon incomplet.";
+            return;
+        }
+
+        var differencePercent = (edpi / reference.MedianEdpi - 1) * 100;
+        var direction = Math.Abs(differencePercent) < 5
+            ? "très proche de"
+            : differencePercent > 0 ? "plus rapide que" : "plus lente que";
+        var differenceText = Math.Abs(differencePercent) < 5
+            ? string.Empty
+            : $" ({Math.Abs(differencePercent):0} % d’écart)";
+        MouseProfessionalMedian.Text = $"{reference.MedianEdpi:0} eDPI";
+        MouseProfessionalComparison.Text = $"Votre sensibilité est {direction} la médiane des joueurs professionnels{differenceText}. Ce repère n’est pas une recommandation obligatoire.";
+        MouseProfessionalSource.Text = $"{reference.SourceName} · {reference.PlayerCount} joueurs · données {reference.UpdatedText}";
     }
 
     private void LoadSavedMouseSensitivity()
@@ -3941,7 +4165,7 @@ public partial class MainWindow : Window
         Focus();
     }
     private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e) { if (!_exit) { e.Cancel = true; Hide(); } }
-    private void ExitHub() { _exit = true; _gamePerformanceService.Dispose(); _systemMonitoringService.Dispose(); _gameChatKeyboardService.Dispose(); _keyboardLayoutMonitorService.Dispose(); _hotkeyService.Dispose(); _translatorHotkeyService.Dispose(); _responseGeneratorHotkeyService.Dispose(); _actionWheelHotkeyService.Dispose(); _reminderTimer.Stop(); _xmpTimer.Stop(); _monitoringTimer.Stop(); _tray.Visible = false; _tray.Dispose(); Close(); System.Windows.Application.Current.Shutdown(); }
+    private void ExitHub() { _exit = true; _dailyActivityReportService.Dispose(); _linkHoverSafetyService.Dispose(); _gameFrameRateService.Dispose(); _gamePerformanceService.Dispose(); _systemMonitoringService.Dispose(); _gameChatKeyboardService.Dispose(); _keyboardLayoutMonitorService.Dispose(); _hotkeyService.Dispose(); _translatorHotkeyService.Dispose(); _responseGeneratorHotkeyService.Dispose(); _actionWheelHotkeyService.Dispose(); _reminderTimer.Stop(); _xmpTimer.Stop(); _monitoringTimer.Stop(); _tray.Visible = false; _tray.Dispose(); Close(); System.Windows.Application.Current.Shutdown(); }
 
     private sealed record LanguageChoice(string Name, string Code)
     {

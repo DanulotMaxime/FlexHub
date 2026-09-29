@@ -84,7 +84,16 @@ public sealed class SettingsService
                 settings.FileFinderModuleEnabled = true;
             if (settings.SettingsSchemaVersion < 28)
                 settings.ToneAnalysisEnabled = true;
-            settings.SettingsSchemaVersion = 28;
+            if (settings.SettingsSchemaVersion < 29)
+                settings.SuspiciousContentModuleEnabled = true;
+            if (settings.SettingsSchemaVersion < 30)
+                settings.LinkHoverSafetyEnabled = false;
+            if (settings.SettingsSchemaVersion < 32)
+            {
+                settings.DailyActivityReportEnabled = false;
+                settings.DailyActivityReportHour = 18;
+            }
+            settings.SettingsSchemaVersion = 32;
             return settings;
         }
         catch
@@ -101,7 +110,7 @@ public sealed class SettingsService
     public void Save(HubSettings settings)
     {
         Directory.CreateDirectory(_folder);
-        settings.SettingsSchemaVersion = 28;
+        settings.SettingsSchemaVersion = 32;
         var temporaryPath = SettingsPath + ".tmp";
         File.WriteAllText(temporaryPath, JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));
         File.Move(temporaryPath, SettingsPath, overwrite: true);
