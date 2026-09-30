@@ -1,5 +1,20 @@
 # Notes de version
 
+## 1.7.0
+
+- Refonte des statistiques d’activité sur sept jours avec graphiques quotidiens, classement des applications les plus utilisées et total du temps mesuré.
+- Conservation locale à long terme de l’historique d’activité, alimenté régulièrement sans lancer de scan lourd du système.
+- Ajout d’une liste des fichiers récemment modifiés avec aperçu des images compatibles et accès direct au fichier ou à son dossier.
+- Séparation claire entre le rapport quotidien textuel et la nouvelle fenêtre « Statistiques et historique » afin de préserver la lisibilité du rapport.
+- Harmonisation visuelle des tableaux et aperçus de l’historique avec les thèmes clair et sombre de FlexHub.
+- Analyse des programmes au démarrage enrichie grâce au nom, à l’éditeur, à la description et à la famille du logiciel afin de réduire les résultats « À vérifier ».
+- Ajout du choix de la taille initiale de FlexHub : petit, moyen, grand, très grand ou plein écran.
+- Nouveau centre des alertes regroupant les rappels Top-Serveurs, les seuils CPU/RAM/GPU, les pauses de session de jeu, le jitter réseau et la surveillance XMP.
+- Synchronisation automatique des réglages du centre des alertes avec les pages d’origine et désactivation visuelle des champs non utilisés.
+- Amélioration de la journalisation et sauvegarde de secours lorsque le fichier de configuration local est illisible.
+- Mise à jour du suivi de développement pour refléter les fonctions réellement terminées et la nouvelle phase d’optimisation de l’application.
+- Corrections de stabilité, de présentation et tests automatisés supplémentaires.
+
 ## 1.6.0
 
 - Ajout du suivi de la consommation électrique dans le monitoring avec puissance CPU, GPU et total mesuré, historique graphique gradué en watts et pic maximal réinitialisable.

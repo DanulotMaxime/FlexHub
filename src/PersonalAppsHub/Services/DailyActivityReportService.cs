@@ -9,6 +9,7 @@ namespace PersonalAppsHub.Services;
 
 public sealed class DailyActivityReportService : IDisposable
 {
+    private readonly object _sync = new();
     private readonly Dictionary<string, TimeSpan> _applicationDurations = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, DateTime> _modifiedFiles = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<uint, string> _processNames = new();
@@ -16,34 +17,45 @@ public sealed class DailyActivityReportService : IDisposable
     private DateTime _lastSample = DateTime.Now;
     private DateTime _lastForegroundProbe = DateTime.MinValue;
     private DateTime _trackingDate = DateTime.Today;
+    private DateTime _lastSnapshotSave = DateTime.MinValue;
     private string? _lastApplication;
 
     public void SampleForegroundApplication()
     {
         var now = DateTime.Now;
-        if (_trackingDate != now.Date)
+        lock (_sync)
         {
-            _applicationDurations.Clear();
-            _trackingDate = now.Date;
-            _lastApplication = null;
-            _modifiedFiles.Clear();
-        }
-        if (now - _lastForegroundProbe < TimeSpan.FromSeconds(20)) return;
-        if (_lastApplication != null)
-        {
-            var elapsed = now - _lastSample;
-            if (elapsed > TimeSpan.Zero && elapsed < TimeSpan.FromMinutes(1))
-                _applicationDurations[_lastApplication] = _applicationDurations.GetValueOrDefault(_lastApplication) + elapsed;
-        }
+            if (_trackingDate != now.Date)
+            {
+                TrySaveSnapshot(CreateSnapshot(_trackingDate, now, GetTrackedFiles()));
+                _applicationDurations.Clear();
+                _trackingDate = now.Date;
+                _lastApplication = null;
+                _modifiedFiles.Clear();
+            }
+            if (now - _lastForegroundProbe < TimeSpan.FromSeconds(20)) return;
+            if (_lastApplication != null)
+            {
+                var elapsed = now - _lastSample;
+                if (elapsed > TimeSpan.Zero && elapsed < TimeSpan.FromMinutes(1))
+                    _applicationDurations[_lastApplication] = _applicationDurations.GetValueOrDefault(_lastApplication) + elapsed;
+            }
 
-        _lastSample = now;
-        _lastForegroundProbe = now;
-        _lastApplication = ReadForegroundApplication();
+            _lastSample = now;
+            _lastForegroundProbe = now;
+            _lastApplication = ReadForegroundApplication();
+            if (now - _lastSnapshotSave >= TimeSpan.FromMinutes(2))
+            {
+                TrySaveSnapshot(CreateSnapshot(now.Date, now, GetTrackedFiles()));
+                _lastSnapshotSave = now;
+            }
+        }
     }
 
     public void StartMonitoring()
     {
         if (_watchers.Count > 0) return;
+        RestoreTodaySnapshot();
         foreach (var folder in PersonalFolders())
         {
             try
@@ -69,6 +81,11 @@ public sealed class DailyActivityReportService : IDisposable
 
     public void StopMonitoring()
     {
+        lock (_sync)
+        {
+            if (_applicationDurations.Count > 0 || _modifiedFiles.Count > 0)
+                TrySaveSnapshot(CreateSnapshot(_trackingDate, DateTime.Now, GetTrackedFiles()));
+        }
         foreach (var watcher in _watchers) watcher.Dispose();
         _watchers.Clear();
         _lastApplication = null;
@@ -83,11 +100,9 @@ public sealed class DailyActivityReportService : IDisposable
         var folder = ReportsFolder;
         Directory.CreateDirectory(folder);
         await File.WriteAllTextAsync(Path.Combine(folder, $"rapport-{today:yyyy-MM-dd}.txt"), report, cancellationToken);
-        var snapshot = new DailyActivitySnapshot(today, DateTime.Now,
-            _applicationDurations.ToDictionary(item => item.Key, item => item.Value.TotalSeconds, StringComparer.OrdinalIgnoreCase),
-            files.Count);
-        await File.WriteAllTextAsync(Path.Combine(folder, $"rapport-{today:yyyy-MM-dd}.json"),
-            JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = true }), cancellationToken);
+        DailyActivitySnapshot snapshot;
+        lock (_sync) snapshot = CreateSnapshot(today, DateTime.Now, files);
+        await SaveSnapshotAsync(snapshot, cancellationToken);
         return report;
     }
 
@@ -95,9 +110,8 @@ public sealed class DailyActivityReportService : IDisposable
     {
         var today = DateTime.Today;
         SampleForegroundApplication();
-        var liveToday = new DailyActivitySnapshot(today, DateTime.Now,
-            _applicationDurations.ToDictionary(item => item.Key, item => item.Value.TotalSeconds, StringComparer.OrdinalIgnoreCase),
-            _modifiedFiles.Count);
+        DailyActivitySnapshot liveToday;
+        lock (_sync) liveToday = CreateSnapshot(today, DateTime.Now, GetTrackedFiles());
         var snapshots = LoadSnapshots().Where(item => item.Date.Date != today).Append(liveToday).ToArray();
         var current = snapshots.Where(item => item.Date.Date >= today.AddDays(-6) && item.Date.Date <= today).ToArray();
         var previous = snapshots.Where(item => item.Date.Date >= today.AddDays(-13) && item.Date.Date < today.AddDays(-6)).ToArray();
@@ -136,6 +150,46 @@ public sealed class DailyActivityReportService : IDisposable
             : $"Temps mesuré : {FormatChange(currentSeconds, previousSeconds)}\nFichiers modifiés : {FormatChange(currentFiles, previousFiles)}");
         builder.AppendLine().AppendLine("Ces chiffres décrivent l’utilisation du PC ; ils ne constituent pas une note de productivité.");
         return builder.ToString();
+    }
+
+    public ActivityStatistics GetStatistics(int days = 7)
+    {
+        days = Math.Clamp(days, 1, 3650);
+        SampleForegroundApplication();
+        var today = DateTime.Today;
+        DailyActivitySnapshot liveToday;
+        lock (_sync) liveToday = CreateSnapshot(today, DateTime.Now, GetTrackedFiles());
+        var snapshots = LoadSnapshots().Where(item => item.Date.Date != today).Append(liveToday)
+            .GroupBy(item => item.Date.Date).Select(group => group.OrderByDescending(item => item.GeneratedAt).First())
+            .ToArray();
+        return CalculateStatistics(snapshots, today, days);
+    }
+
+    public static ActivityStatistics CalculateStatistics(IEnumerable<DailyActivitySnapshot> snapshots,
+        DateTime today, int days = 7)
+    {
+        days = Math.Clamp(days, 1, 3650);
+        today = today.Date;
+        var distinctSnapshots = snapshots.GroupBy(item => item.Date.Date)
+            .Select(group => group.OrderByDescending(item => item.GeneratedAt).First()).ToArray();
+        var start = today.AddDays(-(days - 1));
+        var selected = distinctSnapshots.Where(item => item.Date.Date >= start && item.Date.Date <= today).ToArray();
+        var totals = Enumerable.Range(0, days).Select(offset => start.AddDays(offset)).Select(date =>
+        {
+            var snapshot = selected.FirstOrDefault(item => item.Date.Date == date);
+            return new ActivityDayStatistic(date, snapshot?.ApplicationSeconds.Values.Sum() ?? 0,
+                snapshot?.ModifiedFileCount ?? 0);
+        }).ToArray();
+        var topApplications = selected.SelectMany(item => item.ApplicationSeconds)
+            .GroupBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new ActivityApplicationStatistic(group.Key, group.Sum(item => item.Value)))
+            .OrderByDescending(item => item.Seconds).Take(10).ToArray();
+        var files = selected.SelectMany(item => item.ModifiedFiles ?? [])
+            .GroupBy(item => item.FullPath, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.OrderByDescending(item => item.ModifiedAt).First())
+            .OrderByDescending(item => item.ModifiedAt).Take(100).ToArray();
+        return new ActivityStatistics(totals, topApplications, files,
+            distinctSnapshots.Length == 0 ? null : distinctSnapshots.Min(item => item.Date));
     }
 
     public string? LoadTodayReport()
@@ -209,6 +263,52 @@ public sealed class DailyActivityReportService : IDisposable
         }).Where(file => file?.Exists == true).Cast<FileInfo>().ToList();
     }
 
+    private DailyActivitySnapshot CreateSnapshot(DateTime date, DateTime generatedAt, IReadOnlyList<FileInfo> files) =>
+        new(date.Date, generatedAt,
+            _applicationDurations.ToDictionary(item => item.Key, item => item.Value.TotalSeconds, StringComparer.OrdinalIgnoreCase),
+            files.Count,
+            files.Select(file => new ActivityFileSnapshot(file.FullName,
+                _modifiedFiles.TryGetValue(file.FullName, out var changedAt) ? changedAt : file.LastWriteTime)).ToList());
+
+    private static void SaveSnapshot(DailyActivitySnapshot snapshot)
+    {
+        Directory.CreateDirectory(ReportsFolder);
+        var path = Path.Combine(ReportsFolder, $"rapport-{snapshot.Date:yyyy-MM-dd}.json");
+        var temporary = path + ".tmp";
+        File.WriteAllText(temporary, JsonSerializer.Serialize(snapshot, JsonOptions));
+        File.Move(temporary, path, overwrite: true);
+    }
+
+    private static void TrySaveSnapshot(DailyActivitySnapshot snapshot)
+    {
+        try { SaveSnapshot(snapshot); }
+        catch (Exception ex) { AppLog.Write($"Sauvegarde de l’historique d’activité impossible : {ex.Message}"); }
+    }
+
+    private static async Task SaveSnapshotAsync(DailyActivitySnapshot snapshot, CancellationToken cancellationToken)
+    {
+        Directory.CreateDirectory(ReportsFolder);
+        var path = Path.Combine(ReportsFolder, $"rapport-{snapshot.Date:yyyy-MM-dd}.json");
+        var temporary = path + ".tmp";
+        await File.WriteAllTextAsync(temporary, JsonSerializer.Serialize(snapshot, JsonOptions), cancellationToken);
+        File.Move(temporary, path, overwrite: true);
+    }
+
+    private void RestoreTodaySnapshot()
+    {
+        var snapshot = LoadSnapshots().Where(item => item.Date.Date == DateTime.Today)
+            .OrderByDescending(item => item.GeneratedAt).FirstOrDefault();
+        if (snapshot is null) return;
+        lock (_sync)
+        {
+            foreach (var item in snapshot.ApplicationSeconds)
+                _applicationDurations[item.Key] = TimeSpan.FromSeconds(Math.Max(0, item.Value));
+            foreach (var file in snapshot.ModifiedFiles ?? [])
+                if (File.Exists(file.FullPath)) _modifiedFiles[file.FullPath] = file.ModifiedAt;
+            _trackingDate = DateTime.Today;
+        }
+    }
+
     private string? ReadForegroundApplication()
     {
         var window = GetForegroundWindow();
@@ -249,6 +349,8 @@ public sealed class DailyActivityReportService : IDisposable
         }
         return results;
     }
+
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     private static string FormatChange(double current, double previous)
     {
@@ -301,4 +403,11 @@ public sealed class DailyActivityReportService : IDisposable
 }
 
 public sealed record DailyActivitySnapshot(DateTime Date, DateTime GeneratedAt,
-    Dictionary<string, double> ApplicationSeconds, int ModifiedFileCount);
+    Dictionary<string, double> ApplicationSeconds, int ModifiedFileCount,
+    List<ActivityFileSnapshot>? ModifiedFiles = null);
+public sealed record ActivityFileSnapshot(string FullPath, DateTime ModifiedAt);
+public sealed record ActivityDayStatistic(DateTime Date, double Seconds, int ModifiedFileCount);
+public sealed record ActivityApplicationStatistic(string Name, double Seconds);
+public sealed record ActivityStatistics(IReadOnlyList<ActivityDayStatistic> Days,
+    IReadOnlyList<ActivityApplicationStatistic> Applications, IReadOnlyList<ActivityFileSnapshot> RecentFiles,
+    DateTime? OldestRecordedDate);

@@ -6,13 +6,13 @@
 ## Légende
 
 - ✅ **Terminé** — Fonction présente dans l'application.
-- 🟡 **Partiel** — Une partie existe, mais la fonction décrite n'est pas complète.
-- ⬜ **À faire** — Idée enregistrée, développement non commencé.
-- 🔵 **À définir** — Fonctionnement ou périmètre à préciser avant développement.
+- 🛑 **Abandonné** — Fonction retirée de la feuille de route et non prévue.
 
 Ce document est basé sur le code, le README, les notes de version 1.0.0 à 1.6.0
 et la liste d'idées fournie. Les pourcentages indiquent l'état fonctionnel estimé,
 pas le temps nécessaire.
+
+> **État actuel :** aucune nouvelle fonction n’est planifiée. Le développement se concentre désormais sur l’optimisation, la stabilité et l’amélioration des fonctions existantes.
 
 > [!TIP]
 > Dans VS Code, utilisez **Ctrl + Maj + V** pour ouvrir l'aperçu Markdown,
@@ -21,14 +21,14 @@ pas le temps nécessaire.
 ## Sommaire
 
 1. [Fonctions déjà réalisées](#1-fonctions-déjà-réalisées)
-2. [Fonctions partielles ou à étendre](#2-fonctions-partiellement-réalisées-ou-à-étendre)
-3. [Système, nettoyage et maintenance](#3-reste-à-faire---système-nettoyage-et-maintenance)
-4. [Monitoring et réseau](#4-reste-à-faire---monitoring-et-réseau)
-5. [Jeux et performances](#5-reste-à-faire---jeux-et-performances)
-6. [IA, texte et productivité](#6-reste-à-faire---ia-texte-et-productivité)
-7. [Presse-papiers, recherche et historique](#7-reste-à-faire---presse-papiers-recherche-et-historique)
-8. [Fonctions à définir](#8-fonctions-à-définir-avant-développement)
-9. [Ordre de développement conseillé](#9-ordre-de-développement-conseillé)
+2. [Système et diagnostics réalisés](#2-système-et-diagnostics-réalisés)
+3. [Nettoyage et maintenance réalisés](#3-nettoyage-et-maintenance-réalisés)
+4. [Monitoring et réseau réalisés](#4-monitoring-et-réseau-réalisés)
+5. [Jeux et performances réalisés](#5-jeux-et-performances-réalisés)
+6. [IA, texte et productivité](#6-ia-texte-et-productivité)
+7. [Recherche de fichiers](#7-recherche-de-fichiers)
+8. [Fonctions abandonnées](#8-fonctions-abandonnées)
+9. [Nouvelle orientation du développement](#9-nouvelle-orientation-du-développement)
 
 
 
@@ -94,6 +94,9 @@ pas le temps nécessaire.
 
 ### ✅ Paramètres généraux et sécurité — Terminé
 - Démarrage avec Windows, thèmes clair/sombre et tailles de police.
+- Taille initiale de la fenêtre configurable : petit, moyen, grand, très grand ou plein écran.
+- Centre des alertes dédié pour gérer depuis une seule fenêtre les rappels Top-Serveurs,
+  les seuils CPU/RAM/GPU, les pauses de session de jeu, le jitter réseau et la surveillance XMP.
 - Menu latéral organisé avec une catégorie repliable dédiée aux outils de texte.
 - Tous les modules disposent d'un interrupteur et les modules désactivés sont regroupés séparément avec des compteurs par catégorie.
 - Clés API enregistrées localement et chiffrées pour le compte Windows.
@@ -145,7 +148,7 @@ pas le temps nécessaire.
 
 
 
-## 2. FONCTIONS PARTIELLEMENT RÉALISÉES OU À ÉTENDRE
+## 2. SYSTÈME ET DIAGNOSTICS RÉALISÉS
 
 
 ### ✅ Nettoyage des fichiers temporaires — Terminé
@@ -172,7 +175,8 @@ pas le temps nécessaire.
 ### ✅ Audit des programmes au démarrage — Terminé
 - Inventaire en lecture seule des entrées du registre 32/64 bits et des dossiers Démarrage.
 - Affichage de la commande, de la portée, de la source et de l’état communiqué par Windows.
-- Analyse prudente des lancements essentiels, facultatifs ou à vérifier, avec justification.
+- Analyse enrichie par familles de logiciels, éditeur et description du fichier : sécurité, pilotes, synchronisation, périphériques, accès distant, launchers, communication, création et assistants de mise à jour.
+- Les programmes identifiés mais dépendants de l’usage sont séparés des entrées réellement opaques afin de limiter les verdicts « À vérifier » sans recommander de désactivation risquée.
 - Activation et désactivation confirmées par l’utilisateur et réversibles depuis la même page.
 
 
@@ -206,11 +210,6 @@ pas le temps nécessaire.
 - Les processus consommant le plus de CPU et de RAM sont affichés et ajoutés aux alertes.
 
 
-### 🟡 Mise à jour automatique des applications — 25 %
-- Le moteur de mise à jour sécurisé existe pour FlexHub.
-- Reste à gérer une liste d'applications tierces, leurs sources et les installations nocturnes.
-
-
 ### ✅ Comparaison avant/après un réglage NVIDIA — Terminé
 - L'application sait appliquer, sauvegarder et restaurer un profil NVIDIA.
 - Les sessions enregistrent le profil NVIDIA actif et comparent leurs mesures à une session de référence du même jeu.
@@ -229,22 +228,45 @@ pas le temps nécessaire.
 
 
 
-## 3. RESTE À FAIRE - SYSTÈME, NETTOYAGE ET MAINTENANCE
+## 3. NETTOYAGE ET MAINTENANCE RÉALISÉS
 
-- [x] **Vider le cache RAM et purger les fichiers temporaires.** *(Purge RAM exclusivement manuelle avec confirmation, élévation administrateur et mesure avant/après. Le mode automatique a été retiré car il pouvait provoquer des ralentissements.)*
-- [x] **Vider automatiquement la corbeille au-delà de X Go ou X jours.** *(Inventaire en lecture seule, aperçu, vidage manuel confirmé et contrôle quotidien facultatif désactivé par défaut. Le vidage automatique supprime toute la Corbeille après consentement explicite.)*
-- [x] **Afficher l'espace disque et la santé S.M.A.R.T. des SSD.**
-- [x] **Auditer les programmes lancés au démarrage et proposer leur désactivation.**
-- [x] **Détecter les logiciels et jeux inutilisés depuis une durée configurable.** *(Audit en lecture seule des logiciels installés, des bibliothèques Steam/Epic et de l’historique UserAssist de Windows ; seules les dernières exécutions connues sont signalées, les usages inconnus restent explicitement exclus.)*
-- [x] **Scanner les fichiers en double par hash avec validation avant suppression.** *(Analyse SHA-256, sélection manuelle ou automatique, conservation obligatoire d'un exemplaire et déplacement récupérable vers la Corbeille.)*
-- [x] **Vérifier les pilotes GPU, audio et chipset.** *(Inventaire local en lecture seule avec version et date, recherche des mises à jour de pilotes réellement applicables via Windows Update, correspondance prudente par fabricant/classe/modèle et accès au support officiel NVIDIA, AMD, Intel ou Realtek. Aucun téléchargement ni installation automatique.)*
-- [x] **Nettoyer précisément les caches de navigateurs, Steam, Visual Studio, etc.**
-- [x] **Organiser automatiquement le dossier Téléchargements selon des règles.** *(Analyse et aperçu manuels, catégories par extension et déplacement confirmé. Mode quotidien facultatif, désactivé par défaut : seuls les fichiers reconnus âgés de plus de 24 heures sont déplacés, sans écrasement ; les téléchargements partiels et la catégorie Autres restent intacts.)*
-- [x] **Renommer des fichiers en masse selon leur contexte (EXIF, date, etc.).** *(Aperçu complet, sélection, préfixe, date et numérotation, plus génération locale d’un nom intelligent depuis le contenu texte/code, les titres DOCX/PDF, les tags MP3 et les métadonnées EXIF. Les images JPG, JPEG, PNG, WEBP, HEIC/HEIF, AVIF, GIF, BMP, TIFF et les principaux RAW sont conservées dans la liste même sans métadonnées lisibles. La source de la date et celle du nom sont affichées séparément ; les collisions sont résolues dans l’aperçu sans écrasement. La fonction GPS a été retirée à la demande.)*
+### ✅ Purge manuelle de la mémoire RAM — Terminé
+- Confirmation et élévation administrateur obligatoires, avec mesure avant/après.
+- Le mode automatique a été retiré car il pouvait provoquer des ralentissements.
+
+### ✅ Gestion de la Corbeille — Terminé
+- Inventaire en lecture seule, aperçu et vidage manuel confirmé.
+- Contrôle quotidien facultatif désactivé par défaut, avec consentement explicite avant le vidage complet.
+
+### ✅ Détection des logiciels et jeux inutilisés — Terminé
+- Audit en lecture seule des logiciels installés, des bibliothèques Steam/Epic et de l’historique UserAssist de Windows.
+- Seules les dernières exécutions connues sont signalées ; les usages inconnus restent exclus.
+
+### ✅ Recherche des fichiers en double — Terminé
+- Analyse SHA-256, sélection manuelle ou automatique et conservation obligatoire d’un exemplaire.
+- Les suppressions passent par la Corbeille afin de rester récupérables.
+
+### ✅ Vérification des pilotes — Terminé
+- Inventaire local des pilotes GPU, audio et chipset avec leur version et leur date.
+- Recherche des mises à jour applicables via Windows Update et accès aux supports officiels NVIDIA, AMD, Intel ou Realtek.
+- Aucun téléchargement ni aucune installation automatique.
+
+### ✅ Nettoyage des caches d’applications — Terminé
+- Prise en charge des caches de navigateurs, Steam, Visual Studio et autres applications reconnues.
+
+### ✅ Organisation du dossier Téléchargements — Terminé
+- Analyse, aperçu par catégorie et déplacement confirmé sans écrasement.
+- Mode quotidien facultatif et désactivé par défaut pour les fichiers reconnus âgés de plus de 24 heures.
+- Les téléchargements partiels et la catégorie « Autres » restent intacts.
+
+### ✅ Renommage intelligent de fichiers — Terminé
+- Aperçu complet, sélection, préfixe, date, numérotation et génération locale d’un nom depuis le contenu ou les métadonnées.
+- Prise en charge des textes, du code, des titres DOCX/PDF, des tags MP3, des métadonnées EXIF et des principaux formats d’image et RAW.
+- Les collisions sont résolues sans écrasement. La fonction GPS a été retirée à la demande.
 
 
 
-## 4. RESTE À FAIRE - MONITORING ET RÉSEAU
+## 4. MONITORING ET RÉSEAU RÉALISÉS
 
 ### ✅ Diagnostic réseau avancé — Terminé
 - Qualité locale, Internet et jeu, détection des anomalies et diagnostic automatique.
@@ -253,103 +275,148 @@ pas le temps nécessaire.
 - Analyse ponctuelle des applications ayant du trafic actif, avec mesure de leurs destinations TCP publiques.
 - L’inventaire natif Windows fournit les PID sans élévation administrateur ; le trafic UDP non mesurable est clairement signalé.
 
-- [x] **Afficher RAM et VRAM avec un mini-graphe historique.**
-- [x] **Afficher la température GPU en temps réel.** *(Température CPU retirée : capteur non fiable sur le Ryzen 7 9800X3D.)*
-- [x] **Alerter lorsque le GPU dépasse un seuil de température configurable.**
-- [x] **Tester le ping vers la box, Discord, Steam ou des serveurs personnalisés.**
-- [x] **Mesurer en continu ping, jitter et perte de paquets vers les serveurs de jeu.**
-- [x] **Détecter les connexions TCP des jeux actifs et ajouter automatiquement leurs serveurs mesurables.**
-- [x] **Alerter lorsque le jitter dépasse un seuil avant une partie classée.**
-- [x] **Distinguer une panne locale (Wi-Fi/LAN) d'un problème extérieur.**
-- [x] **Simuler une charge CPU/GPU avec suivi de température en direct.** *(Tests CPU, GPU ou combiné séparés ; quatre niveaux de 50 à 100 %, véritable charge Direct3D 11 hors écran en 1440p/4K, historique et analyse, arrêt manuel et coupure automatique du GPU à 90 °C.)*
+### ✅ Historique RAM et VRAM — Terminé
+- Affichage en temps réel avec mini-graphe historique.
+
+### ✅ Température et alertes GPU — Terminé
+- Température GPU en temps réel et seuil d’alerte configurable.
+- La température CPU a été retirée, son capteur étant peu fiable sur le Ryzen 7 9800X3D.
+
+### ✅ Mesures réseau personnalisées — Terminé
+- Tests vers la box, Discord, Steam ou des serveurs personnalisés.
+- Mesure continue du ping, du jitter et de la perte de paquets vers les serveurs de jeu.
+
+### ✅ Détection réseau des jeux — Terminé
+- Détection des connexions TCP des jeux actifs et ajout automatique des serveurs mesurables.
+- Alerte lorsque le jitter dépasse le seuil configuré et distinction entre panne locale et problème extérieur.
+
+### ✅ Tests de charge CPU/GPU — Terminé
+- Tests CPU, GPU ou combinés avec quatre niveaux de charge de 50 à 100 %.
+- Charge Direct3D 11 hors écran en 1440p/4K, historique, analyse et arrêt manuel.
+- Coupure automatique du test GPU à 90 °C.
 
 
 
-## 5. RESTE À FAIRE - JEUX ET PERFORMANCES
+## 5. JEUX ET PERFORMANCES RÉALISÉS
 
-- [x] **Estimer les FPS en arrière-plan sans overlay.** *(Collecte ciblée avec PresentMon, sans injection dans le jeu.)*
-- [x] **Détecter le jeu lancé, chronométrer la session et alerter après X heures.** *(Alerte de pause disponible mais désactivée par défaut.)*
-- Le suivi des sessions reste actif en arrière-plan toutes les 15 secondes, quelle que soit la page affichée.
-- [x] **Générer un rapport de session : durée, températures, FPS et chutes de FPS.** *(Durée, mesures globales du PC, détail CPU/RAM/GPU/VRAM du jeu, FPS moyens, 1 % low et temps d’image moyen.)*
-- [x] **Conserver l'historique des sessions et afficher des graphes par jeu/semaine.** *(Historique local sans limite et graphique comparatif filtrable sur 7 jours, 30 jours, l'année ou toute la période.)*
-- Export CSV complet avec colonnes distinctes pour les mesures globales du PC et celles du processus du jeu.
-- Une session terminée peut être définie comme référence par jeu ; les sessions suivantes affichent leurs écarts CPU, RAM, GPU et température GPU.
-- Le profil NVIDIA actif au démarrage est conservé avec chaque session afin d'identifier clairement les comparaisons avant/après.
-- [x] **Passer automatiquement le processus d'un jeu en priorité CPU haute.** *(Option désactivée par défaut, confirmation avec aperçu des jeux concernés, priorité Temps réel interdite et restauration automatique de la priorité d’origine.)*
-- [~] **Isoler des cœurs CPU pour le jeu et déplacer les autres processus.** *(Module abandonné et retiré : les essais ont provoqué des freezes et des interruptions temporaires des périphériques.)*
-- [x] **Calculer l'eDPI et comparer la sensibilité aux joueurs professionnels.** *(Calcul local de l’eDPI et du cm/360, avec comparaison prudente aux médianes professionnelles vérifiées pour Valorant et Counter-Strike 2.)*
-- [x] **Convertir la sensibilité entre Valorant, CS2, Apex, etc., avec leur FOV.** *(Bibliothèque de profils fiables pour Valorant, Counter-Strike 2/GO/Source, Apex Legends, Overwatch 2, Rainbow Six Siege, Team Fortress 2, Left 4 Dead 2, Half-Life 2, Quake Live/Champions, Garry’s Mod, Portal 2, Black Mesa et Day of Defeat Source. Seuls les jeux réellement détectés sur le PC sont proposés.)*
-- Lecture automatique en consultation seule de la sensibilité, de l’ADS, du FOV et de l’accélération de WARDOGS.
+### ✅ Mesure des FPS en arrière-plan — Terminé
+- Collecte ciblée avec PresentMon, sans overlay ni injection dans le jeu.
 
+### ✅ Détection et chronométrage des sessions — Terminé
+- Détection du jeu actif et suivi en arrière-plan toutes les 15 secondes, quelle que soit la page affichée.
+- Alerte de pause configurable et désactivée par défaut.
 
+### ✅ Rapports et historique des sessions — Terminé
+- Durée, mesures globales du PC, détail CPU/RAM/GPU/VRAM du jeu, FPS moyens, 1 % low et temps d’image moyen.
+- Historique local sans limite et graphiques filtrables sur 7 jours, 30 jours, l’année ou toute la période.
+- Export CSV avec des colonnes distinctes pour le PC et le processus du jeu.
 
-## 6. RESTE À FAIRE - IA, TEXTE ET PRODUCTIVITÉ
+### ✅ Comparaison des performances par jeu — Terminé
+- Une session terminée peut servir de référence pour comparer les sessions suivantes.
+- Les écarts CPU, RAM, GPU et température GPU sont affichés et le profil NVIDIA actif est conservé.
 
-- [x] **Détecter le ton d'un message (critique, défensif, agressif, etc.).** *(Moteur local explicable combinant familles de mots, expressions, négations, contexte adressé, ponctuation et intensité. Tons critique, agressif, frustré, résigné, défensif, inquiet, triste, enthousiaste, chaleureux, urgent, professionnel, incertain, directif ou neutre, avec jusqu’à deux nuances et les indices ayant motivé le résultat.)*
-- [x] **Analyser la légitimité d'un lien ou exécutable suspect.** *(Analyse locale sans ouverture : structure réelle du lien, protocole, domaine, indices d’hameçonnage, double extension, provenance Internet, signature numérique, taille et empreinte SHA-256. Indicateur facultatif ✓/?/✕ au survol des liens exposés par l’accessibilité Windows. Verdict prudent et non présenté comme une garantie.)*
-- [~] **Ajouter des actions au menu contextuel Windows pour le texte sélectionné.** *(Abandonné : Windows ne fournit pas de menu contextuel universel pour le texte sélectionné dans toutes les applications ; la roue d’actions et les raccourcis FlexHub couvrent déjà ce besoin de manière plus fiable.)*
-- [~] **Ajouter des commandes vocales.** *(Module abandonné avant développement.)*
-- [x] **Générer à 18 h un rapport des applications utilisées et fichiers modifiés.** *(Module local désactivé par défaut, heure configurable, échantillonnage léger de l’application active toutes les 30 secondes sur un thread d’arrière-plan et surveillance événementielle Windows des dossiers personnels, sans scan complet ni lecture du contenu.)*
-- [x] **Produire des statistiques hebdomadaires d'utilisation et de productivité.** *(Vue locale sur 7 jours, activité quotidienne, applications principales, fichiers modifiés et comparaison avec les 7 jours précédents. Les résultats décrivent l’usage sans attribuer une note de productivité.)*
-- [ ] **Mettre en place une veille automatique sur des sources configurables.**
+### ✅ Priorité CPU haute pour les jeux — Terminé
+- Option désactivée par défaut avec confirmation et aperçu des jeux concernés.
+- La priorité Temps réel est interdite et la priorité d’origine est restaurée automatiquement.
 
+### ✅ Calcul et comparaison de l’eDPI — Terminé
+- Calcul local de l’eDPI et du cm/360 avec comparaison prudente aux médianes professionnelles de Valorant et Counter-Strike 2.
 
-
-## 7. RESTE À FAIRE - PRESSE-PAPIERS, RECHERCHE ET HISTORIQUE
-
-- [ ] **Reconnaître le contenu copié et proposer une action adaptée**
-  (téléphone, adresse, lien YouTube, etc.).
-- [ ] **Capturer l'écran périodiquement en mode opt-in, effectuer un OCR**
-  et permettre une recherche dans l'historique.
-- [ ] **Créer une recherche unifiée dans les fichiers, le presse-papiers,**
-  les snippets et les favoris.
-- [x] **Ajouter la recherche « Où est ce fichier ? » par fragment de nom.** *(Recherche locale annulable dans les dossiers personnels, limitée à 500 résultats, avec type, taille, date, ouverture du fichier dans son application associée et ouverture directe de son emplacement.)*
+### ✅ Conversion de sensibilité entre jeux — Terminé
+- Conversion avec prise en compte du FOV pour les jeux compatibles réellement détectés sur le PC.
+- Lecture en consultation seule de la sensibilité, de l’ADS, du FOV et de l’accélération de WARDOGS.
 
 
 
-## 8. FONCTIONS À DÉFINIR AVANT DÉVELOPPEMENT
+## 6. IA, TEXTE ET PRODUCTIVITÉ
+
+### ✅ Analyse locale du ton — Terminé
+- Moteur explicable combinant vocabulaire, expressions, négations, contexte, ponctuation et intensité.
+- Jusqu’à deux nuances sont affichées avec les indices ayant motivé le résultat.
+
+### ✅ Analyse des liens et exécutables suspects — Terminé
+- Analyse locale sans ouverture : protocole, domaine, indices d’hameçonnage, double extension, provenance Internet, signature, taille et empreinte SHA-256.
+- Verdict prudent et indicateur facultatif au survol des liens accessibles par Windows.
+
+### ✅ Rapport quotidien d’activité — Terminé
+- Module local désactivé par défaut avec heure configurable.
+- Échantillonnage léger de l’application active et surveillance événementielle des dossiers personnels, sans lecture du contenu.
+- Sauvegarde automatique de la journée toutes les deux minutes et restauration après un redémarrage de FlexHub.
+- Conservation locale longue durée des journées, des applications et des chemins des fichiers modifiés.
+
+### ✅ Statistiques hebdomadaires d’utilisation — Terminé
+- Vue sur 7 jours, applications principales, fichiers modifiés et comparaison avec les 7 jours précédents.
+- Les résultats décrivent l’usage sans attribuer une note de productivité.
+- Graphiques visuels par jour et par application, historique des fichiers, aperçu des images et ouverture directe du fichier ou de son emplacement.
+
+## 7. RECHERCHE DE FICHIERS
+
+### ✅ Recherche « Où est ce fichier ? » — Terminé
+- Recherche locale annulable par fragment de nom dans les dossiers personnels, limitée à 500 résultats.
+- Affichage du type, de la taille et de la date, avec ouverture du fichier ou de son emplacement.
 
 
-### 🔵 Téléchargement intelligent / téléchargement de vidéos — À définir
-- Préciser les sites autorisés, le respect des conditions d'utilisation et des droits
-  d'auteur, les formats voulus et l'outil technique retenu.
+
+## 8. FONCTIONS ABANDONNÉES
+
+### 🛑 Reconnaissance du contenu copié — Abandonné
+- Module retiré : utilité jugée insuffisante.
+
+### 🛑 Recherche unifiée — Abandonnée
+- La recherche dans le presse-papiers, les snippets et les favoris n’est plus prévue.
+- La recherche locale « Où est ce fichier ? » reste disponible.
+
+### 🛑 Mise à jour des applications tierces — Abandonnée
+- Le moteur sécurisé de mise à jour de FlexHub reste disponible.
+
+### 🛑 Veille automatique — Abandonnée
+- Priorité donnée à l’optimisation et à l’amélioration des modules existants.
+
+### 🛑 Isolation des cœurs CPU — Abandonnée
+- Module retiré après des essais ayant provoqué des freezes et des interruptions temporaires des périphériques.
+
+### 🛑 Menu contextuel Windows universel — Abandonné
+- Windows ne fournit pas de menu contextuel universel fiable pour le texte sélectionné.
+- La roue d’actions et les raccourcis couvrent déjà ce besoin.
+
+### 🛑 Commandes vocales — Abandonnées
+- Module abandonné avant développement.
+
+### 🛑 Téléchargement intelligent ou de vidéos — Abandonné
+- Fonction non prévue afin de concentrer le développement sur les outils existants.
+
+### 🛑 Historique OCR de captures d’écran — Abandonné
+- La capture périodique, l’OCR et l’indexation des captures ne sont plus prévus.
 
 
-### 🔵 Veille automatique — À définir
-- Décider si les sources sont proposées automatiquement, renseignées par l'utilisateur,
-  ou les deux. Définir aussi la fréquence, les thèmes et le format des notifications.
+## 9. NOUVELLE ORIENTATION DU DÉVELOPPEMENT
 
 
-### 🔵 Screenshot searchable — À définir
-- Définir la durée de conservation, les exclusions d'applications, le chiffrement,
-  la suppression et le stockage local. Cette fonction doit rester strictement opt-in.
+### Priorité 1 — stabilité et performances
+
+1. Mesurer et réduire l’utilisation CPU, RAM, disque et réseau de FlexHub en arrière-plan.
+2. Supprimer les blocages de l’interface et déplacer les opérations longues hors du thread graphique.
+3. Renforcer la gestion des erreurs, des annulations et des périphériques ou services indisponibles.
+
+Première passe réalisée : analyseurs .NET sans erreur, libération de la poignée Windows utilisée par le second lancement, journalisation des configurations illisibles et des échecs d’ouverture du rappel, exclusion des fichiers de lancement local du dépôt.
 
 
-## 9. ORDRE DE DÉVELOPPEMENT CONSEILLÉ
+### Priorité 2 — amélioration des fonctions existantes
+
+4. Améliorer l’ergonomie, la clarté des résultats et les temps de réponse des modules actuels.
+5. Étendre uniquement les formats et matériels pris en charge lorsqu’un besoin réel est constaté.
+6. Corriger et enrichir les diagnostics à partir des cas réellement rencontrés.
 
 
-### Priorité 1 — compléter les fonctions existantes
+### Priorité 3 — qualité des versions
 
-1. Comparer automatiquement les pilotes GPU, audio et chipset avec les dernières versions officielles.
-2. Améliorer progressivement les formats reconnus par le renommage intelligent.
-3. Étendre progressivement les explications des erreurs Windows à partir des cas réellement rencontrés.
-
-
-### Priorité 2 — recherche et presse-papiers
-
-4. Reconnaître localement le type de contenu copié et proposer une action adaptée.
-5. Créer une recherche unifiée dans les fichiers, le presse-papiers, les snippets et les favoris.
-
-
-### Priorité 3 — fonctions à cadrer avant développement
-
-6. Définir puis développer la veille automatique sur des sources configurables.
-7. Définir le stockage, les exclusions et la conservation avant tout historique OCR de captures d’écran.
-8. Définir les applications tierces prises en charge avant d’étendre le moteur de mise à jour automatique.
+7. Ajouter des tests de non-régression pour chaque correction importante.
+8. Vérifier la consommation et la stabilité sur une utilisation prolongée avant chaque publication.
+9. Maintenir la documentation, les notes de version et les garde-fous de sécurité à jour.
 
 
 RÈGLE DE MISE À JOUR DE CE FICHIER
-- Lorsqu'une fonction commence : remplacer [À FAIRE - 0 %] par [EN COURS - XX %].
-- Lorsqu'elle est testée et utilisable : la déplacer dans « Fonctions déjà réalisées ».
-- Ajouter une courte note sur ce qui reste lorsqu'une fonction est marquée [PARTIEL].
+- Documenter chaque optimisation ou amélioration lorsqu’elle est testée et utilisable.
+- Conserver les descriptions conformes au comportement réellement présent dans le code.
+- Lorsqu’une idée est abandonnée, la déplacer dans « Fonctions abandonnées » avec une courte justification.
 - Mettre à jour la date située en haut du document à chaque modification.

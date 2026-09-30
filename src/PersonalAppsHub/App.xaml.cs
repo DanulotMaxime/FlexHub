@@ -48,7 +48,15 @@ public partial class App : System.Windows.Application
         _ownsMutex = created;
         if (!created)
         {
-            try { EventWaitHandle.OpenExisting(ShowEventName).Set(); } catch { }
+            try
+            {
+                using var showEvent = EventWaitHandle.OpenExisting(ShowEventName);
+                showEvent.Set();
+            }
+            catch (WaitHandleCannotBeOpenedException ex)
+            {
+                AppLog.Write($"INSTANCE EXISTANTE INJOIGNABLE | {ex.Message}");
+            }
             Shutdown();
             return;
         }

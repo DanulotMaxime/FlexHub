@@ -93,24 +93,30 @@ public sealed class SettingsService
                 settings.DailyActivityReportEnabled = false;
                 settings.DailyActivityReportHour = 18;
             }
-            settings.SettingsSchemaVersion = 32;
+            if (settings.SettingsSchemaVersion < 33 || string.IsNullOrWhiteSpace(settings.InitialWindowSize))
+                settings.InitialWindowSize = "Moyen";
+            settings.SettingsSchemaVersion = 33;
             return settings;
         }
-        catch
+        catch (Exception ex)
         {
+            AppLog.WriteException("CONFIGURATION ILLISIBLE", ex);
             try
             {
                 var backup = Path.Combine(_folder, $"settings-corrompus-{DateTime.Now:yyyyMMdd-HHmmss}.json");
                 File.Copy(SettingsPath, backup, overwrite: false);
             }
-            catch { }
+            catch (Exception backupException)
+            {
+                AppLog.WriteException("SAUVEGARDE DE LA CONFIGURATION ILLISIBLE IMPOSSIBLE", backupException);
+            }
             return new();
         }
     }
     public void Save(HubSettings settings)
     {
         Directory.CreateDirectory(_folder);
-        settings.SettingsSchemaVersion = 32;
+        settings.SettingsSchemaVersion = 33;
         var temporaryPath = SettingsPath + ".tmp";
         File.WriteAllText(temporaryPath, JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));
         File.Move(temporaryPath, SettingsPath, overwrite: true);

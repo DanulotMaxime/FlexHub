@@ -21,6 +21,7 @@ Check(!ddr4Low.IsProbablyActive, "DDR4 sous la plage");
 Check(ddr5Fast.IsProbablyActive, "DDR5 au-dessus de la plage");
 
 var defaults = new HubSettings();
+Check(defaults.InitialWindowSize == "Moyen", "taille initiale moyenne par défaut");
 Check(!defaults.ReminderEnabled, "rappel Top-Serveurs désactivé par défaut");
 Check(!defaults.AutoFrenchKeyboardInDialogs, "clavier de saisie désactivé par défaut");
 Check(defaults.TranslatorProvider == "MyMemory", "MyMemory présélectionné pour la traduction");
@@ -29,6 +30,21 @@ Check(defaults.TranslationSourceLanguage == "EN" && defaults.TranslationTargetLa
 Check(!defaults.GeminiSetupCompleted, "configuration Gemini demandée au premier lancement");
 Check(!defaults.XmpMonitorEnabled && !defaults.MemorySetupCompleted, "surveillance désactivée avant l’assistant");
 Check(!defaults.AiPrivacyConsentAccepted, "consentement API explicite");
+var activityToday = new DateTime(2026, 9, 30);
+var activityStatistics = DailyActivityReportService.CalculateStatistics([
+    new DailyActivitySnapshot(activityToday.AddDays(-1), activityToday.AddDays(-1).AddHours(18),
+        new Dictionary<string, double> { ["Visual Studio Code"] = 3600, ["Discord"] = 600 }, 2,
+        [new ActivityFileSnapshot(@"C:\Documents\rapport.docx", activityToday.AddDays(-1).AddHours(17))]),
+    new DailyActivitySnapshot(activityToday, activityToday.AddHours(12),
+        new Dictionary<string, double> { ["Visual Studio Code"] = 1800 }, 1,
+        [new ActivityFileSnapshot(@"C:\Images\capture.png", activityToday.AddHours(11))])
+], activityToday);
+Check(activityStatistics.Days.Count == 7 && activityStatistics.Days[^1].Seconds == 1800,
+    "statistiques d’activité toujours composées de 7 jours");
+Check(activityStatistics.Applications[0].Name == "Visual Studio Code" && activityStatistics.Applications[0].Seconds == 5400,
+    "agrégation des applications sur plusieurs journées");
+Check(activityStatistics.RecentFiles.Count == 2 && activityStatistics.OldestRecordedDate == activityToday.AddDays(-1),
+    "historique daté des fichiers modifiés");
 var renameTestFolder = Path.Combine(Path.GetTempPath(), $"flexhub-rename-{Guid.NewGuid():N}");
 Directory.CreateDirectory(renameTestFolder);
 try
@@ -128,6 +144,27 @@ Check(StartupAuditService.CreateApprovalValue(false)[0] == 3 &&
 var startupAnalysis = StartupAuditService.Analyze("Discord", @"C:\Apps\Discord\Update.exe");
 Check(startupAnalysis.Recommendation == "Désactivation envisageable" && startupAnalysis.Reason.Contains("manuellement"),
     "analyse prudente d’une application facultative au démarrage");
+Check(StartupAuditService.Analyze("SecurityHealth", @"C:\Windows\System32\SecurityHealthSystray.exe").Recommendation == "À conserver",
+    "conservation des composants de sécurité au démarrage");
+Check(StartupAuditService.Analyze("Avast Update", @"C:\Apps\Avast\updater.exe").Recommendation == "À conserver",
+    "la sécurité reste prioritaire sur la règle des assistants de mise à jour");
+Check(StartupAuditService.Analyze("OneDrive", @"C:\Apps\OneDrive.exe").Recommendation == "Selon votre usage",
+    "classement prudent des services de synchronisation");
+Check(StartupAuditService.Analyze("LGHUB", @"C:\Apps\LGHUB.exe").Recommendation == "Selon votre usage",
+    "classement des utilitaires de périphériques");
+Check(StartupAuditService.Analyze("Riot Vanguard", @"C:\Program Files\Riot Vanguard\vgtray.exe").Recommendation == "Selon votre usage",
+    "classement prudent des services anti-triche");
+Check(StartupAuditService.Analyze("LG Calibration Studio", @"C:\Apps\LCSStartupApp.exe").Recommendation == "Selon votre usage",
+    "classement des utilitaires d’écran");
+Check(StartupAuditService.Analyze("AdobeGCInvoker", @"C:\Apps\AdobeGCInvoker.exe").Recommendation == "Désactivation envisageable",
+    "classement des assistants Adobe facultatifs");
+Check(StartupAuditService.Analyze("Outil métier", @"C:\Apps\outil.exe", "Éditeur Exemple").Recommendation == "Selon votre usage",
+    "utilisation de l’éditeur pour réduire les entrées non identifiées");
+Check(StartupAuditService.Analyze("x7q9", @"C:\Temp\x7q9.exe").Recommendation == "À vérifier",
+    "maintien d’un verdict prudent pour une entrée opaque");
+Check(StartupAuditService.ExtractExecutablePath(@"""C:\Program Files\Exemple\app.exe"" --silent") == @"C:\Program Files\Exemple\app.exe" &&
+      StartupAuditService.ExtractExecutablePath(@"C:\Program Files\Exemple\app.exe --silent") == @"C:\Program Files\Exemple\app.exe",
+    "extraction des chemins d’exécutables avec ou sans guillemets");
 var nvmeLog = new byte[512];
 BinaryPrimitives.WriteUInt16LittleEndian(nvmeLog.AsSpan(1, 2), 300);
 nvmeLog[5] = 4;

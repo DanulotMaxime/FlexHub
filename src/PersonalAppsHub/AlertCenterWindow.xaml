@@ -1,0 +1,40 @@
+<Window x:Class="PersonalAppsHub.AlertCenterWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Centre des alertes" Width="720" Height="790" MinWidth="650" MinHeight="650"
+        WindowStartupLocation="CenterOwner" Background="{DynamicResource BackgroundBrush}"
+        Foreground="{DynamicResource TextBrush}" FontSize="{DynamicResource BaseFontSize}">
+  <Window.Resources>
+    <Style x:Key="AlertCardStyle" TargetType="Border"><Setter Property="Background" Value="{DynamicResource PanelLightBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="10"/><Setter Property="Padding" Value="14"/><Setter Property="Margin" Value="0,0,0,10"/></Style>
+  </Window.Resources>
+  <Grid Margin="24">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <StackPanel><TextBlock Text="Centre des alertes" FontSize="27" FontWeight="SemiBold"/><TextBlock Text="Toutes les notifications automatiques de FlexHub, regroupées au même endroit." Foreground="{DynamicResource MutedBrush}" Margin="0,7,0,0"/></StackPanel>
+    <Border Grid.Row="1" Height="1" Background="{DynamicResource SeparatorBrush}" Margin="0,20"/>
+    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"><StackPanel Margin="0,0,10,0">
+      <Border Style="{StaticResource AlertCardStyle}"><StackPanel>
+        <Grid><TextBlock Text="Rappel Top-Serveurs" FontSize="17" FontWeight="SemiBold"/><ToggleButton x:Name="ReminderAlertEnabled" HorizontalAlignment="Right" Style="{StaticResource ToggleStyle}"/></Grid>
+        <TextBlock Text="Affiche périodiquement le rappel de vote configuré." Foreground="{DynamicResource MutedBrush}" FontSize="11" Margin="0,4,0,10"/>
+        <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel Margin="0,0,6,0"><TextBlock Text="Intervalle (minutes)" FontSize="11" Foreground="{DynamicResource MutedBrush}"/><TextBox x:Name="ReminderMinutes" Margin="0,5,0,0"/></StackPanel><StackPanel Grid.Column="1" Margin="6,0,0,0"><TextBlock Text="Affichage (secondes)" FontSize="11" Foreground="{DynamicResource MutedBrush}"/><TextBox x:Name="ReminderSeconds" Margin="0,5,0,0"/></StackPanel></Grid>
+      </StackPanel></Border>
+      <Border Style="{StaticResource AlertCardStyle}"><StackPanel>
+        <Grid><TextBlock Text="Alertes CPU, RAM et GPU" FontSize="17" FontWeight="SemiBold"/><ToggleButton x:Name="MonitoringAlertsEnabled" HorizontalAlignment="Right" Style="{StaticResource ToggleStyle}"/></Grid>
+        <TextBlock Text="Déclenchées après trois mesures consécutives au-dessus du seuil." Foreground="{DynamicResource MutedBrush}" FontSize="11" Margin="0,4,0,10"/>
+        <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel Margin="0,0,5,0"><TextBlock Text="CPU (%)" FontSize="11"/><TextBox x:Name="CpuThreshold" Margin="0,5,0,0"/></StackPanel><StackPanel Grid.Column="1" Margin="5,0"><TextBlock Text="RAM (%)" FontSize="11"/><TextBox x:Name="RamThreshold" Margin="0,5,0,0"/></StackPanel><StackPanel Grid.Column="2" Margin="5,0,0,0"><TextBlock Text="GPU (°C)" FontSize="11"/><TextBox x:Name="GpuThreshold" Margin="0,5,0,0"/></StackPanel></Grid>
+      </StackPanel></Border>
+      <Border Style="{StaticResource AlertCardStyle}"><StackPanel>
+        <Grid><TextBlock Text="Alerte de pause en jeu" FontSize="17" FontWeight="SemiBold"/><ToggleButton x:Name="GameSessionAlertEnabled" HorizontalAlignment="Right" Style="{StaticResource ToggleStyle}"/></Grid>
+        <Grid Margin="0,8,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="120"/></Grid.ColumnDefinitions><TextBlock Text="Conseiller une pause après cette durée." Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center"/><StackPanel Grid.Column="1"><TextBlock Text="Heures" FontSize="11"/><TextBox x:Name="GameSessionHours" Margin="0,5,0,0"/></StackPanel></Grid>
+      </StackPanel></Border>
+      <Border Style="{StaticResource AlertCardStyle}"><StackPanel>
+        <Grid><TextBlock Text="Alerte de jitter réseau" FontSize="17" FontWeight="SemiBold"/><ToggleButton x:Name="JitterAlertEnabled" HorizontalAlignment="Right" Style="{StaticResource ToggleStyle}"/></Grid>
+        <Grid Margin="0,8,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="120"/></Grid.ColumnDefinitions><TextBlock Text="Prévenir après trois mesures réseau instables." Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center"/><StackPanel Grid.Column="1"><TextBlock Text="Seuil (ms)" FontSize="11"/><TextBox x:Name="JitterThreshold" Margin="0,5,0,0"/></StackPanel></Grid>
+      </StackPanel></Border>
+      <Border Style="{StaticResource AlertCardStyle}"><StackPanel>
+        <Grid><TextBlock Text="Surveillance XMP" FontSize="17" FontWeight="SemiBold"/><ToggleButton x:Name="XmpAlertEnabled" HorizontalAlignment="Right" Style="{StaticResource ToggleStyle}"/></Grid>
+        <TextBlock Text="Alerte lorsque la mémoire fonctionne sous la vitesse attendue. La vitesse cible reste configurable dans la page XMP." Foreground="{DynamicResource MutedBrush}" FontSize="11" Margin="0,5,0,0" TextWrapping="Wrap"/>
+      </StackPanel></Border>
+    </StackPanel></ScrollViewer>
+    <Grid Grid.Row="3" Margin="0,18,0,0"><TextBlock x:Name="ValidationText" Foreground="#FFFF8B8B" VerticalAlignment="Center"/><StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><Button Content="Annuler" Style="{StaticResource ButtonStyle}" Margin="0,0,8,0" Click="Cancel_OnClick"/><Button Content="Enregistrer" Style="{StaticResource PrimaryButtonStyle}" Click="Save_OnClick"/></StackPanel></Grid>
+  </Grid>
+</Window>

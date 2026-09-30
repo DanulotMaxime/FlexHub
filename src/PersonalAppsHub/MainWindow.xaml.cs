@@ -137,6 +137,7 @@ public partial class MainWindow : Window
         _settings = _settingsService.Load();
         LoadNetworkHistory();
         ApplyAppearance();
+        ApplyInitialWindowSize();
         var logoPath = Path.Combine(AppContext.BaseDirectory, "Assets", "app-logo.png");
         _tray = new Forms.NotifyIcon { Text = "FlexHub", Visible = true };
         try
@@ -247,11 +248,7 @@ public partial class MainWindow : Window
         DailyActivityReportEnabled.Checked += (_, _) => SaveDailyActivityReportSettings();
         DailyActivityReportEnabled.Unchecked += (_, _) => SaveDailyActivityReportSettings();
         GenerateDailyActivityReport.Click += async (_, _) => await GenerateDailyActivityReportAsync(false);
-        ShowWeeklyActivityStatistics.Click += (_, _) =>
-        {
-            DailyActivityReportText.Text = _dailyActivityReportService.BuildWeeklyStatistics();
-            DailyActivityReportStatus.Text = "Statistiques calculées depuis les rapports conservés localement.";
-        };
+        ShowWeeklyActivityStatistics.Click += (_, _) => new ActivityStatisticsWindow(_dailyActivityReportService) { Owner = this }.ShowDialog();
         DailyActivityReportHourBox.LostKeyboardFocus += (_, _) => SaveDailyActivityReportSettings();
         LinkHoverSafetyEnabled.Checked += (_, _) => ApplyEnabledStates();
         LinkHoverSafetyEnabled.Unchecked += (_, _) => ApplyEnabledStates();
@@ -367,6 +364,7 @@ public partial class MainWindow : Window
         TestKeyboardLayout.Click += (_, _) => TestKeyboardLayoutNow();
         OpenDiagnosticLog.Click += (_, _) => OpenDiagnosticLogNow();
         SaveGeneralSettings.Click += (_, _) => SaveGeneralSettingsNow();
+        OpenAlertCenter.Click += (_, _) => OpenAlertCenterNow();
         OpenOpenAiApiPage.Click += (_, _) => OpenExternalPage(OpenAiApiKeysUrl, "OpenAI");
         OpenGeminiApiPage.Click += (_, _) => OpenExternalPage(GeminiApiKeysUrl, "Google Gemini");
         OpenDeepLApiPage.Click += (_, _) => OpenExternalPage(DeepLApiKeysUrl, "DeepL");
@@ -584,6 +582,10 @@ public partial class MainWindow : Window
         StartWithWindowsToggle.IsChecked = _settings.StartWithWindows;
         FontSizeBox.SelectedIndex = _settings.FontSizePreference switch { "Petit" => 0, "Grand" => 2, _ => 1 };
         ThemeBox.SelectedIndex = _settings.ThemePreference == "Clair" ? 1 : 0;
+        InitialWindowSizeBox.SelectedIndex = _settings.InitialWindowSize switch
+        {
+            "Petit" => 0, "Grand" => 2, "Très grand" => 3, "Plein écran" => 4, _ => 1
+        };
         AiConsentCheck.IsChecked = _settings.AiPrivacyConsentAccepted;
         CurrentVersionText.Text = $"FlexHub {UpdateService.CurrentVersion}";
         var changelogPath = Path.Combine(AppContext.BaseDirectory, "CHANGELOG.md");
@@ -664,6 +666,7 @@ public partial class MainWindow : Window
         _settings.StartWithWindows = StartWithWindowsToggle.IsChecked == true;
         _settings.FontSizePreference = (FontSizeBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Content?.ToString() ?? "Moyen";
         _settings.ThemePreference = (ThemeBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Content?.ToString() ?? "Sombre";
+        _settings.InitialWindowSize = (InitialWindowSizeBox.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Content?.ToString() ?? "Moyen";
         _settings.AiPrivacyConsentAccepted = AiConsentCheck.IsChecked == true;
         try
         {
@@ -675,12 +678,13 @@ public partial class MainWindow : Window
             StartupService.SetEnabled(_settings.StartWithWindows);
             _settingsService.Save(_settings);
             ApplyAppearance();
+            ApplyInitialWindowSize();
             RefreshGeneralApiKeyBoxes();
             UpdateProviderPanel();
             UpdateTranslationProviderPanel();
             UpdateResponseGeneratorModel();
             AppLog.Write($"PARAMÈTRES GÉNÉRAUX ENREGISTRÉS | DémarrageWindows={_settings.StartWithWindows}; " +
-                         $"Thème={_settings.ThemePreference}; Police={_settings.FontSizePreference}; ConsentementIA={_settings.AiPrivacyConsentAccepted}");
+                         $"Thème={_settings.ThemePreference}; Police={_settings.FontSizePreference}; Fenêtre={_settings.InitialWindowSize}; ConsentementIA={_settings.AiPrivacyConsentAccepted}");
             GeneralSettingsStatus.Text = "Paramètres généraux et clés API enregistrés.";
         }
         catch (Exception ex)
@@ -886,6 +890,70 @@ public partial class MainWindow : Window
         SetThemeBrush("DisabledTextBrush", light ? "#FF8A817A" : "#FF8E8883");
         SetThemeBrush("ToggleOffBrush", light ? "#FFD5CBC2" : "#FF49433E");
         SetThemeBrush("ToggleThumbBrush", light ? "#FFFFFFFF" : "#FFFFDFC0");
+    }
+
+    private void ApplyInitialWindowSize()
+    {
+        if (_settings.InitialWindowSize == "Plein écran")
+        {
+            WindowState = WindowState.Maximized;
+            return;
+        }
+
+        WindowState = WindowState.Normal;
+        var (requestedWidth, requestedHeight) = _settings.InitialWindowSize switch
+        {
+            "Petit" => (1000d, 720d),
+            "Grand" => (1360d, 880d),
+            "Très grand" => (1600d, 1000d),
+            _ => (1120d, 780d)
+        };
+        Width = Math.Min(requestedWidth, SystemParameters.WorkArea.Width);
+        Height = Math.Min(requestedHeight, SystemParameters.WorkArea.Height);
+        Left = SystemParameters.WorkArea.Left + Math.Max(0, (SystemParameters.WorkArea.Width - Width) / 2);
+        Top = SystemParameters.WorkArea.Top + Math.Max(0, (SystemParameters.WorkArea.Height - Height) / 2);
+    }
+
+    private void OpenAlertCenterNow()
+    {
+        var dialog = new AlertCenterWindow(_settings) { Owner = this };
+        if (dialog.ShowDialog() != true) return;
+
+        _settings.ReminderEnabled = dialog.ReminderEnabledValue;
+        _settings.ReminderIntervalMinutes = dialog.ReminderIntervalMinutes;
+        _settings.ReminderDisplaySeconds = dialog.ReminderDisplaySeconds;
+        _settings.MonitoringAlertsEnabled = dialog.MonitoringEnabledValue;
+        _settings.MonitoringCpuAlertPercent = dialog.CpuAlertPercent;
+        _settings.MonitoringRamAlertPercent = dialog.RamAlertPercent;
+        _settings.MonitoringGpuTemperatureAlertC = dialog.GpuTemperatureAlertC;
+        _settings.GameSessionAlertEnabled = dialog.GameAlertEnabledValue;
+        _settings.GameSessionAlertHours = dialog.GameAlertHours;
+        _settings.NetworkJitterAlertEnabled = dialog.JitterEnabledValue;
+        _settings.NetworkJitterAlertMs = dialog.JitterAlertMs;
+        _settings.XmpMonitorEnabled = dialog.XmpEnabledValue;
+
+        ReminderEnabled.IsChecked = _settings.ReminderEnabled;
+        ReminderInterval.Text = _settings.ReminderIntervalMinutes.ToString();
+        ReminderDuration.Text = _settings.ReminderDisplaySeconds.ToString();
+        GameSessionAlertEnabled.IsChecked = _settings.GameSessionAlertEnabled;
+        GameSessionAlertHoursBox.Text = _settings.GameSessionAlertHours.ToString();
+        NetworkJitterAlertEnabled.IsChecked = _settings.NetworkJitterAlertEnabled;
+        NetworkJitterAlertMsBox.Text = _settings.NetworkJitterAlertMs.ToString();
+        XmpEnabled.IsChecked = _settings.XmpMonitorEnabled;
+        _settingsService.Save(_settings);
+        ResetMonitoringAlertCounters();
+        _alertedGameSessionProcessIds.Clear();
+        ConfigureReminderTimer();
+        ConfigureXmpTimer();
+        UpdateNavigationState();
+        MonitoringAlertStatus.Text = _settings.MonitoringAlertsEnabled ? "Alertes centralisées activées." : "Alertes CPU, RAM et GPU désactivées.";
+        ActiveGameSessionSummary.Text = _settings.GameSessionAlertEnabled
+            ? $"Alerte de pause après {_settings.GameSessionAlertHours} h de jeu."
+            : "Alerte de pause désactivée.";
+        NetworkDiagnosticText.Text = _settings.NetworkJitterAlertEnabled
+            ? $"Alerte si le jitter dépasse {_settings.NetworkJitterAlertMs} ms."
+            : "Alerte de jitter désactivée.";
+        GeneralSettingsStatus.Text = "Centre des alertes enregistré.";
     }
 
     private static void SetThemeBrush(string resourceKey, string color)
@@ -4244,9 +4312,11 @@ public partial class MainWindow : Window
             var result = await _startupAuditService.ScanAsync();
             StartupEntriesList.ItemsSource = result.Entries;
             var disabled = result.Entries.Count(entry => entry.Status == "Désactivé");
+            var uncertain = result.Entries.Count(entry => entry.Recommendation == "À vérifier");
             StartupAuditStatus.Text = result.Entries.Count == 0
                 ? "Aucun programme de démarrage trouvé."
                 : $"{result.Entries.Count} programme(s), dont {disabled} désactivé(s)" +
+                  (uncertain > 0 ? $" · {uncertain} réellement non identifié(s)" : " · toutes les entrées ont été catégorisées") +
                   (result.InaccessibleSources > 0 ? $" · {result.InaccessibleSources} source(s) inaccessible(s)." : ".");
         }
         catch (Exception ex)
@@ -4321,7 +4391,11 @@ public partial class MainWindow : Window
         try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
         catch (Exception ex) { AppLog.Write($"Ouverture de la page API {provider} impossible : {ex.Message}"); }
     }
-    private void OpenReminderUrl() { try { Process.Start(new ProcessStartInfo(_settings.ReminderUrl) { UseShellExecute = true }); } catch { } }
+    private void OpenReminderUrl()
+    {
+        try { Process.Start(new ProcessStartInfo(_settings.ReminderUrl) { UseShellExecute = true }); }
+        catch (Exception ex) { AppLog.Write($"Ouverture de la page Top-Serveurs impossible : {ex.Message}"); }
+    }
     private static bool IsHttpUrl(string value) => Uri.TryCreate(value.Trim(), UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https";
     private static void ShowVisibleMessage(string title, string message)
     {

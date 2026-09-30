@@ -5,6 +5,7 @@
 publish/
 artifacts/
 .dotnet-cli/
+.dev-run/
 *.user
 *.suo
 *.log

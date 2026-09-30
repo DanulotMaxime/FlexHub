@@ -2,10 +2,11 @@ namespace PersonalAppsHub.Models;
 
 public sealed class HubSettings
 {
-    public int SettingsSchemaVersion { get; set; } = 32;
+    public int SettingsSchemaVersion { get; set; } = 33;
     public bool StartWithWindows { get; set; } = true;
     public string FontSizePreference { get; set; } = "Moyen";
     public string ThemePreference { get; set; } = "Sombre";
+    public string InitialWindowSize { get; set; } = "Moyen";
     public bool AutoFrenchKeyboardInDialogs { get; set; }
     public string GameChatKeyboardShortcut { get; set; } = "Enter";
     public bool ReminderEnabled { get; set; }
