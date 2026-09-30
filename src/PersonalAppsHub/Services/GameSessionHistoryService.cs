@@ -15,6 +15,9 @@ public sealed class GameSessionReport
     public double? PeakGpuUsagePercent { get; set; }
     public double? PeakCpuUsagePercent { get; set; }
     public double? PeakRamUsagePercent { get; set; }
+    public double? PeakCpuPowerWatts { get; set; }
+    public double? PeakGpuPowerWatts { get; set; }
+    public double? PeakTotalPowerWatts { get; set; }
     public double GpuUsageTotal { get; set; }
     public int GpuUsageSampleCount { get; set; }
     public double? PeakProcessCpuPercent { get; set; }
@@ -47,6 +50,9 @@ public sealed class GameSessionReport
     public string PeakGpuTemperatureText => PeakGpuTemperatureC.HasValue ? $"{PeakGpuTemperatureC:0} °C" : "—";
     public string CpuPeakText => PeakCpuUsagePercent.HasValue ? $"{PeakCpuUsagePercent:0}%" : "—";
     public string RamPeakText => PeakRamUsagePercent.HasValue ? $"{PeakRamUsagePercent:0}%" : "—";
+    public string PowerPeakText => PeakTotalPowerWatts.HasValue
+        ? $"{PeakTotalPowerWatts:0.0} W"
+        : PeakGpuPowerWatts.HasValue ? $"GPU {PeakGpuPowerWatts:0.0} W" : "—";
     public string GpuAverageText => GpuUsageSampleCount > 0 ? $"{GpuUsageTotal / GpuUsageSampleCount:0}%" : "—";
     public string GpuUsagePeakText => PeakGpuUsagePercent.HasValue ? $"{PeakGpuUsagePercent:0}%" : "—";
     public string ProcessCpuPeakText => PeakProcessCpuPercent.HasValue ? $"{PeakProcessCpuPercent:0.0}%" : "—";
@@ -57,7 +63,8 @@ public sealed class GameSessionReport
     public string AverageFpsText => AverageFps.HasValue ? $"{AverageFps:0.0} FPS" : "—";
     public string OnePercentLowFpsText => OnePercentLowFps.HasValue ? $"{OnePercentLowFps:0.0} FPS" : "—";
     public string AverageFrameTimeText => AverageFrameTimeMs.HasValue ? $"{AverageFrameTimeMs:0.00} ms" : "—";
-    public string ProcessPerformanceText => $"JEU · CPU max {ProcessCpuPeakText} · RAM max {ProcessRamPeakText} · GPU moy./max {ProcessGpuAverageText} / {ProcessGpuPeakText} · VRAM max {ProcessVramPeakText}";
+    public string ProcessPerformanceText => $"JEU · CPU max {ProcessCpuPeakText} · RAM max {ProcessRamPeakText} · GPU moy./max {ProcessGpuAverageText} / {ProcessGpuPeakText} · VRAM max {ProcessVramPeakText}" +
+        $"{Environment.NewLine}PUISSANCE · pic total {PowerPeakText} · CPU {PowerValue(PeakCpuPowerWatts)} · GPU {PowerValue(PeakGpuPowerWatts)}";
     public string GpuPeakText => PeakGpuUsagePercent.HasValue || PeakGpuTemperatureC.HasValue
         ? $"{(PeakGpuUsagePercent.HasValue ? $"{PeakGpuUsagePercent:0}%" : "—")} / {(PeakGpuTemperatureC.HasValue ? $"{PeakGpuTemperatureC:0} °C" : "—")}" : "—";
     public string PerformanceText
@@ -70,6 +77,8 @@ public sealed class GameSessionReport
             return $"{cpu} · {ram} · {gpuAverage} · GPU max {GpuPeakText}";
         }
     }
+
+    private static string PowerValue(double? value) => value.HasValue ? $"{value:0.0} W" : "—";
 }
 
 public sealed record WeeklyGameSummary(string GameName, int SessionCount, TimeSpan TotalDuration, double RelativePercent = 0)
@@ -161,7 +170,8 @@ public sealed class GameSessionHistoryService
         Save(true);
     }
 
-    public void RecordPerformanceMetrics(double cpuPercent, double ramPercent, double? gpuUsagePercent, double? gpuTemperatureC)
+    public void RecordPerformanceMetrics(double cpuPercent, double ramPercent, double? gpuUsagePercent, double? gpuTemperatureC,
+        double? cpuPowerWatts = null, double? gpuPowerWatts = null, double? totalPowerWatts = null)
     {
         var changed = false;
         foreach (var report in _reports.Where(report => report.IsActive))
@@ -174,6 +184,21 @@ public sealed class GameSessionHistoryService
             if (!report.PeakRamUsagePercent.HasValue || ramPercent > report.PeakRamUsagePercent.Value)
             {
                 report.PeakRamUsagePercent = ramPercent;
+                changed = true;
+            }
+            if (cpuPowerWatts.HasValue && (!report.PeakCpuPowerWatts.HasValue || cpuPowerWatts > report.PeakCpuPowerWatts))
+            {
+                report.PeakCpuPowerWatts = cpuPowerWatts;
+                changed = true;
+            }
+            if (gpuPowerWatts.HasValue && (!report.PeakGpuPowerWatts.HasValue || gpuPowerWatts > report.PeakGpuPowerWatts))
+            {
+                report.PeakGpuPowerWatts = gpuPowerWatts;
+                changed = true;
+            }
+            if (totalPowerWatts.HasValue && (!report.PeakTotalPowerWatts.HasValue || totalPowerWatts > report.PeakTotalPowerWatts))
+            {
+                report.PeakTotalPowerWatts = totalPowerWatts;
                 changed = true;
             }
             if (gpuTemperatureC.HasValue && (!report.PeakGpuTemperatureC.HasValue || gpuTemperatureC.Value > report.PeakGpuTemperatureC.Value))
@@ -269,6 +294,7 @@ public sealed class GameSessionHistoryService
             var referenceGpuAverage = reference.GpuUsageSampleCount > 0 ? reference.GpuUsageTotal / reference.GpuUsageSampleCount : (double?)null;
             AddDifference(differences, "GPU moy.", currentGpuAverage, referenceGpuAverage, "%");
             AddDifference(differences, "Temp. GPU", report.PeakGpuTemperatureC, reference.PeakGpuTemperatureC, " °C");
+            AddDifference(differences, "Puissance max", report.PeakTotalPowerWatts, reference.PeakTotalPowerWatts, " W");
             AddDifference(differences, "FPS moy.", report.AverageFps, reference.AverageFps, " FPS");
             AddDifference(differences, "1 % low", report.OnePercentLowFps, reference.OnePercentLowFps, " FPS");
             var comparison = differences.Count == 0 ? "Comparaison indisponible" : "Vs réf. : " + string.Join(" · ", differences);

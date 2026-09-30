@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Runtime.InteropServices;
 using LibreHardwareMonitor.Hardware;
 
@@ -7,14 +8,25 @@ namespace PersonalAppsHub.Services;
 
 public sealed record SystemMetrics(double CpuPercent, double RamPercent, double RamUsedGb, double RamTotalGb,
     double? GpuPercent, double? VramPercent, double? VramUsedGb, double? VramTotalGb,
-    double? GpuTemperatureC, string? TopCpuProcessText, string? TopRamProcessText, DateTime CapturedAt);
+    double? GpuTemperatureC, double? CpuPowerWatts, double? GpuPowerWatts, double? GpuPowerLimitWatts,
+    string? TopCpuProcessText, string? TopRamProcessText, DateTime CapturedAt)
+{
+    public double? TotalMeasuredPowerWatts => CpuPowerWatts.HasValue && GpuPowerWatts.HasValue
+        ? CpuPowerWatts.Value + GpuPowerWatts.Value
+        : null;
+}
 
 public sealed class SystemMonitoringService : IDisposable
 {
+    private const string RyzenMasterCliPath = @"C:\Program Files\AMD\RyzenMasterSDK\AMDRyzenMasterCLI\bin-prebuilt\AMDRyzenMasterCLI.exe";
+    private static readonly TimeSpan CpuPowerRefreshInterval = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan RyzenMasterTimeout = TimeSpan.FromSeconds(8);
     private readonly Computer _hardware = new() { IsCpuEnabled = true, IsGpuEnabled = true };
     private bool _hardwareOpened;
     private ulong? _previousIdle;
     private ulong? _previousTotal;
+    private double? _cachedCpuPowerWatts;
+    private DateTime _lastCpuPowerReadUtc = DateTime.MinValue;
     private readonly Dictionary<int, TimeSpan> _previousProcessCpu = new();
     private DateTime? _previousProcessSampleUtc;
 
@@ -24,10 +36,106 @@ public sealed class SystemMonitoringService : IDisposable
         var (ramPercent, ramUsed, ramTotal) = ReadMemory();
         var processesTask = Task.Run(ReadTopProcesses, cancellationToken);
         var gpu = await ReadNvidiaMetricsAsync(cancellationToken) ?? ReadHardwareGpuMetrics();
+        if (DateTime.UtcNow - _lastCpuPowerReadUtc >= CpuPowerRefreshInterval)
+        {
+            _cachedCpuPowerWatts = await ReadCpuPowerAsync(cancellationToken);
+            _lastCpuPowerReadUtc = DateTime.UtcNow;
+        }
         var processes = await processesTask;
         return new SystemMetrics(cpu, ramPercent, ramUsed, ramTotal, gpu?.Usage,
             gpu?.VramPercent, gpu?.VramUsedGb, gpu?.VramTotalGb, gpu?.Temperature,
+            _cachedCpuPowerWatts, gpu?.PowerWatts, gpu?.PowerLimitWatts,
             processes.TopCpu, processes.TopRam, DateTime.Now);
+    }
+
+    private async Task<double?> ReadCpuPowerAsync(CancellationToken cancellationToken)
+    {
+        var amdPower = await ReadAmdRyzenPowerAsync(cancellationToken);
+        return amdPower ?? await Task.Run(ReadCpuPowerFromHardwareSensors, cancellationToken);
+    }
+
+    private static async Task<double?> ReadAmdRyzenPowerAsync(CancellationToken cancellationToken)
+    {
+        if (!File.Exists(RyzenMasterCliPath)) return null;
+
+        Process? process = null;
+        try
+        {
+            process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = RyzenMasterCliPath,
+                    Arguments = "-a GetPMTableData",
+                    WorkingDirectory = Path.GetDirectoryName(RyzenMasterCliPath)!,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                }
+            };
+            process.Start();
+            try { process.PriorityClass = ProcessPriorityClass.BelowNormal; } catch { }
+
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(RyzenMasterTimeout);
+            var outputTask = process.StandardOutput.ReadToEndAsync(timeout.Token);
+            var errorTask = process.StandardError.ReadToEndAsync(timeout.Token);
+            await process.WaitForExitAsync(timeout.Token);
+            var output = await outputTask;
+            _ = await errorTask;
+
+            if (process.ExitCode != 0) return null;
+            foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                const string marker = "PPT Current Value :";
+                var markerIndex = line.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+                if (markerIndex < 0) continue;
+                var valueText = line[(markerIndex + marker.Length)..]
+                    .Replace("W", string.Empty, StringComparison.OrdinalIgnoreCase).Trim();
+                if (double.TryParse(valueText, NumberStyles.Float, CultureInfo.InvariantCulture, out var watts) && watts > 0.5)
+                    return watts;
+            }
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            AppLog.Write("Lecture AMD Ryzen Master interrompue après 8 secondes.");
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write($"Lecture AMD Ryzen Master indisponible : {ex.Message}");
+        }
+        finally
+        {
+            if (process is not null)
+            {
+                try { if (!process.HasExited) process.Kill(true); } catch { }
+            }
+            process?.Dispose();
+        }
+        return null;
+    }
+
+    private double? ReadCpuPowerFromHardwareSensors()
+    {
+        try
+        {
+            EnsureHardwareOpen();
+            foreach (var hardware in _hardware.Hardware.Where(item => item.HardwareType == HardwareType.Cpu))
+            {
+                hardware.Update();
+                var sensors = hardware.Sensors.Where(sensor => sensor.SensorType == SensorType.Power && sensor.Value.HasValue).ToArray();
+                if (sensors.Length == 0) continue;
+                var package = sensors.FirstOrDefault(sensor => sensor.Name.Contains("Package", StringComparison.OrdinalIgnoreCase))?.Value;
+                var cores = sensors.FirstOrDefault(sensor => sensor.Name.Contains("Cores", StringComparison.OrdinalIgnoreCase))?.Value;
+                var best = package ?? cores ?? sensors.Max(sensor => (float?)sensor.Value);
+                // Certains contrôleurs Ryzen publient un capteur présent mais bloqué à 0 W.
+                // Une telle valeur ne doit pas être présentée comme une mesure réelle.
+                if (best is > 0.5f) return best.Value;
+            }
+        }
+        catch (Exception ex) { AppLog.Write($"Capteur de puissance CPU indisponible : {ex.Message}"); }
+        return null;
     }
 
     private (string? TopCpu, string? TopRam) ReadTopProcesses()
@@ -82,9 +190,13 @@ public sealed class SystemMonitoringService : IDisposable
                                   sensors.Where(sensor => sensor.SensorType == SensorType.Temperature).Max(sensor => (double?)sensor.Value);
                 var usedMb = sensors.FirstOrDefault(sensor => sensor.Name.Contains("Memory Used", StringComparison.OrdinalIgnoreCase))?.Value;
                 var totalMb = sensors.FirstOrDefault(sensor => sensor.Name.Contains("Memory Total", StringComparison.OrdinalIgnoreCase))?.Value;
+                var powerSensors = sensors.Where(sensor => sensor.SensorType == SensorType.Power).ToArray();
+                var power = powerSensors.FirstOrDefault(sensor =>
+                    (sensor.Name.Contains("Package", StringComparison.OrdinalIgnoreCase) || sensor.Name.Contains("GPU", StringComparison.OrdinalIgnoreCase)))?.Value
+                    ?? powerSensors.Max(sensor => (float?)sensor.Value);
                 var vramPercent = usedMb.HasValue && totalMb > 0 ? usedMb.Value * 100d / totalMb.Value : (double?)null;
                 if (usage.HasValue || temperature.HasValue)
-                    return new NvidiaMetrics(usage ?? 0, vramPercent, usedMb / 1024d, totalMb / 1024d, temperature);
+                    return new NvidiaMetrics(usage ?? 0, vramPercent, usedMb / 1024d, totalMb / 1024d, temperature, power, null);
             }
         }
         catch (Exception ex) { AppLog.Write($"Capteurs GPU indisponibles : {ex.Message}"); }
@@ -139,7 +251,7 @@ public sealed class SystemMonitoringService : IDisposable
             using var process = new Process { StartInfo = new ProcessStartInfo
             {
                 FileName = "nvidia-smi.exe",
-                Arguments = "--query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu --format=csv,noheader,nounits",
+                Arguments = "--query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,power.limit --format=csv,noheader,nounits",
                 UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true
             }};
             process.Start();
@@ -150,8 +262,10 @@ public sealed class SystemMonitoringService : IDisposable
             var values = line.Split(',', StringSplitOptions.TrimEntries);
             if (values.Length < 4 || !TryNumber(values[0], out var usage) || !TryNumber(values[1], out var usedMb) ||
                 !TryNumber(values[2], out var totalMb) || !TryNumber(values[3], out var temperature)) return null;
+            var power = values.Length > 4 && TryNumber(values[4], out var parsedPower) ? parsedPower : (double?)null;
+            var powerLimit = values.Length > 5 && TryNumber(values[5], out var parsedLimit) ? parsedLimit : (double?)null;
             return new NvidiaMetrics(usage, Percentage((ulong)Math.Max(0, usedMb), (ulong)Math.Max(0, totalMb)),
-                usedMb / 1024d, totalMb / 1024d, temperature);
+                usedMb / 1024d, totalMb / 1024d, temperature, power, powerLimit);
         }
         catch (Exception ex) when (ex is not OperationCanceledException) { return null; }
     }
@@ -159,7 +273,8 @@ public sealed class SystemMonitoringService : IDisposable
     private static bool TryNumber(string value, out double result) =>
         double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out result);
     private static ulong ToUInt64(FileTime time) => ((ulong)time.High << 32) | time.Low;
-    private sealed record NvidiaMetrics(double Usage, double? VramPercent, double? VramUsedGb, double? VramTotalGb, double? Temperature);
+    private sealed record NvidiaMetrics(double Usage, double? VramPercent, double? VramUsedGb, double? VramTotalGb,
+        double? Temperature, double? PowerWatts, double? PowerLimitWatts);
 
     [StructLayout(LayoutKind.Sequential)] private struct FileTime { public uint Low; public uint High; }
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]

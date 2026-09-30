@@ -51,7 +51,9 @@ public sealed class GameFrameRateService : IDisposable
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = _presentMonPath,
-                    Arguments = $"-process_id {processId} -output_stdout -session_name FlexHub_{processId} -terminate_on_proc_exit -no_top",
+                    // Une fermeture forcée de FlexHub peut laisser la session ETW précédente active.
+                    // PresentMon la remplace alors avant de reprendre la mesure du même processus.
+                    Arguments = $"-process_id {processId} -output_stdout -session_name FlexHub_{processId} -stop_existing_session -terminate_on_proc_exit -no_top",
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     WindowStyle = ProcessWindowStyle.Hidden,

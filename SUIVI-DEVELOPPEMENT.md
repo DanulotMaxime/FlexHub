@@ -1,6 +1,6 @@
 ﻿# 🚀 FlexHub — Suivi du développement
 
-*Dernière mise à jour : 28 septembre 2026*
+*Dernière mise à jour : 30 septembre 2026*
 
 
 ## Légende
@@ -10,7 +10,7 @@
 - ⬜ **À faire** — Idée enregistrée, développement non commencé.
 - 🔵 **À définir** — Fonctionnement ou périmètre à préciser avant développement.
 
-Ce document est basé sur le code, le README, les notes de version 1.0.0 à 1.3.1
+Ce document est basé sur le code, le README, les notes de version 1.0.0 à 1.6.0
 et la liste d'idées fournie. Les pourcentages indiquent l'état fonctionnel estimé,
 pas le temps nécessaire.
 
@@ -190,6 +190,16 @@ pas le temps nécessaire.
 - Prise en charge des capteurs GPU NVIDIA, AMD et Intel compatibles exposés par LibreHardwareMonitor.
 
 
+### ✅ Monitoring de la consommation électrique — Terminé
+- Lecture prioritaire de la puissance PPT réelle du processeur AMD via l’API officielle Ryzen Master déjà installée sur le PC (mesure validée sur le Ryzen 7 9800X3D), avec secours LibreHardwareMonitor. La collecte est exécutée en arrière-plan, limitée à une mesure toutes les 15 secondes et interrompue automatiquement après 8 secondes pour éviter les blocages.
+- Lecture de la puissance instantanée et de la limite du GPU NVIDIA avec `nvidia-smi`, avec secours par les capteurs matériels compatibles.
+- Affichage séparé du CPU, du GPU et du total mesuré CPU + GPU.
+- Conservation des 60 dernières mesures dans un graphique et suivi du pic maximal réinitialisable.
+- Page de monitoring défilable à la molette, avec graphiques dimensionnés séparément, unités explicites, graduations en watts à gauche du graphique de puissance, échelle de 0 à 100 % pour l’utilisation et légendes intégrées.
+- Enregistrement des pics CPU, GPU et total dans l’historique des sessions de jeu et dans l’export CSV.
+- Le total mesuré CPU + GPU reste distinct de l’estimation indicative des autres composants, afin de ne pas présenter une approximation comme une mesure réelle.
+
+
 ### ✅ Notification de consommation anormale CPU/RAM — Terminé
 - Le monitoring surveille l’utilisation globale du CPU et de la RAM avec des seuils configurables.
 - Les alertes exigent trois mesures consécutives et respectent un délai de 15 minutes.
@@ -201,15 +211,21 @@ pas le temps nécessaire.
 - Reste à gérer une liste d'applications tierces, leurs sources et les installations nocturnes.
 
 
-### 🟡 Comparaison avant/après un réglage NVIDIA — 70 %
+### ✅ Comparaison avant/après un réglage NVIDIA — Terminé
 - L'application sait appliquer, sauvegarder et restaurer un profil NVIDIA.
 - Les sessions enregistrent le profil NVIDIA actif et comparent leurs mesures à une session de référence du même jeu.
+- Les écarts de CPU, RAM, GPU, température GPU, FPS moyens et 1 % low sont affichés lorsque les données sont disponibles.
 - Les FPS moyens, les 1 % low et le temps d’image moyen sont collectés automatiquement avec PresentMon pendant les sessions compatibles.
+- Les captures PresentMon orphelines laissées par un redémarrage de FlexHub sont remplacées automatiquement afin que la collecte FPS puisse reprendre sur une partie déjà lancée.
 
 
-### 🟡 Rapport et analyse des erreurs — 15 %
+### ✅ Rapport et analyse des erreurs — Terminé
 - FlexHub possède son propre journal de diagnostic en langage lisible.
-- Reste à lire et expliquer les événements de l'Observateur d'événements Windows.
+- Le module « Erreurs Windows » lit en lecture seule les événements critiques et erreurs des journaux Système et Application sur les 7 derniers jours.
+- Les événements répétés sont regroupés par source, identifiant et message, avec priorité, catégorie, nombre d’occurrences et dernière apparition.
+- Les erreurs courantes liées aux arrêts brutaux, écrans bleus, matériel WHEA, stockage, pilote graphique ou périphérique, applications bloquées ou .NET, services, DNS, TLS, DCOM, synchronisation de l’heure, TPM et Secure Boot reçoivent une explication prudente et une action conseillée.
+- Les événements DCOM 10016, très courants, sont explicitement présentés comme généralement sans conséquence afin d’éviter des modifications risquées et inutiles. Les conseils TPM rappellent de préserver la clé BitLocker avant toute intervention.
+- L’analyse est lancée uniquement à la demande et plafonnée afin de ne pas créer de charge permanente.
 
 
 
@@ -221,10 +237,10 @@ pas le temps nécessaire.
 - [x] **Auditer les programmes lancés au démarrage et proposer leur désactivation.**
 - [x] **Détecter les logiciels et jeux inutilisés depuis une durée configurable.** *(Audit en lecture seule des logiciels installés, des bibliothèques Steam/Epic et de l’historique UserAssist de Windows ; seules les dernières exécutions connues sont signalées, les usages inconnus restent explicitement exclus.)*
 - [x] **Scanner les fichiers en double par hash avec validation avant suppression.** *(Analyse SHA-256, sélection manuelle ou automatique, conservation obligatoire d'un exemplaire et déplacement récupérable vers la Corbeille.)*
-- [~] **Vérifier les pilotes GPU, audio et chipset sur les sites fabricants.** *(Inventaire local en lecture seule avec type, fabricant, version, date et fichier INF, plus accès au support officiel NVIDIA, AMD, Intel ou Realtek. La comparaison automatique avec la toute dernière version constructeur reste à ajouter.)*
+- [x] **Vérifier les pilotes GPU, audio et chipset.** *(Inventaire local en lecture seule avec version et date, recherche des mises à jour de pilotes réellement applicables via Windows Update, correspondance prudente par fabricant/classe/modèle et accès au support officiel NVIDIA, AMD, Intel ou Realtek. Aucun téléchargement ni installation automatique.)*
 - [x] **Nettoyer précisément les caches de navigateurs, Steam, Visual Studio, etc.**
 - [x] **Organiser automatiquement le dossier Téléchargements selon des règles.** *(Analyse et aperçu manuels, catégories par extension et déplacement confirmé. Mode quotidien facultatif, désactivé par défaut : seuls les fichiers reconnus âgés de plus de 24 heures sont déplacés, sans écrasement ; les téléchargements partiels et la catégorie Autres restent intacts.)*
-- [~] **Renommer des fichiers en masse selon leur contexte (EXIF, lieu, date, etc.).** *(Aperçu, sélection, préfixe, date et numérotation, plus génération locale d’un nom intelligent depuis le contenu texte/code, les titres DOCX/PDF, les tags MP3 et les métadonnées EXIF. Les fichiers non reconnus conservent leur nom ; le lieu GPS reste à ajouter.)*
+- [x] **Renommer des fichiers en masse selon leur contexte (EXIF, date, etc.).** *(Aperçu complet, sélection, préfixe, date et numérotation, plus génération locale d’un nom intelligent depuis le contenu texte/code, les titres DOCX/PDF, les tags MP3 et les métadonnées EXIF. Les images JPG, JPEG, PNG, WEBP, HEIC/HEIF, AVIF, GIF, BMP, TIFF et les principaux RAW sont conservées dans la liste même sans métadonnées lisibles. La source de la date et celle du nom sont affichées séparément ; les collisions sont résolues dans l’aperçu sans écrasement. La fonction GPS a été retirée à la demande.)*
 
 
 
@@ -273,7 +289,7 @@ pas le temps nécessaire.
 - [x] **Analyser la légitimité d'un lien ou exécutable suspect.** *(Analyse locale sans ouverture : structure réelle du lien, protocole, domaine, indices d’hameçonnage, double extension, provenance Internet, signature numérique, taille et empreinte SHA-256. Indicateur facultatif ✓/?/✕ au survol des liens exposés par l’accessibilité Windows. Verdict prudent et non présenté comme une garantie.)*
 - [~] **Ajouter des actions au menu contextuel Windows pour le texte sélectionné.** *(Abandonné : Windows ne fournit pas de menu contextuel universel pour le texte sélectionné dans toutes les applications ; la roue d’actions et les raccourcis FlexHub couvrent déjà ce besoin de manière plus fiable.)*
 - [~] **Ajouter des commandes vocales.** *(Module abandonné avant développement.)*
-- [x] **Générer à 18 h un rapport des applications utilisées et fichiers modifiés.** *(Module local désactivé par défaut, heure configurable, échantillonnage léger de l’application active toutes les 20 secondes et surveillance événementielle Windows des dossiers personnels, sans scan complet ni lecture du contenu.)*
+- [x] **Générer à 18 h un rapport des applications utilisées et fichiers modifiés.** *(Module local désactivé par défaut, heure configurable, échantillonnage léger de l’application active toutes les 30 secondes sur un thread d’arrière-plan et surveillance événementielle Windows des dossiers personnels, sans scan complet ni lecture du contenu.)*
 - [x] **Produire des statistiques hebdomadaires d'utilisation et de productivité.** *(Vue locale sur 7 jours, activité quotidienne, applications principales, fichiers modifiés et comparaison avec les 7 jours précédents. Les résultats décrivent l’usage sans attribuer une note de productivité.)*
 - [ ] **Mettre en place une veille automatique sur des sources configurables.**
 
@@ -309,52 +325,27 @@ pas le temps nécessaire.
   la suppression et le stockage local. Cette fonction doit rester strictement opt-in.
 
 
-### 🔵 Isolation de cœurs et priorité CPU automatique — À définir
-- Mesurer le bénéfice réel, prévoir une liste de jeux, un retour arrière et des garde-fous
-  pour ne pas dégrader Windows ni les processus importants.
-
-
-### 🔵 Analyse d'un lien ou exécutable suspect — À définir
-- Définir les services externes utilisés, les données envoyées et afficher clairement
-  qu'un résultat automatique ne garantit jamais qu'un fichier est sans danger.
-
-
-
 ## 9. ORDRE DE DÉVELOPPEMENT CONSEILLÉ
 
 
-### Priorité 1 — améliorations rapides des fonctions existantes
+### Priorité 1 — compléter les fonctions existantes
 
-## 1. Ajouter les modes « Reformule » et « Simplifie » au générateur.
-
-## 2. Rendre la détection automatique compatible avec le fournisseur par défaut ou changer
-   automatiquement de fournisseur lorsque « Détection automatique » est choisie.
-
-## 3. Ajouter les températures, RAM/VRAM, CPU et alertes dans un tableau de monitoring.
+1. Comparer automatiquement les pilotes GPU, audio et chipset avec les dernières versions officielles.
+2. Améliorer progressivement les formats reconnus par le renommage intelligent.
+3. Étendre progressivement les explications des erreurs Windows à partir des cas réellement rencontrés.
 
 
-### Priorité 2 — maintenance sûre du PC
+### Priorité 2 — recherche et presse-papiers
 
-## 4. Nettoyage des fichiers temporaires avec aperçu et confirmation.
-
-## 5. Santé des disques et audit du démarrage en lecture seule dans un premier temps.
-
-## 6. Monitoring réseau : ping, jitter et perte de paquets.
+4. Reconnaître localement le type de contenu copié et proposer une action adaptée.
+5. Créer une recherche unifiée dans les fichiers, le presse-papiers, les snippets et les favoris.
 
 
-### Priorité 3 — suivi des jeux
+### Priorité 3 — fonctions à cadrer avant développement
 
-## 7. Détection des sessions et durée de jeu.
-
-## 8. Collecte des FPS/températures et rapports de session.
-
-## 9. Historique et comparaison avant/après les réglages NVIDIA.
-
-
-### Priorité 4 — fonctions sensibles ou complexes
-10. Recherche unifiée, historique OCR, gestion des applications tierces et commandes vocales.
-11. Actions pouvant modifier le système (suppression, désinstallation, priorité/affinité CPU)
-    uniquement avec aperçu, confirmation et possibilité de retour arrière.
+6. Définir puis développer la veille automatique sur des sources configurables.
+7. Définir le stockage, les exclusions et la conservation avant tout historique OCR de captures d’écran.
+8. Définir les applications tierces prises en charge avant d’étendre le moteur de mise à jour automatique.
 
 
 RÈGLE DE MISE À JOUR DE CE FICHIER

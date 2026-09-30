@@ -76,7 +76,7 @@ public sealed class DailyActivityReportService : IDisposable
 
     public async Task<string> GenerateAsync(CancellationToken cancellationToken = default)
     {
-        SampleForegroundApplication();
+        await Task.Run(SampleForegroundApplication, cancellationToken);
         var today = DateTime.Today;
         var files = GetTrackedFiles();
         var report = BuildReport(today, files);

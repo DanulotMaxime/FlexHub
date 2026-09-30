@@ -1,5 +1,22 @@
 # Notes de version
 
+## 1.6.0
+
+- Ajout du suivi de la consommation électrique dans le monitoring avec puissance CPU, GPU et total mesuré, historique graphique gradué en watts et pic maximal réinitialisable.
+- Lecture prioritaire de la puissance PPT des processeurs AMD compatibles via Ryzen Master SDK, limitée à une interrogation toutes les 15 secondes avec délai maximal afin de préserver la réactivité du PC.
+- Enregistrement des pics de puissance CPU, GPU et totale dans les sessions de jeu, les comparaisons de référence et l’export CSV.
+- Correction et réorganisation de la page Monitoring : défilement à la molette, graphiques séparés et redimensionnés, unités et légendes explicites.
+- Stabilisation de la collecte FPS PresentMon après un redémarrage de FlexHub grâce au remplacement des anciennes sessions de capture restées actives.
+- Le rapport quotidien échantillonne désormais l’application active toutes les 30 secondes et effectue sa génération hors du fil d’interface pour réduire les freezes passagers.
+- L’audit des pilotes compare maintenant l’inventaire GPU, audio et chipset aux mises à jour de pilotes réellement proposées par Windows Update, sans téléchargement ni installation automatique.
+- Nouveau module « Erreurs Windows » : lecture à la demande des journaux Système et Application, regroupement des événements répétés, priorité, explication et action conseillée.
+- Explications dédiées aux arrêts brutaux, écrans bleus, erreurs WHEA, stockage, pilotes graphiques et périphériques, applications bloquées, .NET, services, DNS, TLS, DCOM, TPM et Secure Boot.
+- Les événements DCOM 10016 sont présentés comme généralement sans conséquence et les recommandations TPM rappellent de conserver la clé BitLocker avant toute intervention.
+- Renommage en masse fiabilisé pour les grandes collections : aucun format non reconnu n’est masqué, sources de date et de nom séparées et collisions résolues dans l’aperçu sans écrasement.
+- Identification explicite des images JPG, JPEG, PNG, WEBP, HEIC/HEIF, AVIF, GIF, BMP, TIFF et des principaux formats RAW.
+- Suppression de la fonction GPS du renommage à la demande des utilisateurs.
+- Nombreuses améliorations de robustesse et tests automatisés supplémentaires.
+
 ## 1.5.0
 
 - Ajout d’une purge manuelle du cache RAM en attente de Windows, avec confirmation, autorisation administrateur et mesure de la mémoire disponible avant/après.

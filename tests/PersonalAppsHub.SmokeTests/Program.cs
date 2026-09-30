@@ -29,7 +29,37 @@ Check(defaults.TranslationSourceLanguage == "EN" && defaults.TranslationTargetLa
 Check(!defaults.GeminiSetupCompleted, "configuration Gemini demandée au premier lancement");
 Check(!defaults.XmpMonitorEnabled && !defaults.MemorySetupCompleted, "surveillance désactivée avant l’assistant");
 Check(!defaults.AiPrivacyConsentAccepted, "consentement API explicite");
+var renameTestFolder = Path.Combine(Path.GetTempPath(), $"flexhub-rename-{Guid.NewGuid():N}");
+Directory.CreateDirectory(renameTestFolder);
+try
+{
+    var imageNames = new[] { "photo.jpg", "image.png", "photo.webp", "mobile.heic", "brut.nef", "brut.cr3", "scan.tiff" };
+    foreach (var name in imageNames) File.WriteAllText(Path.Combine(renameTestFolder, name), "fichier de test artificiel");
+    File.WriteAllText(Path.Combine(renameTestFolder, "photo-2.jpg"), "fichier de test artificiel");
+
+    var renamePreview = await new BulkRenameService().PreviewAsync(renameTestFolder, "Album", false, false, true);
+    Check(renamePreview.Count == imageNames.Length + 1, "aperçu de tous les formats d’image courants");
+    Check(renamePreview.Select(item => item.DestinationPath).Distinct(StringComparer.OrdinalIgnoreCase).Count() == renamePreview.Count,
+        "résolution des collisions dans l’aperçu de renommage");
+    Check(renamePreview.Any(item => item.OldName.EndsWith(".heic") && item.AnalysisSource.Contains("HEIC")) &&
+          renamePreview.Any(item => item.OldName.EndsWith(".nef") && item.AnalysisSource.Contains("NEF")),
+        "identification explicite des images HEIC et RAW");
+}
+finally
+{
+    Directory.Delete(renameTestFolder, true);
+}
 Check(defaults.MonitoringEnabled, "monitoring activé par défaut");
+Check(WindowsEventAuditService.Explain("Microsoft-Windows-DistributedCOM", 10016, "Local Activation").Category == "Autorisation Windows" &&
+      WindowsEventAuditService.Explain("Microsoft-Windows-DistributedCOM", 10016, "Local Activation").Recommendation.Contains("Ignorer"),
+    "explication prudente de l’événement DCOM 10016");
+Check(WindowsEventAuditService.Explain("Microsoft-Windows-WER-SystemErrorReporting", 1001, "bugcheck").Category == "Écran bleu",
+    "distinction entre écran bleu et rapport applicatif");
+Check(WindowsEventAuditService.Explain("Microsoft-Windows-Kernel-PnP", 219, "driver failed").Category == "Pilote de périphérique",
+    "explication d’un échec de chargement de pilote");
+Check(WindowsEventAuditService.Explain("Schannel", 36871, "TLS").Category == "Connexion sécurisée" &&
+      WindowsEventAuditService.Explain("Microsoft-Windows-TPM-WMI", 1796, "Secure Boot").Recommendation.Contains("BitLocker"),
+    "explications TLS et TPM avec garde-fou");
 Check(defaults.MonitoringAlertsEnabled && defaults.MonitoringCpuAlertPercent == 95 &&
       defaults.MonitoringRamAlertPercent == 90 && defaults.MonitoringGpuTemperatureAlertC == 85,
     "seuils de monitoring prudents par défaut");

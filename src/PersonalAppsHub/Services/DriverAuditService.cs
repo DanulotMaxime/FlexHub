@@ -12,7 +12,9 @@ public sealed record DriverAuditEntry(
     string DriverVersion,
     string DriverDate,
     string InfName,
-    string SupportUrl);
+    string SupportUrl,
+    string UpdateStatus = "Non vérifié",
+    string AvailableUpdate = "—");
 
 public sealed class DriverAuditService
 {
@@ -24,6 +26,8 @@ public sealed class DriverAuditService
 
     static DriverAuditService() => Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
+    public string UpdateSearchSummary { get; private set; } = "Vérification des mises à jour non lancée.";
+
     public async Task<IReadOnlyList<DriverAuditEntry>> ScanAsync()
     {
         var entries = new List<DriverAuditEntry>();
@@ -34,13 +38,97 @@ public sealed class DriverAuditService
             .Where(entry => ContainsAny(entry.Manufacturer, "intel", "amd", "advanced micro devices") &&
                             ContainsAny(entry.DeviceName, "chipset", "smbus", "pci", "management engine", "gpio", "i2c", "system", "processor", "amd")));
 
-        return entries
+        var installed = entries
             .GroupBy(entry => $"{entry.Category}|{entry.DeviceName}|{entry.DriverVersion}", StringComparer.OrdinalIgnoreCase)
             .Select(group => group.First())
             .OrderBy(entry => CategoryRank(entry.Category))
             .ThenBy(entry => entry.DeviceName, StringComparer.CurrentCultureIgnoreCase)
             .ToArray();
+
+        try
+        {
+            var updates = await Task.Run(SearchWindowsDriverUpdates);
+            UpdateSearchSummary = updates.Count == 0
+                ? "Windows Update ne propose actuellement aucun pilote applicable."
+                : $"Windows Update propose {updates.Count} mise(s) à jour de pilote ; les correspondances sûres sont signalées.";
+            return installed.Select(entry => ApplyAvailableUpdate(entry, updates)).ToArray();
+        }
+        catch (Exception ex)
+        {
+            UpdateSearchSummary = $"Comparaison Windows Update indisponible : {ex.Message}";
+            AppLog.Write(UpdateSearchSummary);
+            return installed.Select(entry => entry with { UpdateStatus = "Vérification impossible" }).ToArray();
+        }
     }
+
+    private static IReadOnlyList<DriverUpdateCandidate> SearchWindowsDriverUpdates()
+    {
+        var sessionType = Type.GetTypeFromProgID("Microsoft.Update.Session")
+            ?? throw new InvalidOperationException("Le service Windows Update n’est pas disponible.");
+        dynamic session = Activator.CreateInstance(sessionType)
+            ?? throw new InvalidOperationException("La session Windows Update n’a pas pu être créée.");
+        dynamic searcher = session.CreateUpdateSearcher();
+        searcher.Online = true;
+        dynamic result = searcher.Search("IsInstalled=0 and Type='Driver' and IsHidden=0");
+        var updates = new List<DriverUpdateCandidate>();
+        for (var index = 0; index < (int)result.Updates.Count; index++)
+        {
+            dynamic update = result.Updates.Item(index);
+            updates.Add(new DriverUpdateCandidate(
+                SafeDynamic(() => (string)update.Title),
+                SafeDynamic(() => (string)update.DriverManufacturer),
+                SafeDynamic(() => (string)update.DriverModel),
+                SafeDynamic(() => (string)update.DriverClass)));
+        }
+        return updates;
+    }
+
+    private static DriverAuditEntry ApplyAvailableUpdate(DriverAuditEntry entry, IReadOnlyList<DriverUpdateCandidate> updates)
+    {
+        var best = updates.Select(update => (Update: update, Score: MatchScore(entry, update)))
+            .OrderByDescending(match => match.Score).FirstOrDefault();
+        return best.Score >= 5
+            ? entry with { UpdateStatus = "Mise à jour proposée", AvailableUpdate = best.Update.Title }
+            : entry with { UpdateStatus = "Aucune mise à jour proposée" };
+    }
+
+    private static int MatchScore(DriverAuditEntry entry, DriverUpdateCandidate update)
+    {
+        var score = 0;
+        if (SameManufacturer(entry.Manufacturer, update.Manufacturer)) score += 3;
+        if (CategoryMatches(entry.Category, update.DriverClass)) score += 2;
+        var deviceTokens = SignificantTokens(entry.DeviceName);
+        var updateText = $"{update.Model} {update.Title}";
+        score += Math.Min(3, deviceTokens.Count(token => updateText.Contains(token, StringComparison.OrdinalIgnoreCase)));
+        return score;
+    }
+
+    private static bool SameManufacturer(string installed, string proposed)
+    {
+        var left = installed.ToLowerInvariant();
+        var right = proposed.ToLowerInvariant();
+        if ((left.Contains("amd") || left.Contains("advanced micro")) && (right.Contains("amd") || right.Contains("advanced micro"))) return true;
+        return new[] { "nvidia", "intel", "realtek", "mediatek" }.Any(name => left.Contains(name) && right.Contains(name));
+    }
+
+    private static bool CategoryMatches(string category, string driverClass) => category switch
+    {
+        "GPU" => driverClass.Contains("display", StringComparison.OrdinalIgnoreCase),
+        "Audio" => ContainsAny(driverClass, "media", "audio"),
+        "Chipset" => driverClass.Contains("system", StringComparison.OrdinalIgnoreCase),
+        _ => false
+    };
+
+    private static string[] SignificantTokens(string value) => Regex.Matches(value, @"[A-Za-z0-9]{4,}")
+        .Select(match => match.Value).Where(token => !ContainsAny(token, "device", "controller", "graphics", "audio", "high", "definition"))
+        .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+
+    private static string SafeDynamic(Func<string> read)
+    {
+        try { return read() ?? ""; } catch { return ""; }
+    }
+
+    private sealed record DriverUpdateCandidate(string Title, string Manufacturer, string Model, string DriverClass);
 
     private static async Task<string> RunPnpUtilAsync(string deviceClass)
     {

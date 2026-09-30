@@ -56,6 +56,7 @@ public partial class MainWindow : Window
     private readonly StartupAuditService _startupAuditService = new();
     private readonly FileFinderService _fileFinderService = new();
     private readonly DriverAuditService _driverAuditService = new();
+    private readonly WindowsEventAuditService _windowsEventAuditService = new();
     private readonly UpdateService _updateService = new();
     private readonly ApiQuotaService _apiQuotaService = new();
     private readonly HotkeyService _hotkeyService = new(9471);
@@ -67,10 +68,17 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _reminderTimer = new();
     private readonly DispatcherTimer _xmpTimer = new();
     private readonly DispatcherTimer _monitoringTimer = new() { Interval = TimeSpan.FromSeconds(3) };
+    private readonly DispatcherTimer _dailyActivityTimer = new() { Interval = TimeSpan.FromSeconds(30) };
     private readonly Queue<double> _cpuHistory = new();
     private readonly Queue<double> _ramHistory = new();
     private readonly Queue<double> _gpuHistory = new();
+    private readonly Queue<double> _cpuPowerHistory = new();
+    private readonly Queue<double> _gpuPowerHistory = new();
+    private readonly Queue<double> _totalPowerHistory = new();
     private readonly Queue<DateTime> _monitoringTimestamps = new();
+    private double? _peakCpuPowerWatts;
+    private double? _peakGpuPowerWatts;
+    private double? _peakTotalPowerWatts;
     private readonly Forms.NotifyIcon _tray;
     private HubSettings _settings;
     private bool _exit;
@@ -93,6 +101,7 @@ public partial class MainWindow : Window
     private bool _automaticDownloadsOrganizerRunning;
     private bool _duplicateScanRunning;
     private bool _dailyActivityReportRunning;
+    private bool _dailyActivitySampleRunning;
     private CancellationTokenSource? _duplicateScanCancellation;
     private CancellationTokenSource? _fileSearchCancellation;
     private IReadOnlyList<DuplicateFileCandidate> _duplicateResults = Array.Empty<DuplicateFileCandidate>();
@@ -182,6 +191,7 @@ public partial class MainWindow : Window
         StorageHealthNav.Click += async (_, _) => { ShowPage("storageHealth"); await RefreshStorageHealthAsync(); };
         DriverAuditNav.Click += async (_, _) => { ShowPage("driverAudit"); await RefreshDriverAuditAsync(); };
         StartupAuditNav.Click += async (_, _) => { ShowPage("startupAudit"); await RefreshStartupAuditAsync(); };
+        WindowsEventsNav.Click += async (_, _) => { ShowPage("windowsEvents"); await RefreshWindowsEventsAsync(); };
         CorrectorNav.Click += (_, _) => ShowPage("corrector");
         ReformulateNav.Click += (_, _) => ShowPage("reformulate");
         SimplifyNav.Click += (_, _) => ShowPage("simplify");
@@ -285,6 +295,7 @@ public partial class MainWindow : Window
         FileFinderModuleEnabled.Unchecked += (_, _) => ApplyEnabledStates();
         TestXmp.Click += async (_, _) => await CheckXmpAsync(true);
         RefreshMonitoring.Click += async (_, _) => await RefreshMonitoringAsync();
+        ResetPowerPeak.Click += (_, _) => ResetPowerPeaks();
         ConfigureMonitoringAlerts.Click += (_, _) => OpenMonitoringAlertSettings();
         OpenStressTest.Click += (_, _) => new StressTestWindow { Owner = this }.ShowDialog();
         RefreshNetworkMonitoring.Click += async (_, _) => await RefreshNetworkMonitoringAsync();
@@ -298,6 +309,7 @@ public partial class MainWindow : Window
         ClearGameSessionHistory.Click += (_, _) => ClearGameSessionHistory_OnClick();
         ExportGameSessionHistory.Click += (_, _) => ExportGameSessionHistory_OnClick();
         SaveNetworkJitterAlert.Click += (_, _) => SaveNetworkJitterAlertSettings();
+        RefreshWindowsEvents.Click += async (_, _) => await RefreshWindowsEventsAsync();
         CalculateMouseSensitivity.Click += (_, _) => CalculateMouseSensitivityNow();
         AnalyzeTone.Click += (_, _) => AnalyzeToneNow();
         AnalyzeSuspiciousUrl.Click += (_, _) => AnalyzeSuspiciousUrlNow();
@@ -419,8 +431,8 @@ public partial class MainWindow : Window
             await RunAutomaticTemporaryCleanupAsync();
             await RunAutomaticRecycleBinCleanupAsync();
             await RunAutomaticDownloadsOrganizerAsync();
-            await UpdateDailyActivityReportAsync();
         };
+        _dailyActivityTimer.Tick += async (_, _) => await UpdateDailyActivityReportAsync();
         SourceInitialized += (_, _) => { RegisterHotkey(); RegisterTranslatorHotkey(); RegisterResponseGeneratorHotkey(); RegisterActionWheelHotkey(); };
         ContentRendered += async (_, _) =>
         {
@@ -438,6 +450,7 @@ public partial class MainWindow : Window
         ConfigureReminderTimer();
         ConfigureXmpTimer();
         _monitoringTimer.Start();
+        _dailyActivityTimer.Start();
         ConfigureKeyboardLayoutMonitor();
         UpdateNavigationState();
         if (_settings.LinkHoverSafetyEnabled) _linkHoverSafetyService.Start();
@@ -613,6 +626,7 @@ public partial class MainWindow : Window
         StorageHealthPage.Visibility = page == "storageHealth" ? Visibility.Visible : Visibility.Collapsed;
         StartupAuditPage.Visibility = page == "startupAudit" ? Visibility.Visible : Visibility.Collapsed;
         DriverAuditPage.Visibility = page == "driverAudit" ? Visibility.Visible : Visibility.Collapsed;
+        WindowsEventsPage.Visibility = page == "windowsEvents" ? Visibility.Visible : Visibility.Collapsed;
         XmpPage.Visibility = page == "xmp" ? Visibility.Visible : Visibility.Collapsed;
         KeyboardLayoutPage.Visibility = page == "keyboardLayout" ? Visibility.Visible : Visibility.Collapsed;
         GeneralSettingsPage.Visibility = page == "general" ? Visibility.Visible : Visibility.Collapsed;
@@ -885,7 +899,7 @@ public partial class MainWindow : Window
 
     private void UpdateNavigationState()
     {
-        if (ReminderNav == null || SuspiciousContentNav == null || DailyActivityReportNav == null || CorrectorNav == null || ReformulateNav == null || SimplifyNav == null || ConversationSummaryNav == null || WordDefinitionNav == null || TranslatorNav == null || ResponseGeneratorNav == null || ActionWheelNav == null || MonitoringNav == null || GameSessionsNav == null || NetworkMonitoringNav == null || MouseSensitivityNav == null || FileFinderNav == null || CleanupNav == null || MemoryCacheNav == null || RecycleBinNav == null || DownloadsOrganizerNav == null || BulkRenameNav == null || UnusedApplicationsNav == null || DuplicateFilesNav == null || StorageHealthNav == null || DriverAuditNav == null || StartupAuditNav == null || NvidiaNav == null || XmpNav == null || KeyboardLayoutNav == null) return;
+        if (ReminderNav == null || SuspiciousContentNav == null || DailyActivityReportNav == null || CorrectorNav == null || ReformulateNav == null || SimplifyNav == null || ConversationSummaryNav == null || WordDefinitionNav == null || TranslatorNav == null || ResponseGeneratorNav == null || ActionWheelNav == null || MonitoringNav == null || GameSessionsNav == null || NetworkMonitoringNav == null || MouseSensitivityNav == null || FileFinderNav == null || CleanupNav == null || MemoryCacheNav == null || RecycleBinNav == null || DownloadsOrganizerNav == null || BulkRenameNav == null || UnusedApplicationsNav == null || DuplicateFilesNav == null || StorageHealthNav == null || WindowsEventsNav == null || DriverAuditNav == null || StartupAuditNav == null || NvidiaNav == null || XmpNav == null || KeyboardLayoutNav == null) return;
         PlaceNavigationButton(ReminderNav, ReminderEnabled.IsChecked == true);
         PlaceNavigationButton(SuspiciousContentNav, SuspiciousContentModuleEnabled.IsChecked == true);
         PlaceNavigationButton(DailyActivityReportNav, DailyActivityReportEnabled.IsChecked == true);
@@ -911,6 +925,7 @@ public partial class MainWindow : Window
         PlaceNavigationButton(UnusedApplicationsNav, _settings.UnusedApplicationsModuleEnabled);
         PlaceNavigationButton(DuplicateFilesNav, _settings.DuplicateFilesModuleEnabled);
         PlaceNavigationButton(StorageHealthNav, _settings.StorageHealthModuleEnabled);
+        PlaceNavigationButton(WindowsEventsNav, true);
         PlaceNavigationButton(DriverAuditNav, _settings.DriverAuditModuleEnabled);
         PlaceNavigationButton(StartupAuditNav, _settings.StartupAuditModuleEnabled);
         PlaceNavigationButton(NvidiaNav, NvidiaEnabled.IsChecked == true);
@@ -925,7 +940,7 @@ public partial class MainWindow : Window
             ConversationSummaryNav, WordDefinitionNav, TranslatorNav, ResponseGeneratorNav, ToneAnalysisNav);
         UpdateCategoryCount(MonitoringGamesModuleCount, MonitoringNav, GameSessionsNav,
             NetworkMonitoringNav, MouseSensitivityNav, NvidiaNav, XmpNav);
-        UpdateCategoryCount(MaintenanceModuleCount, CleanupNav, MemoryCacheNav, RecycleBinNav, UnusedApplicationsNav, StorageHealthNav, DriverAuditNav, StartupAuditNav);
+        UpdateCategoryCount(MaintenanceModuleCount, CleanupNav, MemoryCacheNav, RecycleBinNav, UnusedApplicationsNav, StorageHealthNav, WindowsEventsNav, DriverAuditNav, StartupAuditNav);
         UpdateCategoryCount(AutomationModuleCount, ReminderNav, SuspiciousContentNav, DailyActivityReportNav, ActionWheelNav, FileFinderNav, DownloadsOrganizerNav, BulkRenameNav, DuplicateFilesNav, KeyboardLayoutNav);
     }
 
@@ -956,7 +971,7 @@ public partial class MainWindow : Window
         if (button == MonitoringNav || button == GameSessionsNav || button == NetworkMonitoringNav || button == MouseSensitivityNav ||
             button == NvidiaNav || button == XmpNav) return MonitoringGamesPanel;
         if (button == CleanupNav || button == MemoryCacheNav || button == RecycleBinNav || button == UnusedApplicationsNav || button == StorageHealthNav ||
-            button == DriverAuditNav || button == StartupAuditNav) return MaintenancePanel;
+            button == WindowsEventsNav || button == DriverAuditNav || button == StartupAuditNav) return MaintenancePanel;
         return AutomationPanel;
     }
 
@@ -986,7 +1001,7 @@ public partial class MainWindow : Window
     }
 
     private int NavigationRank(System.Windows.Controls.Button button) =>
-        button == ReminderNav ? 0 : button == CorrectorNav ? 1 : button == ReformulateNav ? 2 : button == SimplifyNav ? 3 : button == ConversationSummaryNav ? 4 : button == WordDefinitionNav ? 5 : button == TranslatorNav ? 6 : button == ResponseGeneratorNav ? 7 : button == SuspiciousContentNav ? 8 : button == DailyActivityReportNav ? 9 : button == ActionWheelNav ? 10 : button == MonitoringNav ? 11 : button == GameSessionsNav ? 12 : button == NetworkMonitoringNav ? 13 : button == MouseSensitivityNav ? 14 : button == CleanupNav ? 15 : button == MemoryCacheNav ? 16 : button == RecycleBinNav ? 17 : button == DownloadsOrganizerNav ? 18 : button == BulkRenameNav ? 19 : button == UnusedApplicationsNav ? 20 : button == DuplicateFilesNav ? 21 : button == StorageHealthNav ? 22 : button == DriverAuditNav ? 23 : button == StartupAuditNav ? 24 : button == NvidiaNav ? 25 : button == XmpNav ? 26 : 27;
+        button == ReminderNav ? 0 : button == CorrectorNav ? 1 : button == ReformulateNav ? 2 : button == SimplifyNav ? 3 : button == ConversationSummaryNav ? 4 : button == WordDefinitionNav ? 5 : button == TranslatorNav ? 6 : button == ResponseGeneratorNav ? 7 : button == SuspiciousContentNav ? 8 : button == DailyActivityReportNav ? 9 : button == ActionWheelNav ? 10 : button == MonitoringNav ? 11 : button == GameSessionsNav ? 12 : button == NetworkMonitoringNav ? 13 : button == MouseSensitivityNav ? 14 : button == CleanupNav ? 15 : button == MemoryCacheNav ? 16 : button == RecycleBinNav ? 17 : button == DownloadsOrganizerNav ? 18 : button == BulkRenameNav ? 19 : button == UnusedApplicationsNav ? 20 : button == DuplicateFilesNav ? 21 : button == StorageHealthNav ? 22 : button == WindowsEventsNav ? 23 : button == DriverAuditNav ? 24 : button == StartupAuditNav ? 25 : button == NvidiaNav ? 26 : button == XmpNav ? 27 : 28;
 
     private void ApplyEnabledStates()
     {
@@ -2516,7 +2531,7 @@ public partial class MainWindow : Window
         static string Csv(string value) => "\"" + value.Replace("\"", "\"\"") + "\"";
         var lines = new List<string>
         {
-            "Jeu;Reference;Profil_NVIDIA;Debut;Fin;Duree_minutes;FPS_moyen;FPS_1pct_low;Temps_image_moyen_ms;Images_mesurees;PC_CPU_max_pct;PC_RAM_max_pct;PC_GPU_moy_pct;PC_GPU_max_pct;GPU_max_C;Jeu_CPU_max_pct;Jeu_RAM_max_Mo;Jeu_GPU_moy_pct;Jeu_GPU_max_pct;Jeu_VRAM_max_Mo"
+            "Jeu;Reference;Profil_NVIDIA;Debut;Fin;Duree_minutes;FPS_moyen;FPS_1pct_low;Temps_image_moyen_ms;Images_mesurees;PC_CPU_max_pct;PC_RAM_max_pct;PC_GPU_moy_pct;PC_GPU_max_pct;GPU_max_C;Puissance_CPU_max_W;Puissance_GPU_max_W;Puissance_totale_mesuree_max_W;Jeu_CPU_max_pct;Jeu_RAM_max_Mo;Jeu_GPU_moy_pct;Jeu_GPU_max_pct;Jeu_VRAM_max_Mo"
         };
         foreach (var report in reports)
         {
@@ -2534,6 +2549,9 @@ public partial class MainWindow : Window
                 gpuAverage?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? "",
                 report.PeakGpuUsagePercent?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? "",
                 report.PeakGpuTemperatureC?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? "",
+                report.PeakCpuPowerWatts?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? "",
+                report.PeakGpuPowerWatts?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? "",
+                report.PeakTotalPowerWatts?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? "",
                 report.PeakProcessCpuPercent?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? "",
                 report.PeakProcessRamMb?.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) ?? "",
                 report.ProcessGpuUsageSampleCount > 0 ? (report.ProcessGpuUsageTotal / report.ProcessGpuUsageSampleCount).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) : "",
@@ -2855,7 +2873,8 @@ public partial class MainWindow : Window
         {
             var metrics = await _systemMonitoringService.CaptureAsync();
             _gameSessionHistoryService.RecordPerformanceMetrics(metrics.CpuPercent, metrics.RamPercent,
-                metrics.GpuPercent, metrics.GpuTemperatureC);
+                metrics.GpuPercent, metrics.GpuTemperatureC, metrics.CpuPowerWatts,
+                metrics.GpuPowerWatts, metrics.TotalMeasuredPowerWatts);
             MonitorCpuText.Text = $"{metrics.CpuPercent:0}%";
             MonitorCpuDetail.Text = metrics.TopCpuProcessText is null ? "Mesure du processus…" : "Top : " + metrics.TopCpuProcessText;
             MonitorRamText.Text = $"{metrics.RamPercent:0}%";
@@ -2868,6 +2887,7 @@ public partial class MainWindow : Window
             MonitorVramDetail.Text = metrics.VramUsedGb.HasValue
                 ? $"{metrics.VramUsedGb:0.0} / {metrics.VramTotalGb:0.0} Go"
                 : "Capteurs GPU compatibles non détectés";
+            UpdatePowerMonitoring(metrics);
             MonitoringStatus.Text = $"Dernière mesure à {metrics.CapturedAt:HH:mm:ss}";
             AddHistory(_cpuHistory, metrics.CpuPercent);
             AddHistory(_ramHistory, metrics.RamPercent);
@@ -2875,6 +2895,7 @@ public partial class MainWindow : Window
             _monitoringTimestamps.Enqueue(metrics.CapturedAt);
             while (_monitoringTimestamps.Count > 60) _monitoringTimestamps.Dequeue();
             DrawMonitoringChart();
+            DrawPowerChart();
             CheckMonitoringAlerts(metrics);
         }
         catch (Exception ex)
@@ -2893,6 +2914,48 @@ public partial class MainWindow : Window
     {
         history.Enqueue(Math.Clamp(value, 0, 100));
         while (history.Count > 60) history.Dequeue();
+    }
+
+    private static void AddPowerHistory(Queue<double> history, double? value)
+    {
+        history.Enqueue(Math.Max(0, value ?? 0));
+        while (history.Count > 60) history.Dequeue();
+    }
+
+    private void UpdatePowerMonitoring(SystemMetrics metrics)
+    {
+        if (metrics.CpuPowerWatts.HasValue)
+            _peakCpuPowerWatts = Math.Max(_peakCpuPowerWatts ?? 0, metrics.CpuPowerWatts.Value);
+        if (metrics.GpuPowerWatts.HasValue)
+            _peakGpuPowerWatts = Math.Max(_peakGpuPowerWatts ?? 0, metrics.GpuPowerWatts.Value);
+        if (metrics.TotalMeasuredPowerWatts.HasValue)
+            _peakTotalPowerWatts = Math.Max(_peakTotalPowerWatts ?? 0, metrics.TotalMeasuredPowerWatts.Value);
+
+        MonitorCpuPowerText.Text = PowerText(metrics.CpuPowerWatts);
+        MonitorCpuPowerPeak.Text = "Pic : " + PowerText(_peakCpuPowerWatts);
+        MonitorGpuPowerText.Text = PowerText(metrics.GpuPowerWatts);
+        MonitorGpuPowerPeak.Text = "Pic : " + PowerText(_peakGpuPowerWatts) +
+            (metrics.GpuPowerLimitWatts.HasValue ? $" · limite {metrics.GpuPowerLimitWatts:0} W" : string.Empty);
+        MonitorTotalPowerText.Text = PowerText(metrics.TotalMeasuredPowerWatts);
+        MonitorTotalPowerPeak.Text = "Pic maximal : " + PowerText(_peakTotalPowerWatts) +
+            Environment.NewLine + "Autres composants estimés : 33–63 W";
+        MonitorTotalPowerPeak.ToolTip = "Estimations indicatives sans capteur : carte mère et ventilateurs 25 à 45 W, " +
+            "mémoire RAM 5 à 10 W, stockage SSD 3 à 8 W. Ces valeurs ne sont pas incluses dans le total mesuré.";
+        AddPowerHistory(_cpuPowerHistory, metrics.CpuPowerWatts);
+        AddPowerHistory(_gpuPowerHistory, metrics.GpuPowerWatts);
+        AddPowerHistory(_totalPowerHistory, metrics.TotalMeasuredPowerWatts);
+    }
+
+    private static string PowerText(double? watts) => watts.HasValue ? $"{watts:0.0} W" : "Indisponible";
+
+    private void ResetPowerPeaks()
+    {
+        _peakCpuPowerWatts = null;
+        _peakGpuPowerWatts = null;
+        _peakTotalPowerWatts = null;
+        MonitorCpuPowerPeak.Text = "Pic : —";
+        MonitorGpuPowerPeak.Text = "Pic : —";
+        MonitorTotalPowerPeak.Text = "Pic maximal : —";
     }
 
     private void OpenMonitoringAlertSettings()
@@ -2993,6 +3056,79 @@ public partial class MainWindow : Window
     }
 
     private void MonitoringChart_OnSizeChanged(object sender, SizeChangedEventArgs e) => DrawMonitoringChart();
+
+    private void PowerHistoryChart_OnSizeChanged(object sender, SizeChangedEventArgs e) => DrawPowerChart();
+
+    private void DrawPowerChart()
+    {
+        if (PowerHistoryChart.ActualWidth <= 0 || PowerHistoryChart.ActualHeight <= 0) return;
+        var measuredMaximum = _totalPowerHistory.Concat(_cpuPowerHistory).Concat(_gpuPowerHistory).DefaultIfEmpty(0).Max();
+        var maximum = Math.Max(100, Math.Ceiling(measuredMaximum * 1.1 / 100d) * 100d);
+        DrawPowerScale(maximum);
+        CpuPowerHistoryLine.Points = CreatePowerHistoryPoints(_cpuPowerHistory, maximum);
+        GpuPowerHistoryLine.Points = CreatePowerHistoryPoints(_gpuPowerHistory, maximum);
+        TotalPowerHistoryLine.Points = CreatePowerHistoryPoints(_totalPowerHistory, maximum);
+        System.Windows.Controls.Panel.SetZIndex(CpuPowerHistoryLine, 2);
+        System.Windows.Controls.Panel.SetZIndex(GpuPowerHistoryLine, 2);
+        System.Windows.Controls.Panel.SetZIndex(TotalPowerHistoryLine, 2);
+        PowerChartScale.Text = "Puissance (W)";
+    }
+
+    private void DrawPowerScale(double maximum)
+    {
+        foreach (var element in PowerHistoryChart.Children.OfType<FrameworkElement>()
+                     .Where(element => Equals(element.Tag, "power-scale")).ToArray())
+            PowerHistoryChart.Children.Remove(element);
+
+        const double left = 48;
+        const double top = 4;
+        const double bottom = 24;
+        var plotHeight = Math.Max(1, PowerHistoryChart.ActualHeight - top - bottom);
+        var step = maximum <= 500 ? 100d : Math.Ceiling(maximum / 5d / 100d) * 100d;
+        for (var value = 0d; value <= maximum + 0.1; value += step)
+        {
+            var y = top + plotHeight * (1 - value / maximum);
+            var line = new System.Windows.Shapes.Line
+            {
+                X1 = left, X2 = PowerHistoryChart.ActualWidth - 6, Y1 = y, Y2 = y,
+                Stroke = new SolidColorBrush(System.Windows.Media.Color.FromArgb(42, 255, 255, 255)),
+                StrokeThickness = 1, Tag = "power-scale"
+            };
+            System.Windows.Controls.Panel.SetZIndex(line, 0);
+            PowerHistoryChart.Children.Add(line);
+
+            var label = new System.Windows.Controls.TextBlock
+            {
+                Text = $"{value:0} W", FontSize = 10,
+                Foreground = (System.Windows.Media.Brush)FindResource("MutedBrush"), Tag = "power-scale"
+            };
+            System.Windows.Controls.Canvas.SetLeft(label, 2);
+            System.Windows.Controls.Canvas.SetTop(label,
+                Math.Clamp(y - 7, 0, Math.Max(0, PowerHistoryChart.ActualHeight - 15)));
+            System.Windows.Controls.Panel.SetZIndex(label, 1);
+            PowerHistoryChart.Children.Add(label);
+        }
+    }
+
+    private PointCollection CreatePowerHistoryPoints(IEnumerable<double> values, double maximum)
+    {
+        var samples = values.ToArray();
+        var points = new PointCollection(samples.Length);
+        // Réserve l'espace des libellés superposés au-dessus et sous le canevas.
+        const double top = 20;
+        const double bottom = 24;
+        const double left = 48;
+        const double right = 6;
+        var width = Math.Max(1, PowerHistoryChart.ActualWidth - left - right);
+        var height = Math.Max(1, PowerHistoryChart.ActualHeight - top - bottom);
+        for (var index = 0; index < samples.Length; index++)
+        {
+            var x = samples.Length <= 1 ? left : left + index * width / (samples.Length - 1);
+            var y = top + height * (1 - Math.Clamp(samples[index] / maximum, 0, 1));
+            points.Add(new System.Windows.Point(x, y));
+        }
+        return points;
+    }
 
     private void DrawMonitoringChart()
     {
@@ -3415,11 +3551,16 @@ public partial class MainWindow : Window
 
     private async Task UpdateDailyActivityReportAsync()
     {
-        if (!_settings.DailyActivityReportEnabled) return;
-        _dailyActivityReportService.SampleForegroundApplication();
-        var now = DateTime.Now;
-        if (now.Hour < _settings.DailyActivityReportHour || _settings.LastDailyActivityReportDate?.Date == now.Date) return;
-        await GenerateDailyActivityReportAsync(true);
+        if (!_settings.DailyActivityReportEnabled || _dailyActivitySampleRunning) return;
+        _dailyActivitySampleRunning = true;
+        try
+        {
+            await Task.Run(_dailyActivityReportService.SampleForegroundApplication);
+            var now = DateTime.Now;
+            if (now.Hour >= _settings.DailyActivityReportHour && _settings.LastDailyActivityReportDate?.Date != now.Date)
+                await GenerateDailyActivityReportAsync(true);
+        }
+        finally { _dailyActivitySampleRunning = false; }
     }
 
     private async Task GenerateDailyActivityReportAsync(bool automatic)
@@ -3822,6 +3963,9 @@ public partial class MainWindow : Window
         ApplyBulkRename.IsEnabled = false;
         try
         {
+            var fileCount = Directory.Exists(BulkRenameFolderBox.Text)
+                ? Directory.EnumerateFiles(BulkRenameFolderBox.Text, "*", SearchOption.TopDirectoryOnly).Count() : 0;
+            BulkRenameStatus.Text = $"Analyse de {fileCount} fichier(s) en cours… Les grandes collections de photos peuvent demander quelques instants.";
             _bulkRenameResults = await _bulkRenameService.PreviewAsync(BulkRenameFolderBox.Text,
                 BulkRenamePrefixBox.Text, BulkRenameDateCheck.IsChecked == true, BulkRenameNumberCheck.IsChecked == true,
                 BulkRenameSmartCheck.IsChecked == true);
@@ -4037,10 +4181,11 @@ public partial class MainWindow : Window
             var gpu = entries.Count(entry => entry.Category == "GPU");
             var audio = entries.Count(entry => entry.Category == "Audio");
             var chipset = entries.Count(entry => entry.Category == "Chipset");
+            var proposed = entries.Count(entry => entry.UpdateStatus == "Mise à jour proposée");
             DriverAuditStatus.Text = entries.Count == 0
                 ? "Aucun pilote GPU, audio ou chipset n’a été identifié."
-                : $"{entries.Count} pilote(s) affiché(s) · GPU : {gpu} · Audio : {audio} · Chipset : {chipset}.";
-            AppLog.Write($"AUDIT PILOTES | Total={entries.Count}; GPU={gpu}; Audio={audio}; Chipset={chipset}");
+                : $"{entries.Count} pilote(s) · GPU : {gpu} · Audio : {audio} · Chipset : {chipset} · {proposed} mise(s) à jour proposée(s). {_driverAuditService.UpdateSearchSummary}";
+            AppLog.Write($"AUDIT PILOTES | Total={entries.Count}; GPU={gpu}; Audio={audio}; Chipset={chipset}; Proposées={proposed}");
         }
         catch (Exception ex)
         {
@@ -4048,6 +4193,35 @@ public partial class MainWindow : Window
             AppLog.Write($"Audit des pilotes impossible : {ex.Message}");
         }
         finally { RefreshDriverAudit.IsEnabled = true; }
+    }
+
+    private async Task RefreshWindowsEventsAsync()
+    {
+        RefreshWindowsEvents.IsEnabled = false;
+        WindowsEventsList.ItemsSource = null;
+        WindowsEventsStatus.Text = "Lecture des journaux Système et Application…";
+        try
+        {
+            var result = await _windowsEventAuditService.ScanAsync();
+            WindowsEventsList.ItemsSource = result.Entries;
+            if (result.Entries.Count > 0) WindowsEventsList.SelectedIndex = 0;
+            var critical = result.Entries.Count(entry => entry.Severity == "Critique");
+            var important = result.Entries.Count(entry => entry.Severity == "Important");
+            WindowsEventsStatus.Text = result.Entries.Count == 0
+                ? "Aucune erreur critique ou erreur Windows trouvée sur les 7 derniers jours."
+                : $"{result.EventsRead} événement(s) regroupé(s) en {result.Entries.Count} problème(s) · {critical} critique(s) · {important} important(s)" +
+                  (result.InaccessibleLogs > 0 ? $" · {result.InaccessibleLogs} journal(aux) inaccessible(s)." : ".");
+        }
+        catch (OperationCanceledException)
+        {
+            WindowsEventsStatus.Text = "Analyse annulée.";
+        }
+        catch (Exception ex)
+        {
+            WindowsEventsStatus.Text = $"Analyse impossible : {ex.Message}";
+            AppLog.Write($"Analyse des événements Windows impossible : {ex.Message}");
+        }
+        finally { RefreshWindowsEvents.IsEnabled = true; }
     }
 
     private void OpenSelectedDriverSupportPage()
@@ -4165,7 +4339,7 @@ public partial class MainWindow : Window
         Focus();
     }
     private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e) { if (!_exit) { e.Cancel = true; Hide(); } }
-    private void ExitHub() { _exit = true; _dailyActivityReportService.Dispose(); _linkHoverSafetyService.Dispose(); _gameFrameRateService.Dispose(); _gamePerformanceService.Dispose(); _systemMonitoringService.Dispose(); _gameChatKeyboardService.Dispose(); _keyboardLayoutMonitorService.Dispose(); _hotkeyService.Dispose(); _translatorHotkeyService.Dispose(); _responseGeneratorHotkeyService.Dispose(); _actionWheelHotkeyService.Dispose(); _reminderTimer.Stop(); _xmpTimer.Stop(); _monitoringTimer.Stop(); _tray.Visible = false; _tray.Dispose(); Close(); System.Windows.Application.Current.Shutdown(); }
+    private void ExitHub() { _exit = true; _dailyActivityReportService.Dispose(); _linkHoverSafetyService.Dispose(); _gameFrameRateService.Dispose(); _gamePerformanceService.Dispose(); _systemMonitoringService.Dispose(); _gameChatKeyboardService.Dispose(); _keyboardLayoutMonitorService.Dispose(); _hotkeyService.Dispose(); _translatorHotkeyService.Dispose(); _responseGeneratorHotkeyService.Dispose(); _actionWheelHotkeyService.Dispose(); _reminderTimer.Stop(); _xmpTimer.Stop(); _monitoringTimer.Stop(); _dailyActivityTimer.Stop(); _tray.Visible = false; _tray.Dispose(); Close(); System.Windows.Application.Current.Shutdown(); }
 
     private sealed record LanguageChoice(string Name, string Code)
     {
