@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
 using System.Runtime.InteropServices;
 using LibreHardwareMonitor.Hardware;
 
@@ -8,7 +7,8 @@ namespace PersonalAppsHub.Services;
 
 public sealed record SystemMetrics(double CpuPercent, double RamPercent, double RamUsedGb, double RamTotalGb,
     double? GpuPercent, double? VramPercent, double? VramUsedGb, double? VramTotalGb,
-    double? GpuTemperatureC, double? CpuPowerWatts, double? GpuPowerWatts, double? GpuPowerLimitWatts,
+    double? GpuTemperatureC, double? CpuPowerWatts, bool CpuPowerIsEstimated,
+    double? GpuPowerWatts, double? GpuPowerLimitWatts,
     string? TopCpuProcessText, string? TopRamProcessText, DateTime CapturedAt)
 {
     public double? TotalMeasuredPowerWatts => CpuPowerWatts.HasValue && GpuPowerWatts.HasValue
@@ -18,9 +18,7 @@ public sealed record SystemMetrics(double CpuPercent, double RamPercent, double 
 
 public sealed class SystemMonitoringService : IDisposable
 {
-    private const string RyzenMasterCliPath = @"C:\Program Files\AMD\RyzenMasterSDK\AMDRyzenMasterCLI\bin-prebuilt\AMDRyzenMasterCLI.exe";
     private static readonly TimeSpan CpuPowerRefreshInterval = TimeSpan.FromSeconds(15);
-    private static readonly TimeSpan RyzenMasterTimeout = TimeSpan.FromSeconds(8);
     private readonly Computer _hardware = new() { IsCpuEnabled = true, IsGpuEnabled = true };
     private bool _hardwareOpened;
     private ulong? _previousIdle;
@@ -42,78 +40,20 @@ public sealed class SystemMonitoringService : IDisposable
             _lastCpuPowerReadUtc = DateTime.UtcNow;
         }
         var processes = await processesTask;
+        var cpuPower = _cachedCpuPowerWatts;
+        var cpuPowerIsEstimated = !cpuPower.HasValue;
+        cpuPower ??= EstimateCpuPower(cpu);
         return new SystemMetrics(cpu, ramPercent, ramUsed, ramTotal, gpu?.Usage,
             gpu?.VramPercent, gpu?.VramUsedGb, gpu?.VramTotalGb, gpu?.Temperature,
-            _cachedCpuPowerWatts, gpu?.PowerWatts, gpu?.PowerLimitWatts,
+            cpuPower, cpuPowerIsEstimated, gpu?.PowerWatts, gpu?.PowerLimitWatts,
             processes.TopCpu, processes.TopRam, DateTime.Now);
     }
 
     private async Task<double?> ReadCpuPowerAsync(CancellationToken cancellationToken)
     {
-        var amdPower = await ReadAmdRyzenPowerAsync(cancellationToken);
-        return amdPower ?? await Task.Run(ReadCpuPowerFromHardwareSensors, cancellationToken);
-    }
-
-    private static async Task<double?> ReadAmdRyzenPowerAsync(CancellationToken cancellationToken)
-    {
-        if (!File.Exists(RyzenMasterCliPath)) return null;
-
-        Process? process = null;
-        try
-        {
-            process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = RyzenMasterCliPath,
-                    Arguments = "-a GetPMTableData",
-                    WorkingDirectory = Path.GetDirectoryName(RyzenMasterCliPath)!,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true
-                }
-            };
-            process.Start();
-            try { process.PriorityClass = ProcessPriorityClass.BelowNormal; } catch { }
-
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeout.CancelAfter(RyzenMasterTimeout);
-            var outputTask = process.StandardOutput.ReadToEndAsync(timeout.Token);
-            var errorTask = process.StandardError.ReadToEndAsync(timeout.Token);
-            await process.WaitForExitAsync(timeout.Token);
-            var output = await outputTask;
-            _ = await errorTask;
-
-            if (process.ExitCode != 0) return null;
-            foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-            {
-                const string marker = "PPT Current Value :";
-                var markerIndex = line.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-                if (markerIndex < 0) continue;
-                var valueText = line[(markerIndex + marker.Length)..]
-                    .Replace("W", string.Empty, StringComparison.OrdinalIgnoreCase).Trim();
-                if (double.TryParse(valueText, NumberStyles.Float, CultureInfo.InvariantCulture, out var watts) && watts > 0.5)
-                    return watts;
-            }
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            AppLog.Write("Lecture AMD Ryzen Master interrompue après 8 secondes.");
-        }
-        catch (Exception ex)
-        {
-            AppLog.Write($"Lecture AMD Ryzen Master indisponible : {ex.Message}");
-        }
-        finally
-        {
-            if (process is not null)
-            {
-                try { if (!process.HasExited) process.Kill(true); } catch { }
-            }
-            process?.Dispose();
-        }
-        return null;
+        // Ryzen Master CLI affiche une boîte de dialogue "Access Denied" quand
+        // FlexHub démarre sans élévation. Le capteur local évite toute demande UAC.
+        return await Task.Run(ReadCpuPowerFromHardwareSensors, cancellationToken);
     }
 
     private double? ReadCpuPowerFromHardwareSensors()
@@ -136,6 +76,24 @@ public sealed class SystemMonitoringService : IDisposable
         }
         catch (Exception ex) { AppLog.Write($"Capteur de puissance CPU indisponible : {ex.Message}"); }
         return null;
+    }
+
+    private static double EstimateCpuPower(double cpuPercent)
+    {
+        // Estimation indicative du package CPU lorsque les capteurs matériels sont
+        // inaccessibles sans administrateur. L'enveloppe reste volontairement prudente.
+        var logicalProcessors = Environment.ProcessorCount;
+        var estimatedMaximumWatts = logicalProcessors switch
+        {
+            <= 4 => 35d,
+            <= 8 => 65d,
+            <= 16 => 105d,
+            <= 24 => 125d,
+            _ => 170d
+        };
+        var idleWatts = Math.Max(8d, estimatedMaximumWatts * 0.12d);
+        var normalizedLoad = Math.Clamp(cpuPercent / 100d, 0d, 1d);
+        return idleWatts + (estimatedMaximumWatts - idleWatts) * Math.Pow(normalizedLoad, 0.65d);
     }
 
     private (string? TopCpu, string? TopRam) ReadTopProcesses()

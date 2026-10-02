@@ -10,7 +10,7 @@
     <ApplicationIcon>..\..\assets\app-logo.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <RootNamespace>PersonalAppsHub</RootNamespace>
-    <Version>1.7.2</Version>
+    <Version>1.7.3</Version>
     <Company>Flexron</Company>
     <Product>FlexHub</Product>
     <Description>Hub Windows regroupant des outils personnels et des profils NVIDIA.</Description>

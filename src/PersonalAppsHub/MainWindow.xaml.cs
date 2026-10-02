@@ -3003,16 +3003,19 @@ public partial class MainWindow : Window
         if (metrics.TotalMeasuredPowerWatts.HasValue)
             _peakTotalPowerWatts = Math.Max(_peakTotalPowerWatts ?? 0, metrics.TotalMeasuredPowerWatts.Value);
 
-        MonitorCpuPowerText.Text = PowerText(metrics.CpuPowerWatts);
-        MonitorCpuPowerPeak.Text = "Pic : " + PowerText(_peakCpuPowerWatts);
+        var cpuEstimateSuffix = metrics.CpuPowerIsEstimated ? " (estimée)" : string.Empty;
+        MonitorCpuPowerText.Text = PowerText(metrics.CpuPowerWatts) + cpuEstimateSuffix;
+        MonitorCpuPowerPeak.Text = "Pic : " + PowerText(_peakCpuPowerWatts) + cpuEstimateSuffix;
         MonitorGpuPowerText.Text = PowerText(metrics.GpuPowerWatts);
         MonitorGpuPowerPeak.Text = "Pic : " + PowerText(_peakGpuPowerWatts) +
             (metrics.GpuPowerLimitWatts.HasValue ? $" · limite {metrics.GpuPowerLimitWatts:0} W" : string.Empty);
-        MonitorTotalPowerText.Text = PowerText(metrics.TotalMeasuredPowerWatts);
-        MonitorTotalPowerPeak.Text = "Pic maximal : " + PowerText(_peakTotalPowerWatts) +
+        var totalEstimateSuffix = metrics.CpuPowerIsEstimated ? " (estimé)" : string.Empty;
+        MonitorTotalPowerText.Text = PowerText(metrics.TotalMeasuredPowerWatts) + totalEstimateSuffix;
+        MonitorTotalPowerPeak.Text = "Pic maximal : " + PowerText(_peakTotalPowerWatts) + totalEstimateSuffix +
             Environment.NewLine + "Autres composants estimés : 33–63 W";
-        MonitorTotalPowerPeak.ToolTip = "Estimations indicatives sans capteur : carte mère et ventilateurs 25 à 45 W, " +
-            "mémoire RAM 5 à 10 W, stockage SSD 3 à 8 W. Ces valeurs ne sont pas incluses dans le total mesuré.";
+        MonitorTotalPowerPeak.ToolTip = "La puissance CPU est estimée à partir de sa charge lorsque son capteur est inaccessible. " +
+            "Autres estimations indicatives : carte mère et ventilateurs 25 à 45 W, mémoire RAM 5 à 10 W, stockage SSD 3 à 8 W. " +
+            "Ces autres composants ne sont pas inclus dans le total CPU + GPU.";
         AddPowerHistory(_cpuPowerHistory, metrics.CpuPowerWatts);
         AddPowerHistory(_gpuPowerHistory, metrics.GpuPowerWatts);
         AddPowerHistory(_totalPowerHistory, metrics.TotalMeasuredPowerWatts);

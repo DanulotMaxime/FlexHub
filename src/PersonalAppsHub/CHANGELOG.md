@@ -1,5 +1,12 @@
 # Notes de version
 
+## 1.7.3
+
+- Suppression de l'appel automatique à AMD Ryzen Master CLI, qui pouvait afficher une erreur de droits administrateur au démarrage.
+- Le lancement automatique de FlexHub reste silencieux et ne demande aucune élévation UAC.
+- Ajout d'une estimation clairement signalée de la puissance CPU lorsque le capteur matériel n'est pas accessible.
+- Le total CPU + GPU et les pics indiquent désormais explicitement lorsqu'ils reposent sur cette estimation.
+
 ## 1.7.2
 
 - FlexHub ne demande plus les droits administrateur au lancement afin que Windows puisse l'ouvrir automatiquement à la connexion.
