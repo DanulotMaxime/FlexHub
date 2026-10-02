@@ -2447,6 +2447,7 @@ public partial class MainWindow : Window
             _gameSessionHistoryService.Update(sessions, _settings.ActiveNvidiaProfileName);
             _gameSessionHistoryService.RecordProcessMetrics(processMetrics.Values);
             _gameSessionHistoryService.RecordFrameRateMetrics(frameRateMetrics.Values);
+            FavoriteGameSessionList.ItemsSource = _gameSessionHistoryService.GetReferenceReports();
             GameSessionHistoryList.ItemsSource = _gameSessionHistoryService.GetRecentReports();
             var performance = _gamePerformanceService.Update(sessions, _settings.AutomaticGameHighPriorityEnabled);
             GamePerformanceStatus.Text = performance.Message;
@@ -2558,6 +2559,7 @@ public partial class MainWindow : Window
             "Effacer l’historique", MessageBoxButton.YesNo, MessageBoxImage.Warning);
         if (confirmation != MessageBoxResult.Yes) return;
         _gameSessionHistoryService.Clear();
+        FavoriteGameSessionList.ItemsSource = Array.Empty<GameSessionReport>();
         GameSessionHistoryList.ItemsSource = Array.Empty<GameSessionReport>();
         WeeklyGameSummaryList.ItemsSource = Array.Empty<WeeklyGameSummary>();
         _currentGameSummaries = Array.Empty<WeeklyGameSummary>();
@@ -2576,6 +2578,8 @@ public partial class MainWindow : Window
         }
         GameSessionHistoryList.ItemsSource = null;
         GameSessionHistoryList.ItemsSource = _gameSessionHistoryService.GetRecentReports();
+        FavoriteGameSessionList.ItemsSource = null;
+        FavoriteGameSessionList.ItemsSource = _gameSessionHistoryService.GetReferenceReports();
         ActiveGameSessionSummary.Text = $"Référence enregistrée pour {report.GameName}.";
     }
 

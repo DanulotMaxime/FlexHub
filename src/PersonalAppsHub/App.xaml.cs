@@ -61,6 +61,7 @@ public partial class App : System.Windows.Application
             return;
         }
         base.OnStartup(e);
+        RepairStartupRegistration();
         _runtimeDiagnostics = new RuntimeDiagnosticsService();
         _showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowEventName);
         _mainWindow = new MainWindow();
@@ -73,6 +74,21 @@ public partial class App : System.Windows.Application
                 if (!_exiting) Dispatcher.Invoke(() => _mainWindow?.ShowFromSecondaryLaunch());
             }
         });
+    }
+
+    private static void RepairStartupRegistration()
+    {
+        try
+        {
+            var settings = new SettingsService().Load();
+            StartupService.SetEnabled(settings.StartWithWindows);
+        }
+        catch (Exception ex)
+        {
+            // Le démarrage de FlexHub ne doit jamais être bloqué par un registre
+            // inaccessible. Le prochain enregistrement des paramètres réessaiera.
+            AppLog.Write($"RÉPARATION DÉMARRAGE WINDOWS IMPOSSIBLE | {ex.Message}");
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)

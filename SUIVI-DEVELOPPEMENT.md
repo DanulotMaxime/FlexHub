@@ -1,6 +1,6 @@
 ﻿# 🚀 FlexHub — Suivi du développement
 
-*Dernière mise à jour : 30 septembre 2026*
+*Dernière mise à jour : 2 octobre 2026*
 
 
 ## Légende
@@ -8,7 +8,7 @@
 - ✅ **Terminé** — Fonction présente dans l'application.
 - 🛑 **Abandonné** — Fonction retirée de la feuille de route et non prévue.
 
-Ce document est basé sur le code, le README, les notes de version 1.0.0 à 1.6.0
+Ce document est basé sur le code, le README, les notes de version 1.0.0 à 1.7.1
 et la liste d'idées fournie. Les pourcentages indiquent l'état fonctionnel estimé,
 pas le temps nécessaire.
 
@@ -93,7 +93,7 @@ pas le temps nécessaire.
 
 
 ### ✅ Paramètres généraux et sécurité — Terminé
-- Démarrage avec Windows, thèmes clair/sombre et tailles de police.
+- Démarrage avec Windows auto-réparé lorsque l’entrée du registre disparaît, thèmes clair/sombre et tailles de police.
 - Taille initiale de la fenêtre configurable : petit, moyen, grand, très grand ou plein écran.
 - Centre des alertes dédié pour gérer depuis une seule fenêtre les rappels Top-Serveurs,
   les seuils CPU/RAM/GPU, les pauses de session de jeu, le jitter réseau et la surveillance XMP.
@@ -309,6 +309,7 @@ pas le temps nécessaire.
 ### ✅ Rapports et historique des sessions — Terminé
 - Durée, mesures globales du PC, détail CPU/RAM/GPU/VRAM du jeu, FPS moyens, 1 % low et temps d’image moyen.
 - Historique local sans limite et graphiques filtrables sur 7 jours, 30 jours, l’année ou toute la période.
+- Section persistante pour les sessions favorites, indépendante des 10 dernières sessions affichées de la plus récente à la plus ancienne.
 - Export CSV avec des colonnes distinctes pour le PC et le processus du jeu.
 
 ### ✅ Comparaison des performances par jeu — Terminé

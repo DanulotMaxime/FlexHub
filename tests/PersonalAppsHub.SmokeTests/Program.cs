@@ -83,6 +83,29 @@ Check(defaults.MonitoringCpuTemperatureAlertC == 90, "seuil de température CPU 
 Check(defaults.GameSessionAlertHours == 2, "alerte de session de jeu après 2 heures par défaut");
 Check(!defaults.GameSessionAlertEnabled, "alerte de session de jeu désactivée par défaut");
 Check(!defaults.AutomaticGameHighPriorityEnabled, "mode performance jeu désactivé par défaut");
+var gameHistoryPath = Path.Combine(Path.GetTempPath(), $"flexhub-game-history-{Guid.NewGuid():N}.json");
+try
+{
+    var reports = Enumerable.Range(0, 12).Select(index => new GameSessionReport
+    {
+        ProcessId = index,
+        GameName = "Jeu test",
+        StartedAt = DateTime.Now.AddDays(-index),
+        LastSeenAt = DateTime.Now.AddDays(-index).AddHours(1),
+        IsReference = index == 11
+    }).ToArray();
+    File.WriteAllText(gameHistoryPath, System.Text.Json.JsonSerializer.Serialize(reports));
+    var gameHistory = new GameSessionHistoryService(gameHistoryPath);
+    Check(gameHistory.GetRecentReports().Count == 10 &&
+          gameHistory.GetRecentReports()[0].StartedAt > gameHistory.GetRecentReports()[^1].StartedAt,
+        "10 dernières sessions triées de la plus récente à la plus ancienne");
+    Check(gameHistory.GetReferenceReports().Count == 1 && gameHistory.GetReferenceReports()[0].ProcessId == 11,
+        "session favorite conservée hors des 10 dernières");
+}
+finally
+{
+    if (File.Exists(gameHistoryPath)) File.Delete(gameHistoryPath);
+}
 Check(defaults.NetworkJitterAlertEnabled && defaults.NetworkJitterAlertMs == 30,
     "alerte jitter activée à 30 ms par défaut");
 var networkHistoryPath = Path.Combine(Path.GetTempPath(), $"flexhub-network-history-{Guid.NewGuid():N}.json");

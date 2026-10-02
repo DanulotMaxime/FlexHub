@@ -1,4 +1,5 @@
 using Microsoft.Win32;
+using System.IO;
 
 namespace PersonalAppsHub.Services;
 
@@ -20,9 +21,19 @@ public static class StartupService
             return;
         }
 
-        var executablePath = Environment.ProcessPath
-            ?? throw new InvalidOperationException("Le chemin de l'application est introuvable.");
+        var executablePath = ResolveStartupExecutablePath();
         runKey.SetValue(ValueName, $"\"{executablePath}\"", RegistryValueKind.String);
         runKey.DeleteValue(LegacyValueName, throwOnMissingValue: false);
+    }
+
+    private static string ResolveStartupExecutablePath()
+    {
+        var installedPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Programs", "FlexHub", "FlexHub.exe");
+        if (File.Exists(installedPath)) return installedPath;
+
+        return Environment.ProcessPath
+            ?? throw new InvalidOperationException("Le chemin de l'application est introuvable.");
     }
 }

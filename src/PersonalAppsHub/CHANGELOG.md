@@ -1,5 +1,15 @@
 # Notes de version
 
+## 1.7.1
+
+- Correction du démarrage automatique lorsque le réglage « Démarrage avec Windows » est activé mais que l’entrée correspondante a disparu du registre.
+- Vérification et réparation silencieuse de l’entrée de démarrage à chaque lancement, sans empêcher FlexHub de s’ouvrir si le registre est temporairement inaccessible.
+- La version de développement conserve désormais le chemin de l’installation officielle dans l’entrée de démarrage lorsqu’une installation de FlexHub est présente.
+- Ajout d’une section dédiée aux sessions de jeu favorites, qui restent visibles même lorsqu’elles ne figurent plus parmi les 10 dernières sessions.
+- Les 10 dernières sessions sont affichées de la plus récente à la plus ancienne.
+- Réorganisation de la page Sessions de jeu : graphique et options avant les favoris et l’historique récent.
+- Ajout de tests automatisés pour la conservation des favoris anciens et l’ordre des sessions récentes.
+
 ## 1.7.0
 
 - Refonte des statistiques d’activité sur sept jours avec graphiques quotidiens, classement des applications les plus utilisées et total du temps mesuré.

@@ -91,12 +91,16 @@ public sealed record WeeklyGameSummary(string GameName, int SessionCount, TimeSp
 
 public sealed class GameSessionHistoryService
 {
-    private readonly string _path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "PersonalAppsHub", "game-sessions.json");
+    private readonly string _path;
     private readonly List<GameSessionReport> _reports;
     private DateTime _lastSaveUtc = DateTime.MinValue;
 
-    public GameSessionHistoryService() => _reports = Load();
+    public GameSessionHistoryService(string? path = null)
+    {
+        _path = path ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "PersonalAppsHub", "game-sessions.json");
+        _reports = Load();
+    }
 
     public IReadOnlyList<GameSessionReport> Update(IReadOnlyList<ActiveGameSession> sessions, string? activeNvidiaProfileName = null)
     {
@@ -162,6 +166,14 @@ public sealed class GameSessionHistoryService
     {
         UpdateComparisons();
         return _reports.OrderByDescending(report => report.StartedAt).Take(10).ToArray();
+    }
+
+    public IReadOnlyList<GameSessionReport> GetReferenceReports()
+    {
+        UpdateComparisons();
+        return _reports.Where(report => report.IsReference)
+            .OrderByDescending(report => report.StartedAt)
+            .ToArray();
     }
 
     public void Clear()
