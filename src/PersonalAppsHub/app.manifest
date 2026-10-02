@@ -3,7 +3,10 @@
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
     <security>
       <requestedPrivileges>
-        <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
+        <!-- FlexHub doit pouvoir être lancé par la clé Windows Run à l'ouverture
+             de session. Les opérations privilégiées élèvent uniquement leur
+             processus dédié avec le verbe runas. -->
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
       </requestedPrivileges>
     </security>
   </trustInfo>

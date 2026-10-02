@@ -1,5 +1,11 @@
 # Notes de version
 
+## 1.7.2
+
+- FlexHub ne demande plus les droits administrateur au lancement afin que Windows puisse l'ouvrir automatiquement à la connexion.
+- Les opérations sensibles, notamment la purge de la mémoire et les réglages NVIDIA, conservent leur demande d'autorisation administrateur dédiée.
+- Le démarrage général reste utilisable sans élévation ; les capteurs matériels protégés peuvent rester indisponibles lorsque Windows en refuse l'accès.
+
 ## 1.7.1
 
 - Correction du démarrage automatique lorsque le réglage « Démarrage avec Windows » est activé mais que l’entrée correspondante a disparu du registre.

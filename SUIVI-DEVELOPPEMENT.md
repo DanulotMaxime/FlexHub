@@ -8,7 +8,7 @@
 - ✅ **Terminé** — Fonction présente dans l'application.
 - 🛑 **Abandonné** — Fonction retirée de la feuille de route et non prévue.
 
-Ce document est basé sur le code, le README, les notes de version 1.0.0 à 1.7.1
+Ce document est basé sur le code, le README, les notes de version 1.0.0 à 1.7.2
 et la liste d'idées fournie. Les pourcentages indiquent l'état fonctionnel estimé,
 pas le temps nécessaire.
 
