@@ -97,7 +97,12 @@ public partial class App : System.Windows.Application
         _showEvent?.Set();
         _showEvent?.Dispose();
         _runtimeDiagnostics?.Dispose();
-        if (_ownsMutex) _mutex?.ReleaseMutex();
+        if (_ownsMutex)
+        {
+            try { _mutex?.ReleaseMutex(); }
+            catch (ApplicationException ex) { AppLog.Write($"LIBÉRATION DU VERROU D'INSTANCE IMPOSSIBLE | {ex.Message}"); }
+            finally { _ownsMutex = false; }
+        }
         _mutex?.Dispose();
         base.OnExit(e);
     }

@@ -4056,13 +4056,26 @@ public partial class MainWindow : Window
     {
         var selected = _bulkRenameResults.Where(file => file.IsSelected).ToArray();
         if (selected.Length == 0) { BulkRenameStatus.Text = "Sélectionnez au moins un fichier."; return; }
+        var folderPath = BulkRenameFolderBox.Text;
         if (System.Windows.MessageBox.Show(this, $"Renommer {selected.Length} fichier(s) ?\n\nLes nouveaux noms affichés dans l’aperçu seront appliqués.",
                 "Confirmer le renommage", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         ApplyBulkRename.IsEnabled = false;
-        var result = await Task.Run(() => _bulkRenameService.Rename(selected, BulkRenameFolderBox.Text));
-        AppLog.Write($"RENOMMAGE MASSE | Renommés={result.RenamedFiles}; Échecs={result.FailedFiles}");
-        await PreviewBulkRenameAsync();
-        BulkRenameStatus.Text = $"{result.RenamedFiles} fichier(s) renommé(s)" + (result.FailedFiles > 0 ? $" · {result.FailedFiles} échec(s)." : ".");
+        try
+        {
+            var result = await Task.Run(() => _bulkRenameService.Rename(selected, folderPath));
+            AppLog.Write($"RENOMMAGE MASSE | Renommés={result.RenamedFiles}; Échecs={result.FailedFiles}");
+            await PreviewBulkRenameAsync();
+            BulkRenameStatus.Text = $"{result.RenamedFiles} fichier(s) renommé(s)" + (result.FailedFiles > 0 ? $" · {result.FailedFiles} échec(s)." : ".");
+        }
+        catch (Exception ex)
+        {
+            BulkRenameStatus.Text = $"Renommage impossible : {ex.Message}";
+            AppLog.WriteException("ERREUR RENOMMAGE MASSE", ex);
+        }
+        finally
+        {
+            ApplyBulkRename.IsEnabled = true;
+        }
     }
 
     private async Task EmptyRecycleBinAsync()

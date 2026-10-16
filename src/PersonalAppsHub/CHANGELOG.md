@@ -1,5 +1,15 @@
 # Notes de version
 
+## 1.7.4
+
+- Rétablissement des FPS moyens, du 1 % low et du temps d’image dans les statistiques des sessions de jeu.
+- PresentMon utilise désormais une seule session de collecte partagée entre les jeux afin d’éviter l’épuisement des ressources ETW de Windows et l’erreur 1450.
+- La collecte FPS redémarre automatiquement si PresentMon s’interrompt et s’arrête proprement lorsqu’aucun jeu n’est actif.
+- Correction des erreurs répétées du détecteur de liens lorsque Windows refuse ou interrompt une requête UI Automation.
+- Correction du renommage en masse qui pouvait accéder à un contrôle WPF depuis un thread d’arrière-plan.
+- Les erreurs de renommage restent maintenant limitées au module et le bouton d’action est toujours réactivé.
+- Sécurisation de la libération du verrou d’instance lors de la fermeture de FlexHub.
+
 ## 1.7.3
 
 - Suppression de l'appel automatique à AMD Ryzen Master CLI, qui pouvait afficher une erreur de droits administrateur au démarrage.

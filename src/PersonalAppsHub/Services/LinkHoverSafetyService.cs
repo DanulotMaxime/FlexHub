@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Automation;
@@ -90,6 +91,9 @@ public sealed class LinkHoverSafetyService : IDisposable
         }
         catch (ElementNotAvailableException) { }
         catch (COMException) { }
+        catch (Win32Exception) { }
+        catch (TimeoutException) { }
+        catch (InvalidOperationException) { }
         return null;
     }
 
