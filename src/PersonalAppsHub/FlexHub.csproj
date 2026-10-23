@@ -10,7 +10,7 @@
     <ApplicationIcon>..\..\assets\app-logo.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <RootNamespace>PersonalAppsHub</RootNamespace>
-    <Version>1.7.4</Version>
+    <Version>1.7.5</Version>
     <Company>Flexron</Company>
     <Product>FlexHub</Product>
     <Description>Hub Windows regroupant des outils personnels et des profils NVIDIA.</Description>
@@ -35,6 +35,8 @@
     <Content Include="..\..\tools\nvidia-profile-inspector\nvidiaProfileInspector.exe" Link="Tools\nvidiaProfileInspector.exe" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\tools\nvidia-profile-inspector\Reference.xml" Link="Tools\Reference.xml" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\tools\presentmon\PresentMon.exe" Link="Tools\PresentMon.exe" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\tools\frameview\FlexHub.FrameViewBridge.dll" Link="Tools\FlexHub.FrameViewBridge.dll" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\tools\pawnio\PawnIO_setup.exe" Link="Tools\PawnIO_setup.exe" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\nvidia-profiles\NVIDIA-Global-Profile-Baseline.nip" Link="Profiles\NVIDIA-Global-Profile-Baseline.nip" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>

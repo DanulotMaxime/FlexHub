@@ -80,6 +80,9 @@ Check(defaults.MonitoringAlertsEnabled && defaults.MonitoringCpuAlertPercent == 
       defaults.MonitoringRamAlertPercent == 90 && defaults.MonitoringGpuTemperatureAlertC == 85,
     "seuils de monitoring prudents par défaut");
 Check(defaults.MonitoringCpuTemperatureAlertC == 90, "seuil de température CPU prudent par défaut");
+Check(KeyboardLayoutMonitorService.IsWindowsShellClass("CabinetWClass") &&
+      !KeyboardLayoutMonitorService.IsWindowsShellClass("Chrome_WidgetWin_1"),
+    "exclusion de l’Explorateur Windows du hook clavier");
 Check(defaults.GameSessionAlertHours == 2, "alerte de session de jeu après 2 heures par défaut");
 Check(!defaults.GameSessionAlertEnabled, "alerte de session de jeu désactivée par défaut");
 Check(!defaults.AutomaticGameHighPriorityEnabled, "mode performance jeu désactivé par défaut");
@@ -137,6 +140,17 @@ finally
     if (File.Exists(stressHistoryPath)) File.Delete(stressHistoryPath);
 }
 Check(Math.Abs(SystemMonitoringService.Percentage(25, 100) - 25) < 0.01, "calcul de pourcentage monitoring");
+Check(ElevatedLaunchService.HasArgument(["--ELEVATED-TASK"], ElevatedLaunchService.ElevatedArgument) &&
+      !ElevatedLaunchService.HasArgument(["--autre"], ElevatedLaunchService.ElevatedArgument),
+    "détection du lancement administrateur sécurisé");
+if (FrameViewCpuMetricsService.IsInstalled)
+{
+    using var frameViewCpu = new FrameViewCpuMetricsService();
+    var frameViewMetrics = frameViewCpu.Capture();
+    Check(frameViewMetrics.PackagePowerWatts is null or (> 0 and < 1000) &&
+          frameViewMetrics.PackageTemperatureC is null or (> 0 and < 125),
+        "plages de télémétrie CPU NVIDIA FrameView");
+}
 using (var direct3DLoad = new Direct3DGpuLoadService())
 {
     direct3DLoad.Start(35);

@@ -124,9 +124,11 @@ public partial class MainWindow : Window
     private bool _maintenanceExpanded;
     private bool _automationExpanded;
     private int _highCpuSamples;
+    private int _highCpuTemperatureSamples;
     private int _highRamSamples;
     private int _highGpuTemperatureSamples;
     private DateTime _lastCpuAlertUtc = DateTime.MinValue;
+    private DateTime _lastCpuTemperatureAlertUtc = DateTime.MinValue;
     private DateTime _lastRamAlertUtc = DateTime.MinValue;
     private DateTime _lastGpuTemperatureAlertUtc = DateTime.MinValue;
 
@@ -2947,7 +2949,9 @@ public partial class MainWindow : Window
             _gameSessionHistoryService.RecordPerformanceMetrics(metrics.CpuPercent, metrics.RamPercent,
                 metrics.GpuPercent, metrics.GpuTemperatureC, metrics.CpuPowerWatts,
                 metrics.GpuPowerWatts, metrics.TotalMeasuredPowerWatts);
-            MonitorCpuText.Text = $"{metrics.CpuPercent:0}%";
+            MonitorCpuText.Text = metrics.CpuTemperatureC.HasValue
+                ? $"{metrics.CpuPercent:0}%  ·  {metrics.CpuTemperatureC:0} °C"
+                : $"{metrics.CpuPercent:0}%  ·  temp. indisponible";
             MonitorCpuDetail.Text = metrics.TopCpuProcessText is null ? "Mesure du processus…" : "Top : " + metrics.TopCpuProcessText;
             MonitorRamText.Text = $"{metrics.RamPercent:0}%";
             MonitorRamDetail.Text = $"{metrics.RamUsedGb:0.0} / {metrics.RamTotalGb:0.0} Go";
@@ -3069,11 +3073,14 @@ public partial class MainWindow : Window
         }
 
         _highCpuSamples = metrics.CpuPercent >= _settings.MonitoringCpuAlertPercent ? _highCpuSamples + 1 : 0;
+        _highCpuTemperatureSamples = metrics.CpuTemperatureC >= _settings.MonitoringCpuTemperatureAlertC
+            ? _highCpuTemperatureSamples + 1 : 0;
         _highRamSamples = metrics.RamPercent >= _settings.MonitoringRamAlertPercent ? _highRamSamples + 1 : 0;
         _highGpuTemperatureSamples = metrics.GpuTemperatureC >= _settings.MonitoringGpuTemperatureAlertC
             ? _highGpuTemperatureSamples + 1 : 0;
 
-        var pending = Math.Max(Math.Max(_highCpuSamples, _highRamSamples), _highGpuTemperatureSamples);
+        var pending = Math.Max(Math.Max(_highCpuSamples, _highCpuTemperatureSamples),
+            Math.Max(_highRamSamples, _highGpuTemperatureSamples));
         if (pending is > 0 and < 3)
             MonitoringAlertStatus.Text = $"Seuil dépassé : confirmation en cours ({pending}/3 mesures).";
         else if (pending == 0)
@@ -3094,6 +3101,14 @@ public partial class MainWindow : Window
                 $"Utilisation RAM élevée : {metrics.RamPercent:0}% (seuil {_settings.MonitoringRamAlertPercent}%).\nProcessus principal : {metrics.TopRamProcessText ?? "indéterminé"}.",
                 $"RAM élevée : {metrics.RamPercent:0}% à {DateTime.Now:HH:mm:ss}");
             AppLog.Write($"ALERTE MONITORING | RAM={metrics.RamPercent:0}%");
+        }
+        if (_highCpuTemperatureSamples >= 3 && CanShowMonitoringAlert(_lastCpuTemperatureAlertUtc))
+        {
+            _lastCpuTemperatureAlertUtc = DateTime.UtcNow;
+            ShowMonitoringAlert("Alerte température CPU",
+                $"Le CPU atteint {metrics.CpuTemperatureC:0} °C (seuil {_settings.MonitoringCpuTemperatureAlertC} °C).",
+                $"Température CPU élevée : {metrics.CpuTemperatureC:0} °C à {DateTime.Now:HH:mm:ss}");
+            AppLog.Write($"ALERTE MONITORING | Température CPU={metrics.CpuTemperatureC:0}°C");
         }
         if (_highGpuTemperatureSamples >= 3 && CanShowMonitoringAlert(_lastGpuTemperatureAlertUtc))
         {
@@ -3126,6 +3141,7 @@ public partial class MainWindow : Window
     private void ResetMonitoringAlertCounters()
     {
         _highCpuSamples = 0;
+        _highCpuTemperatureSamples = 0;
         _highRamSamples = 0;
         _highGpuTemperatureSamples = 0;
     }

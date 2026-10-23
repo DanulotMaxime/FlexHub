@@ -16,6 +16,7 @@ FlexHub permet notamment de :
 - utiliser une roue d'actions avec des raccourcis ;
 - recevoir un rappel Top-Serveurs ;
 - appliquer des profils d'optimisation NVIDIA ;
+- surveiller la température, la charge et la consommation CPU/GPU, y compris avec l’overlay NVIDIA actif ;
 - surveiller la configuration XMP de la mémoire ;
 - nettoyer les fichiers temporaires et purger manuellement le cache RAM en attente ;
 - consulter la Corbeille et configurer son vidage selon sa taille ou son ancienneté ;
@@ -29,6 +30,8 @@ FlexHub permet notamment de :
 4. Lancez FlexHub depuis le menu Démarrer ou son raccourci.
 
 FlexHub contient les composants .NET nécessaires et fonctionne sur Windows 64 bits.
+
+Au premier lancement, FlexHub peut demander une autorisation administrateur unique pour installer le pilote signé PawnIO et activer la lecture des capteurs CPU. Les lancements suivants utilisent une tâche Windows sécurisée pour l’utilisateur courant, sans nouvelle invite UAC.
 
 ## Recommandations de base gratuites
 

@@ -1,5 +1,16 @@
 # Notes de version
 
+## 1.7.5
+
+- Ajout de la température CPU dans le monitoring avec seuil d’alerte configurable.
+- Lecture directe de la température et de la puissance des Ryzen récents grâce à LibreHardwareMonitor et au pilote signé PawnIO 2.2.0.
+- Compatibilité simultanée avec NVIDIA Overlay : les capteurs AMD sont prioritaires et FrameView devient une solution de secours.
+- Ajout d’une autorisation administrateur unique au premier lancement, suivie d’un démarrage élevé sans nouvelle invite grâce au Planificateur de tâches Windows.
+- Installation du pilote PawnIO intégrée à cette autorisation initiale sur les nouvelles installations.
+- Correction des ralentissements possibles de l’Explorateur Windows causés par les contrôles de focus et les lectures répétées de métadonnées.
+- Stabilisation du rendu WPF pendant les longues sessions et amélioration de l’arrêt de PresentMon.
+- Ajout de diagnostics matériels et de tests de contrôle pour les nouveaux chemins de monitoring.
+
 ## 1.7.4
 
 - Rétablissement des FPS moyens, du 1 % low et du temps d’image dans les statistiques des sessions de jeu.

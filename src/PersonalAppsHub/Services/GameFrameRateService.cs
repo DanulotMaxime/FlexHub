@@ -19,11 +19,13 @@ public sealed class GameFrameRateService : IDisposable
 
     private readonly object _sync = new();
     private readonly Dictionary<int, FrameState> _framesByProcess = [];
+    private readonly HashSet<int> _intentionalStopProcessIds = [];
     private readonly string _presentMonPath = Path.Combine(AppContext.BaseDirectory, "Tools", "PresentMon.exe");
     private HashSet<int> _activeProcessIds = [];
     private Process? _captureProcess;
     private int _processIdColumn = -1;
     private int _frameTimeColumn = -1;
+    private bool _privilegeWarningLogged;
 
     public IReadOnlyDictionary<int, GameFrameRateMetrics> Capture(IReadOnlyList<ActiveGameSession> sessions)
     {
@@ -83,15 +85,17 @@ public sealed class GameFrameRateService : IDisposable
                 EnableRaisingEvents = true
             };
             process.OutputDataReceived += (_, args) => ParseFrameLine(args.Data);
-            process.ErrorDataReceived += (_, args) =>
-            {
-                if (!string.IsNullOrWhiteSpace(args.Data)) AppLog.Write($"PresentMon : {args.Data}");
-            };
+            process.ErrorDataReceived += (_, args) => LogPresentMonError(args.Data);
             process.Exited += (_, _) =>
             {
+                bool intentionalStop;
                 long frameCount;
-                lock (_sync) frameCount = _framesByProcess.Values.Sum(state => state.FrameCount);
-                if (frameCount == 0)
+                lock (_sync)
+                {
+                    intentionalStop = _intentionalStopProcessIds.Remove(process.Id);
+                    frameCount = _framesByProcess.Values.Sum(state => state.FrameCount);
+                }
+                if (!intentionalStop && frameCount == 0)
                     AppLog.Write($"PresentMon s’est arrêté sans fournir d’image (code {SafeExitCode(process)}).");
             };
             if (!process.Start()) { process.Dispose(); return; }
@@ -109,6 +113,26 @@ public sealed class GameFrameRateService : IDisposable
         {
             AppLog.Write($"Mesure FPS indisponible : {ex.Message}");
         }
+    }
+
+    private void LogPresentMonError(string? line)
+    {
+        if (string.IsNullOrWhiteSpace(line)) return;
+
+        // PresentMon 1.10 affiche quatre lignes pour cet avertissement à chaque
+        // lancement sans élévation. Une seule occurrence suffit au diagnostic.
+        if (line.Contains("requires elevated privilege", StringComparison.OrdinalIgnoreCase))
+        {
+            if (_privilegeWarningLogged) return;
+            _privilegeWarningLogged = true;
+            AppLog.Write("PresentMon : accès limité aux processus du compte courant (mode non administrateur).");
+            return;
+        }
+        if (line.TrimStart().StartsWith("short-running", StringComparison.OrdinalIgnoreCase) ||
+            line.TrimStart().StartsWith("be listed as", StringComparison.OrdinalIgnoreCase) ||
+            line.TrimStart().StartsWith("-terminate_on_proc_exit", StringComparison.OrdinalIgnoreCase)) return;
+
+        AppLog.Write($"PresentMon : {line}");
     }
 
     private void ParseFrameLine(string? line)
@@ -159,8 +183,36 @@ public sealed class GameFrameRateService : IDisposable
         var process = _captureProcess;
         _captureProcess = null;
         if (process is null) return;
-        try { if (!process.HasExited) process.Kill(true); } catch { }
+        try
+        {
+            if (!process.HasExited)
+            {
+                lock (_sync) _intentionalStopProcessIds.Add(process.Id);
+                StopTraceSession();
+                if (!process.WaitForExit(2000))
+                {
+                    process.Kill(true);
+                    process.WaitForExit(1000);
+                }
+            }
+        }
+        catch (InvalidOperationException) { }
+        catch (Win32Exception ex) { AppLog.Write($"Arrêt de PresentMon incomplet : {ex.Message}"); }
+        catch (IOException ex) { AppLog.Write($"Arrêt de PresentMon incomplet : {ex.Message}"); }
         process.Dispose();
+    }
+
+    private void StopTraceSession()
+    {
+        using var terminator = Process.Start(new ProcessStartInfo
+        {
+            FileName = _presentMonPath,
+            Arguments = "-session_name FlexHub -terminate_existing",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WindowStyle = ProcessWindowStyle.Hidden
+        });
+        terminator?.WaitForExit(1500);
     }
 
     private static int SafeExitCode(Process process)

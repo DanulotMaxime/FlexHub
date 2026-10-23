@@ -9,6 +9,16 @@ Projet officiel : https://github.com/LibreHardwareMonitor/LibreHardwareMonitor
 Ce composant est distribué sous licence Mozilla Public License 2.0 (MPL-2.0).
 Le texte de la licence est disponible à l’adresse : https://www.mozilla.org/MPL/2.0/
 
+## PawnIO
+
+FlexHub distribue l’installateur officiel signé PawnIO 2.2.0 afin de permettre à LibreHardwareMonitor de lire les capteurs CPU protégés sur les versions récentes de Windows.
+
+Projet officiel : https://github.com/namazso/PawnIO
+
+Installateur officiel : https://github.com/namazso/PawnIO.Setup
+
+PawnIO est distribué sous licence GNU General Public License v2.0. Le pilote est installé séparément avec l’accord administrateur de l’utilisateur et peut être partagé avec d’autres logiciels de monitoring.
+
 ## NVIDIA Profile Inspector
 
 FlexHub distribue NVIDIA Profile Inspector, projet open source de Orbmu2k, sous licence MIT.

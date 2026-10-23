@@ -248,8 +248,9 @@ public sealed class DailyActivityReportService : IDisposable
     {
         try
         {
-            var file = new FileInfo(path);
-            if (file.Exists && IsUsefulPersonalFile(file)) _modifiedFiles[path] = DateTime.Now;
+            // Les événements peuvent arriver par centaines pendant une copie ou un déplacement.
+            // Éviter toute lecture de métadonnées ici maintient l'Explorateur réactif.
+            if (IsUsefulPersonalFile(path)) _modifiedFiles[path] = DateTime.Now;
         }
         catch { }
     }
@@ -359,15 +360,15 @@ public sealed class DailyActivityReportService : IDisposable
         return $"{(percentage >= 0 ? "+" : string.Empty)}{percentage:0}%";
     }
 
-    private static bool IsUsefulPersonalFile(FileInfo file)
+    private static bool IsUsefulPersonalFile(string path)
     {
-        var segments = file.FullName.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+        var segments = path.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
         if (segments.Any(segment => segment.Equals("bin", StringComparison.OrdinalIgnoreCase) ||
                                     segment.Equals("obj", StringComparison.OrdinalIgnoreCase) ||
                                     segment.Equals(".git", StringComparison.OrdinalIgnoreCase) ||
                                     segment.Equals(".vs", StringComparison.OrdinalIgnoreCase) ||
                                     segment.Equals("node_modules", StringComparison.OrdinalIgnoreCase))) return false;
-        return file.Extension.ToLowerInvariant() is not (".dll" or ".pdb" or ".cache" or ".tmp" or ".log" or ".obj" or ".ilk");
+        return Path.GetExtension(path).ToLowerInvariant() is not (".dll" or ".pdb" or ".cache" or ".tmp" or ".log" or ".obj" or ".ilk");
     }
 
     private static string GetFolderLabel(FileInfo file)

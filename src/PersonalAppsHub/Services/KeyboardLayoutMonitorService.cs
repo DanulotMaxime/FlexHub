@@ -24,6 +24,7 @@ public sealed class KeyboardLayoutMonitorService : IDisposable
     private IntPtr _focusHook;
     private ActiveOverride? _activeOverride;
     private System.Threading.Timer? _foregroundTimer;
+    private int _foregroundProbeQueued;
 
     public KeyboardLayoutMonitorService() => _callback = OnForegroundChanged;
 
@@ -67,7 +68,21 @@ public sealed class KeyboardLayoutMonitorService : IDisposable
     }
 
     private void OnForegroundChanged(IntPtr hook, uint eventType, IntPtr window, int objectId,
-        int childId, uint eventThread, uint eventTime) => HandleForegroundWindow(GetForegroundWindow());
+        int childId, uint eventThread, uint eventTime)
+    {
+        // Ne jamais exécuter UI Automation dans le rappel WinEvent : certains contrôles
+        // du shell répondent lentement et pouvaient alors figer le déplacement des fenêtres.
+        if (Interlocked.Exchange(ref _foregroundProbeQueued, 1) != 0) return;
+        ThreadPool.QueueUserWorkItem(_ =>
+        {
+            try
+            {
+                Thread.Sleep(35);
+                HandleForegroundWindow(GetForegroundWindow());
+            }
+            finally { Interlocked.Exchange(ref _foregroundProbeQueued, 0); }
+        });
+    }
 
     private void CheckForegroundWindow(object? state)
     {
@@ -94,6 +109,7 @@ public sealed class KeyboardLayoutMonitorService : IDisposable
                 return;
 
             RestorePreviousLayout(window);
+            if (IsWindowsShellWindow(window)) return;
             if (focusedWindow == IntPtr.Zero || !IsEditableControl(focusedWindow)) return;
 
             var currentLayout = GetKeyboardLayout(threadId);
@@ -173,6 +189,16 @@ public sealed class KeyboardLayoutMonitorService : IDisposable
                name.Contains("TextBox", StringComparison.OrdinalIgnoreCase) ||
                name.Contains("RenderWidgetHost", StringComparison.OrdinalIgnoreCase);
     }
+
+    private static bool IsWindowsShellWindow(IntPtr window)
+    {
+        var className = new StringBuilder(128);
+        if (GetClassName(window, className, className.Capacity) <= 0) return false;
+        return IsWindowsShellClass(className.ToString());
+    }
+
+    public static bool IsWindowsShellClass(string className) => className is
+        "CabinetWClass" or "ExploreWClass" or "Progman" or "WorkerW" or "Shell_TrayWnd";
 
     private static IntPtr FindInstalledLayout(ushort primaryLanguage)
     {

@@ -7,7 +7,7 @@ namespace PersonalAppsHub.Services;
 
 public sealed record SystemMetrics(double CpuPercent, double RamPercent, double RamUsedGb, double RamTotalGb,
     double? GpuPercent, double? VramPercent, double? VramUsedGb, double? VramTotalGb,
-    double? GpuTemperatureC, double? CpuPowerWatts, bool CpuPowerIsEstimated,
+    double? GpuTemperatureC, double? CpuTemperatureC, double? CpuPowerWatts, bool CpuPowerIsEstimated,
     double? GpuPowerWatts, double? GpuPowerLimitWatts,
     string? TopCpuProcessText, string? TopRamProcessText, DateTime CapturedAt)
 {
@@ -20,11 +20,14 @@ public sealed class SystemMonitoringService : IDisposable
 {
     private static readonly TimeSpan CpuPowerRefreshInterval = TimeSpan.FromSeconds(15);
     private readonly Computer _hardware = new() { IsCpuEnabled = true, IsGpuEnabled = true };
+    private readonly FrameViewCpuMetricsService _frameViewCpuMetrics = new();
     private bool _hardwareOpened;
     private ulong? _previousIdle;
     private ulong? _previousTotal;
     private double? _cachedCpuPowerWatts;
+    private double? _cachedCpuTemperatureC;
     private DateTime _lastCpuPowerReadUtc = DateTime.MinValue;
+    private bool _cpuSensorDiagnosticLogged;
     private readonly Dictionary<int, TimeSpan> _previousProcessCpu = new();
     private DateTime? _previousProcessSampleUtc;
 
@@ -36,7 +39,13 @@ public sealed class SystemMonitoringService : IDisposable
         var gpu = await ReadNvidiaMetricsAsync(cancellationToken) ?? ReadHardwareGpuMetrics();
         if (DateTime.UtcNow - _lastCpuPowerReadUtc >= CpuPowerRefreshInterval)
         {
-            _cachedCpuPowerWatts = await ReadCpuPowerAsync(cancellationToken);
+            var sensorPower = await ReadCpuPowerAsync(cancellationToken);
+            var sensorTemperature = ReadCpuTemperatureFromHardwareSensors();
+            var frameView = sensorPower.HasValue && sensorTemperature.HasValue
+                ? default
+                : await Task.Run(_frameViewCpuMetrics.Capture, cancellationToken);
+            _cachedCpuPowerWatts = sensorPower ?? frameView.PackagePowerWatts;
+            _cachedCpuTemperatureC = sensorTemperature ?? frameView.PackageTemperatureC;
             _lastCpuPowerReadUtc = DateTime.UtcNow;
         }
         var processes = await processesTask;
@@ -44,7 +53,7 @@ public sealed class SystemMonitoringService : IDisposable
         var cpuPowerIsEstimated = !cpuPower.HasValue;
         cpuPower ??= EstimateCpuPower(cpu);
         return new SystemMetrics(cpu, ramPercent, ramUsed, ramTotal, gpu?.Usage,
-            gpu?.VramPercent, gpu?.VramUsedGb, gpu?.VramTotalGb, gpu?.Temperature,
+            gpu?.VramPercent, gpu?.VramUsedGb, gpu?.VramTotalGb, gpu?.Temperature, _cachedCpuTemperatureC,
             cpuPower, cpuPowerIsEstimated, gpu?.PowerWatts, gpu?.PowerLimitWatts,
             processes.TopCpu, processes.TopRam, DateTime.Now);
     }
@@ -64,6 +73,7 @@ public sealed class SystemMonitoringService : IDisposable
             foreach (var hardware in _hardware.Hardware.Where(item => item.HardwareType == HardwareType.Cpu))
             {
                 hardware.Update();
+                LogCpuSensorsOnce(hardware);
                 var sensors = hardware.Sensors.Where(sensor => sensor.SensorType == SensorType.Power && sensor.Value.HasValue).ToArray();
                 if (sensors.Length == 0) continue;
                 var package = sensors.FirstOrDefault(sensor => sensor.Name.Contains("Package", StringComparison.OrdinalIgnoreCase))?.Value;
@@ -76,6 +86,39 @@ public sealed class SystemMonitoringService : IDisposable
         }
         catch (Exception ex) { AppLog.Write($"Capteur de puissance CPU indisponible : {ex.Message}"); }
         return null;
+    }
+
+    private double? ReadCpuTemperatureFromHardwareSensors()
+    {
+        try
+        {
+            EnsureHardwareOpen();
+            foreach (var hardware in _hardware.Hardware.Where(item => item.HardwareType == HardwareType.Cpu))
+            {
+                hardware.Update();
+                LogCpuSensorsOnce(hardware);
+                var sensors = hardware.Sensors.Where(sensor => sensor.SensorType == SensorType.Temperature && sensor.Value.HasValue).ToArray();
+                var package = sensors.FirstOrDefault(sensor =>
+                    sensor.Name.Contains("Package", StringComparison.OrdinalIgnoreCase) ||
+                    sensor.Name.Contains("Tctl", StringComparison.OrdinalIgnoreCase) ||
+                    sensor.Name.Contains("Tdie", StringComparison.OrdinalIgnoreCase))?.Value;
+                var value = package ?? sensors.Max(sensor => (float?)sensor.Value);
+                if (value is > 0 and < 125) return value.Value;
+            }
+        }
+        catch (Exception ex) { AppLog.Write($"Température CPU indisponible : {ex.Message}"); }
+        return null;
+    }
+
+    private void LogCpuSensorsOnce(IHardware hardware)
+    {
+        if (_cpuSensorDiagnosticLogged) return;
+        _cpuSensorDiagnosticLogged = true;
+        var sensors = hardware.Sensors
+            .Where(sensor => sensor.SensorType is SensorType.Temperature or SensorType.Power)
+            .Select(sensor => $"{sensor.SensorType}:{sensor.Name}={sensor.Value?.ToString("0.0", CultureInfo.InvariantCulture) ?? "null"}")
+            .ToArray();
+        AppLog.Write($"CAPTEURS CPU | {hardware.Name} | {(sensors.Length == 0 ? "aucun capteur température/puissance" : string.Join("; ", sensors))}");
     }
 
     private static double EstimateCpuPower(double cpuPercent)
@@ -174,6 +217,7 @@ public sealed class SystemMonitoringService : IDisposable
 
     public void Dispose()
     {
+        _frameViewCpuMetrics.Dispose();
         if (_hardwareOpened) _hardware.Close();
     }
 
